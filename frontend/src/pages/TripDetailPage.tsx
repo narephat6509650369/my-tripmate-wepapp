@@ -6,10 +6,12 @@ import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { ArrowLeft, Users, Calendar, DollarSign } from 'lucide-react';
 import { mockTrips, mockVoteCategories } from '../data/mockData';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const TripDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   
   const trip = mockTrips.find(t => t.id === Number(id));
 
@@ -36,11 +38,11 @@ export const TripDetailPage: React.FC = () => {
           onClick={() => navigate('/trips')}
           className="mb-6"
         >
-          <ArrowLeft className="w-5 h-5 mr-2" />
+          <ArrowLeft className="w-5 h-5 mr-2 inline" />
           Back to Trips
         </Button>
 
-        {/* Trip Header */}
+        {/* Trip Image */}
         {trip.imageUrl && (
           <img
             src={trip.imageUrl}
@@ -49,14 +51,11 @@ export const TripDetailPage: React.FC = () => {
           />
         )}
 
+        {/* Trip Header */}
         <div className="bg-white rounded-xl p-6 shadow-md mb-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">{trip.name}</h1>
-              <p className="text-gray-600 mb-3">{trip.description}</p>
-              <Badge variant="warning">กำลังวางแผน</Badge>
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">{trip.name}</h1>
+          <p className="text-gray-600 mb-3">{trip.description}</p>
+          <Badge variant="warning">กำลังวางแผน</Badge>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
             <div className="flex items-center gap-3">

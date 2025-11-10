@@ -1,3 +1,9 @@
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export interface Trip {
   id: number;
   name: string;
@@ -13,7 +19,7 @@ export interface Trip {
 export interface VoteOption {
   id: number;
   text: string;
-  votes: string[]; // รายชื่อคนโหวต
+  votes: string[];
 }
 
 export interface VoteCategory {

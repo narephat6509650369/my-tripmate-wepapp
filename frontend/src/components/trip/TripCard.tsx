@@ -11,21 +11,15 @@ interface TripCardProps {
 
 export const TripCard: React.FC<TripCardProps> = ({ trip, onClick }) => {
   const getStatusVariant = (status: Trip['status']) => {
-    switch (status) {
-      case 'confirmed': return 'success';
-      case 'planning': return 'warning';
-      case 'completed': return 'info';
-      default: return 'default';
-    }
+    if (status === 'confirmed') return 'success';
+    if (status === 'planning') return 'warning';
+    return 'info';
   };
 
   const getStatusText = (status: Trip['status']) => {
-    switch (status) {
-      case 'confirmed': return 'ยืนยันแล้ว';
-      case 'planning': return 'กำลังวางแผน';
-      case 'completed': return 'เสร็จสิ้น';
-      default: return status;
-    }
+    if (status === 'confirmed') return 'ยืนยันแล้ว';
+    if (status === 'planning') return 'กำลังวางแผน';
+    return 'เสร็จสิ้น';
   };
 
   return (
@@ -38,15 +32,11 @@ export const TripCard: React.FC<TripCardProps> = ({ trip, onClick }) => {
         />
       )}
       <div className="p-6">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-800 mb-2">{trip.name}</h3>
-            <p className="text-gray-600 text-sm mb-3">{trip.description}</p>
-            <Badge variant={getStatusVariant(trip.status)}>
-              {getStatusText(trip.status)}
-            </Badge>
-          </div>
-        </div>
+        <h3 className="text-xl font-bold text-gray-800 mb-2">{trip.name}</h3>
+        <p className="text-gray-600 text-sm mb-3">{trip.description}</p>
+        <Badge variant={getStatusVariant(trip.status)}>
+          {getStatusText(trip.status)}
+        </Badge>
 
         <div className="grid grid-cols-2 gap-4 mt-4 text-sm text-gray-600">
           <div className="flex items-center gap-2">
