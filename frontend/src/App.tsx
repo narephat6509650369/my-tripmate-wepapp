@@ -4,13 +4,16 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 
 import { Loading } from './components/common/Loading';
-import HomePage from "./pages/HomePage";
+// import HomePage from "./pages/HomePage";
+import { LanguageProvider } from './contexts/LanguageContext';
+import { HomePage } from './pages/HomePage';
 import { GoogleSuccessPage } from './pages/GoogleSuccessPage';
 
 
 const App: React.FC = () => {
   return (
     <BrowserRouter>
+    <LanguageProvider>
       <AuthProvider>
         <Routes>
           <Route path="/HomePage" element={<HomePage />} />
@@ -18,6 +21,7 @@ const App: React.FC = () => {
           <Route path="/" element={<LoginPage />} />
         </Routes>
       </AuthProvider>
+      </LanguageProvider>
     </BrowserRouter>
   );
 };

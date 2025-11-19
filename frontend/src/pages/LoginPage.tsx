@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import bgImage from '../assets/login-bg.jpg';
 import '../styles/Login.css';
 
 export const LoginPage: React.FC = () => {
@@ -21,7 +21,10 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="wrap-login100">
-      <div className="login100-more" />
+      <div 
+        className="login100-more" 
+        style={{ backgroundImage: `url(${bgImage})` }}
+      />
 
       <div className="login100-form-container">
         <form className="login100-form" onSubmit={handleGoogleLogin}>
