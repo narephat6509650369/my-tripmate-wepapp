@@ -1,7 +1,6 @@
 // ==========================================
 // 📁 src/services/authService.ts
 // ==========================================
-
 import api from './api';
 import { User, ApiResponse } from '../types';
 
@@ -12,30 +11,23 @@ export interface LoginData {
 
 export interface RegisterData extends LoginData {
   name: string;
+  passwordConfirm: string;
 }
 
 export const authService = {
-  async register(data: RegisterData): Promise<{ token: string; user: User }> {
-    const response = await api.post<ApiResponse<{ token: string; user: User }>>(
+  async register(data: RegisterData): Promise<{ user: User }> {
+    const response = await api.post<ApiResponse<{ user: User }>>(
       '/auth/register',
       data
-    );
-    if (response.data.data?.token) {
-      localStorage.setItem('token', response.data.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.data.user));
-    }
-    return response.data.data!;
-  },
+  );
 
-  async login(data: LoginData): Promise<{ token: string; user: User }> {
-    const response = await api.post<{ token: string; user: User }>('/auth/login', data);
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    }
-    return response.data;
-  },
+  const user = response.data.data?.user;
+  if (!user) throw new Error('Register failed');
 
+  localStorage.setItem('user', JSON.stringify(user));
+  return { user };
+}
+,
   async getMe(): Promise<User> {
     const response = await api.get<{ user: User }>('/auth/me');
     return response.data.user;

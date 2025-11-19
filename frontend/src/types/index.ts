@@ -6,6 +6,8 @@ export interface User {
   id: number;
   email: string;
   name: string;
+  password?: string;
+  email_verified: boolean;
   avatar_url?: string;
 }
 
@@ -77,3 +79,4 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+  

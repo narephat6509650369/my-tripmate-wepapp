@@ -92,33 +92,18 @@
 // 📁 src/pages/LoginPage.tsx
 // ==========================================
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+
 import '../styles/Login.css';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      await login(email, password);
-      navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid email or password');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoogleLogin = () => {
     window.location.href = 'http://localhost:5000/api/auth/google';
@@ -129,7 +114,7 @@ export const LoginPage: React.FC = () => {
       <div className="login100-more" />
 
       <div className="login100-form-container">
-        <form className="login100-form" onSubmit={handleLogin}>
+        <form className="login100-form" onSubmit={handleGoogleLogin}>
           <div className="form-header">
             <h2 className="login100-form-title">Welcome Back 👋</h2>
             <p className="login100-form-subtitle">
