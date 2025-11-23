@@ -100,13 +100,7 @@ export const getMe = async (req: Request, res: Response) => {
   res.json({ user });
 };
 
-/**
- * @swagger
- * /auth/google/callback:
- *   get:
- *     summary: Google OAuth callback
- *     tags: [Auth]
- */
+
 export const googleCallback = (req: Request, res: Response) => {
   const user = (req as any).user;
   if (!user) return res.status(401).json({ error: "User not found" });
@@ -115,31 +109,12 @@ export const googleCallback = (req: Request, res: Response) => {
   res.redirect(`http://localhost:5173/google-success?token=${token}&email_verified=${verified}`);
 };
 
-/**
- * @swagger
- * /auth/logout:
- *   get:
- *     summary: Logout user
- *     tags: [Auth]
- *     responses:
- *       200:
- *         description: Logout successful
- *       500:
- *         description: Server error
- */
+
 export const logout = (req: Request, res: Response) => {
   req.logout((err) => {
     if (err) return res.status(500).json({ error: "Logout failed" });
+    console.log("token before logout:", req.headers.authorization);
 
-    /*// ทำลาย session อย่างสมบูรณ์
-    req.session?.destroy((err) => {
-      if (err) return res.status(500).json({ error: "Failed to destroy session" });
-
-      // ลบ session cookie ของ Passport
-      res.clearCookie("connect.sid");
-
-      res.json({ message: "Logged out successfully" });
-    });*/
   });
 };
 

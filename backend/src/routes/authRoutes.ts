@@ -26,23 +26,6 @@ router.get(
   googleCallback // ✅ ใช้ controller แทน inline
 );
 
-/*
-// 🔹 Login failed
-router.get("/login/failed", (req, res) => {
-  res.status(401).json({ error: "Google login failed" });
-});
-
-// 🔹 Login success (test endpoint)
-router.get("/login/success", (req, res) => {
-  const user = req.user as User;
-  if (user) {
-    const token = generateToken(user.id);
-    res.json({ token });
-  } else {
-    res.status(401).json({ error: "User not authenticated" });
-  }
-});
-*/
 // 🔹 Logout
 router.get("/logout", logout);
 

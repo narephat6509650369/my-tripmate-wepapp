@@ -22,6 +22,8 @@ export const Header: React.FC = () => {
     setLanguage(language === 'th' ? 'en' : 'th');
   };
 
+  const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? "?";
+
   return (
     <>
       <header className="bg-white shadow-md sticky top-0 z-40">
@@ -82,21 +84,23 @@ export const Header: React.FC = () => {
             {/* User Info (Desktop) */}
             <div className="hidden md:flex items-center gap-2">
               <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-                {user?.name.charAt(0).toUpperCase()}
+                {userInitial}
               </div>
               <span className="text-sm font-medium text-gray-700">
-                {user?.name}
+                {user?.name ?? "Guest"}
               </span>
             </div>
 
             {/* Logout (Desktop) */}
-            <button
-              onClick={handleLogout}
-              className="hidden md:block p-2 hover:bg-gray-100 rounded-full transition-colors"
-              title="Logout"
-            >
-              <LogOut className="w-5 h-5 text-gray-600" />
-            </button>
+            {user && (
+              <button
+                onClick={handleLogout}
+                className="hidden md:block p-2 hover:bg-gray-100 rounded-full transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5 text-gray-600" />
+              </button>
+            )}
 
             {/* Mobile Menu Button */}
             <button
@@ -119,11 +123,11 @@ export const Header: React.FC = () => {
               {/* User Info */}
               <div className="flex items-center gap-3 pb-4 border-b">
                 <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-                  {user?.name.charAt(0).toUpperCase()}
+                  {userInitial}
                 </div>
                 <div>
-                  <div className="font-medium text-gray-800">{user?.name}</div>
-                  <div className="text-sm text-gray-600">{user?.email}</div>
+                  <div className="font-medium text-gray-800">{user?.name ?? "Guest"}</div>
+                  <div className="text-sm text-gray-600">{user?.email ?? "—"}</div>
                 </div>
               </div>
 
@@ -136,6 +140,7 @@ export const Header: React.FC = () => {
               >
                 {t('nav.home')}
               </button>
+
               <button
                 onClick={() => {
                   navigate('/trips');
@@ -145,12 +150,15 @@ export const Header: React.FC = () => {
               >
                 {t('nav.trips')}
               </button>
-              <button
-                onClick={handleLogout}
-                className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Logout
-              </button>
+
+              {user && (
+                <button
+                  onClick={handleLogout}
+                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Logout
+                </button>
+              )}
             </nav>
           </div>
         )}
