@@ -5,11 +5,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-  "dev": "node --loader ts-node/esm src/server.ts",
-  "build": "tsc",
-  "start": "node dist/server.js"
-},
-
+    "dev": "node --loader ts-node/esm src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -28,6 +27,8 @@
     "express-session": "^1.18.2",
     "mysql2": "^3.15.3",
     "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0"
+    "passport-google-oauth20": "^2.0.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   }
 }
