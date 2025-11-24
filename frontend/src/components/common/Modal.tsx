@@ -1,7 +1,3 @@
-// ==========================================
-// 📁 src/components/common/Modal.tsx
-// ==========================================
-
 import React, { ReactNode, useEffect } from 'react';
 import { X } from 'lucide-react';
 
@@ -21,11 +17,7 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
 }) => {
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
+    document.body.style.overflow = isOpen ? 'hidden' : 'unset';
     return () => {
       document.body.style.overflow = 'unset';
     };
@@ -43,7 +35,7 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black bg-opacity-50"
+        className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
       <div
@@ -51,15 +43,16 @@ export const Modal: React.FC<ModalProps> = ({
       >
         {title && (
           <div className="flex items-center justify-between p-6 border-b">
-            <h3 className="text-xl font-bold text-gray-800">{title}</h3>
+            <h3 className="text-xl font-bold">{title}</h3>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-1 hover:bg-gray-100 rounded-full"
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="w-5 h-5 text-gray-600" />
             </button>
           </div>
         )}
+
         <div className="p-6 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>

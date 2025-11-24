@@ -8,7 +8,7 @@ import { Loading } from './components/common/Loading';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { HomePage } from './pages/HomePage';
 import { GoogleSuccessPage } from './pages/GoogleSuccessPage';
-
+import { Dashboard } from './pages/Dashboard';
 
 const App: React.FC = () => {
   return (
@@ -17,6 +17,7 @@ const App: React.FC = () => {
       <AuthProvider>
         <Routes>
           <Route path="/HomePage" element={<HomePage />} />
+          <Route path="/Dashboard" element={<Dashboard />} />      
           <Route path="/google-success" element={<GoogleSuccessPage />} />
           <Route path="/" element={<LoginPage />} />
         </Routes>
