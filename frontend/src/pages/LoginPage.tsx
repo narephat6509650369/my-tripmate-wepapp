@@ -3,17 +3,14 @@
 // ==========================================
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import bgImage from '../assets/login-bg.jpg';
 import '../styles/Login.css';
 
 export const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  
 
   const handleGoogleLogin = () => {
     console.log("User clicked Google Login");
