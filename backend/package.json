@@ -8,7 +8,9 @@
     "dev": "node --loader ts-node/esm src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test-user": "ts-node test/test.ts"
+    "testuser": "node --loader ts-node/esm src/test/testDelete.ts",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
   },
   "keywords": [],
   "author": "",
@@ -16,9 +18,10 @@
   "devDependencies": {
     "@types/express": "^5.0.5",
     "@types/express-session": "^1.18.2",
-    "@types/node": "^24.9.2",
+    "@types/node": "^24.10.1",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
+    "@types/uuid": "^9.0.8",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
@@ -26,10 +29,12 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-session": "^1.18.2",
+    "google-auth-library": "^10.5.0",
     "mysql2": "^3.15.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^9.0.1"
   }
 }

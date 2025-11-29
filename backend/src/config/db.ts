@@ -1,15 +1,17 @@
-import { env } from "process";
+import dotenv from 'dotenv';
+
+dotenv.config(); 
 
 import mysql from 'mysql2/promise';
 
 export const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: env.DB_PASSWORD || '',
-  database: env.DB_NAME || 'tripmate',
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'tripmate_app',
+  port: Number(process.env.DB_PORT) || 3306,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
 });
 
-export default pool;
