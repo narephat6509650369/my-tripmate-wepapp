@@ -71,20 +71,22 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* สร้างทริป / เข้าร่วม */}
-        <div className="flex gap-4 mb-6">
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          {/* ปุ่มสร้างทริปใหม่ */}
           <button
             onClick={handleCreateTrip}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-4 rounded-lg transition"
+            className="md:flex-[2] flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-4 rounded-lg transition"
           >
             <Plus className="w-5 h-5" />
             สร้างทริปใหม่
           </button>
 
-          <div className="flex gap-2 w-full md:w-auto">
+          {/* Input + ปุ่มเข้าร่วม */}
+          <div className="md:flex-1 flex gap-2 w-full">
             <input
               type="text"
               placeholder="กรอกเลขห้องเพื่อเข้าร่วม"
-              className="border border-blue-300 rounded-lg px-3 py-2 w-full md:w-56 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 border border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={roomCode}
               onChange={(e) => setRoomCode(e.target.value)}
               onPaste={(e) => setRoomCode(e.clipboardData.getData("text"))}
