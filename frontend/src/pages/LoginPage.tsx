@@ -29,8 +29,9 @@ function LoginPage() {
         `${API_BASE_URL}/auth/google`,
         { access_token: tokenResponse.access_token }
       );
-      const { token } = res.data;
+      const { token , user} = res.data;
       localStorage.setItem('jwtToken', token);
+      window.user_id = user?.id || '';
       navigate('/HomePage');
     } catch (err) {
       console.error('Login failed:', err);

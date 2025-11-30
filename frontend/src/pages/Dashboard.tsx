@@ -125,10 +125,10 @@ const Dashboard: React.FC = () => {
                   cx="50%"
                   cy="50%"
                   outerRadius={80}
-                  label={(entry) => `${entry.name}: ${entry.value}`}
+                  label={(entry: typeof pieData[number]) => `${entry.name}: ${entry.value}`}
                 >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  {pieData.map((entry: typeof pieData[number], index: number) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />

@@ -20,6 +20,7 @@
     "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "recharts": "^3.5.1",
     "sequelize": "^6.37.7",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0"

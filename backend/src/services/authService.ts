@@ -5,7 +5,7 @@ import axios from "axios";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-export const googleLoginService = async (access_token: string): Promise<string> => {
+export const googleLoginService = async (access_token: string): Promise<{ token: string; user: any }> => {
   
   // ดึง user profile จาก Google ด้วย access_token
   const res = await axios.get("https://www.googleapis.com/oauth2/v3/userinfo", {
@@ -19,15 +19,16 @@ export const googleLoginService = async (access_token: string): Promise<string> 
   const user = await findOrCreateUser({
     email: payload.email!,
     fullName: payload.name!,
+    google_id: payload.sub!,
     avatarUrl: payload.picture!,
   });
 
-  // สร้าง JWT ของเรา
-  const token = jwt.sign(
-    { userId: user.user_id, email: user.email },
-    process.env.JWT_SECRET!,
-    { expiresIn: "7d" }
-  );
+// สร้าง JWT ของเรา
+const token = jwt.sign(
+  { userId: user.user_id, email: user.email },
+  process.env.JWT_SECRET!,
+  { expiresIn: "7d" }
+);
 
-  return token;
+return { token, user};
 };

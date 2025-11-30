@@ -16,7 +16,9 @@ const HomePage: React.FC = () => {
     { name: "ทริปพัทยา", days: "2 วัน", people: 5, status: "กำลังรอ", statusColor: "bg-orange-100 text-orange-700", filled: "กรอกแล้ว 3 คน, ยังไม่กรอก 2 คน" }
   ];
 
-  const handleCreateTrip = () => console.log("สร้างทริปใหม่");
+  const handleCreateTrip = () => {
+    console.log("สร้างทริปใหม่");
+  };
   const handleJoinTrip = (code: string) => {
     if (!code) return alert("กรุณากรอกเลขห้อง");
     console.log("เข้าร่วมทริปด้วยเลขห้อง:", code);
