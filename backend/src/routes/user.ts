@@ -6,4 +6,5 @@ const router = express.Router();
 
 router.post('/google', validateGoogleLogin, googleLogin);
 
+
 export default router;
