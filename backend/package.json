@@ -9,6 +9,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "testuser": "node --loader ts-node/esm src/test/testDelete.ts",
+    "testtrip": "vitest src/test/TripController.test.ts",
     "test": "vitest",
     "test:watch": "vitest --watch"
   },

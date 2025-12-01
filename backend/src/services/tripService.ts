@@ -1,16 +1,48 @@
-import {  initializeTrip } from "../models/tripModel.js";
+import { v4 as uuidv4 } from 'uuid';
+import { createTrip, generateInviteCode, generateInviteLink  } from "../models/tripModel.js";
+import type { Trip } from '../models/tripModel.js';
 
-export const tripService = {
-  addTrip: async (userId: string,trip_name: string, description?: string | null, num_days?: number) => {
+
+
+export const tripService = async (userId: string,trip_name: string, description?: string | null, num_days?: number) => {
     const response = await fetch('/api/trips/AddTrip', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify(await initializeTrip({ trip_id: userId, trip_name, description: description || null, num_days: num_days || 1 })),
+        body: JSON.stringify(await initializeTrip({ user_id: userId, trip_name, description: description || null, num_days: num_days || 1 })),
     });
     return response.json();
-  },
-};  
+  };
+  
+export async function initializeTrip(tripData: {
+    user_id: string;
+    trip_name: string;
+    description?: string | null;
+    num_days: number;
+}): Promise<Trip> {
+    const trip_id = uuidv4();
+    const invite_code = await generateInviteCode();
+    const invite_link = await generateInviteLink(trip_id);
 
-export default tripService
+    const newTrip: Trip = {
+        trip_id: trip_id,
+        owner_id: tripData.user_id,
+        trip_name: tripData.trip_name,
+        description: tripData.description || null,
+        num_days: tripData.num_days,
+        invite_code: invite_code,
+        invite_link: invite_link,
+        status: 'planning',
+    };
+    await createTrip(newTrip.trip_id, newTrip.owner_id, newTrip.trip_name, newTrip.description || null, newTrip.num_days, newTrip.invite_code, newTrip.invite_link, newTrip.status);
+    return newTrip;
+}
+
+export async function deleteTrip(trip_id: string, owner_id: string): Promise<void> {
+    await deleteTrip(trip_id, owner_id);
+    return ;
+}
+
+
+export default {tripService, deleteTrip};

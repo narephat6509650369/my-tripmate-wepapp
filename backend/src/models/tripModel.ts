@@ -45,8 +45,8 @@ export async function updateTrip(trip: Trip): Promise<void> {
     );
 }
 
-export async function deleteTrip(tripId: string): Promise<void> {
-    await pool.query('DELETE FROM trips WHERE trip_id = ?', [tripId]);
+export async function deleteTrip(tripId: string,owner_id: string): Promise<void> {
+    await pool.query('DELETE FROM trips WHERE trip_id = ? AND owner_id = ?', [tripId, owner_id]);
 }   
 
 export async function generateInviteCode(): Promise<string> {
@@ -59,52 +59,6 @@ export async function generateInviteLink(tripId: string): Promise<string> {
     return `${baseUrl}/join/${tripId}`;
 }
 
-export async function initializeTrip(tripData: {
-    trip_id: string;
-    trip_name: string;
-    description?: string | null;
-    num_days: number;
-}): Promise<Trip> {
-    const owner_id = uuidv4();
-    const invite_code = await generateInviteCode();
-    const invite_link = await generateInviteLink(tripData.trip_id);
-
-    const newTrip: Trip = {
-        trip_id: tripData.trip_id,
-        owner_id: owner_id,
-        trip_name: tripData.trip_name,
-        description: tripData.description || null,
-        num_days: tripData.num_days,
-        invite_code: invite_code,
-        invite_link: invite_link,
-        status: 'planning',
-    };
-    await createTrip(newTrip.trip_id, newTrip.owner_id, newTrip.trip_name, newTrip.description || null, newTrip.num_days, newTrip.invite_code, newTrip.invite_link, newTrip.status);
-    return newTrip;
-}
-
-export async function initializeTripVoting(tripData: {
-    owner_id: string;
-    trip_name: string;
-    description?: string | null;
-    num_days: number;
-}): Promise<Trip> {
-    const trip_id = crypto.randomUUID();
-    const invite_code = await generateInviteCode();
-    const invite_link = await generateInviteLink(trip_id);
-    const newTrip: Trip = {
-        trip_id,
-        owner_id: tripData.owner_id,
-        trip_name: tripData.trip_name,
-        description: tripData.description ?? null,
-        num_days: tripData.num_days,
-        invite_code,
-        invite_link,
-        status: 'voting',
-    };
-    await createTrip(newTrip.trip_id, newTrip.owner_id, newTrip.trip_name, newTrip.description || null, newTrip.num_days, newTrip.invite_code, newTrip.invite_link, newTrip.status);
-    return newTrip;
-}
 
 export async function deactivateTrip(tripId: string): Promise<void> {
     await pool.query(
@@ -171,16 +125,11 @@ export async function archiveTrip(tripId: string): Promise<void> {
     );
 }
 
-
-
-
 export default {
     createTrip,
     getTripById,
     updateTrip,
     deleteTrip,
-    initializeTrip,
-    initializeTripVoting,
     deactivateTrip,
     activateTrip,
     addMemberToTrip,
@@ -191,3 +140,7 @@ export default {
     completeTrip,
     archiveTrip,
 };
+
+export function initializeTrip(tripData: { user_id: string; trip_name: string; description: string; num_days: number; }) {
+    throw new Error("Function not implemented.");
+}
