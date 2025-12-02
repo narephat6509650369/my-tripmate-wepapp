@@ -119,23 +119,26 @@ const Dashboard: React.FC = () => {
 
             <h2 className="text-xl font-semibold mt-10 mb-2 text-blue-900">สัดส่วนผู้เข้าร่วมทั้งหมด</h2>
             <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  label={(entry: typeof pieData[number]) => `${entry.name}: ${entry.value}`}
-                >
-                  {pieData.map((entry: typeof pieData[number], index: number) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            <PieChart>
+              <Pie
+                data={pieData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                label={({ name, value }) => `${name}: ${value}`}
+              >
+                {pieData.map((entry: typeof pieData[number], index: number) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}  // ใช้สีจาก COLORS ที่กำหนดไว้
+                  />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
           </>
         )}
 
