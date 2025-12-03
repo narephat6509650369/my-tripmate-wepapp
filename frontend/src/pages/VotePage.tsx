@@ -2,6 +2,15 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Check, X, Copy, Plus, Info } from "lucide-react";
 import Header from "../components/Header";
 import { useNavigate } from "react-router-dom";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
 
 // ---------------- Interfaces ----------------
 interface Member {
@@ -196,6 +205,11 @@ const VotePage: React.FC = () => {
   const [copied, setCopied] = useState<string | null>(null);
 
   const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("jwtToken");
+    navigate("/");
+  };
 
   const goHome = () => {
     navigate("/homepage");
@@ -416,7 +430,7 @@ const VotePage: React.FC = () => {
 
       setTrip(prev => ({
         ...prev,
-        members: prev.members.map(m => 
+        members: prev.members.map(m =>
           m.id === memberBudget.id ? { ...m, budget: updatedBudget } : m
         )
       }));
@@ -424,32 +438,6 @@ const VotePage: React.FC = () => {
 
     return (
       <div className="space-y-6">
-        {/* Budget Comparison Charts */}
-        <div className="bg-white p-6 rounded-xl shadow-lg">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">การกระจายงบประมาณของสมาชิกทั้งหมด</h3>
-          
-          <div className="flex flex-wrap gap-4 mb-4 text-sm text-gray-700">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-red-500"></span>
-              <span>จุดสีแดง = งบของเรา</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-[3px] bg-blue-500"></span>
-              <span>เส้นสีน้ำเงิน = ค่ากึ่งกลาง (Median) ของสมาชิกทั้งหมด</span>
-            </div>
-          </div>  
-
-          {BUDGET_CATEGORIES.map(({ key, label, color }) => (
-            <RangeBar
-              key={key}
-              stats={budgetStats[key]}
-              label={label}
-              color={color}
-              currentValue={memberBudget.budget[key]}
-            />
-          ))}
-        </div>
-
         {/* Budget Input Table */}
         <div className="bg-white p-6 rounded-xl shadow-lg">
           <h3 className="text-xl font-bold text-gray-800 mb-4">แก้ไขงบประมาณ</h3>
@@ -496,6 +484,32 @@ const VotePage: React.FC = () => {
           </div>
         </div>
 
+        {/* Budget Comparison Charts */}
+        <div className="bg-white p-6 rounded-xl shadow-lg">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">การกระจายงบประมาณของสมาชิกทั้งหมด</h3>
+          
+          <div className="flex flex-wrap gap-4 mb-4 text-sm text-gray-700">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-500"></span>
+              <span>จุดสีแดง = งบของเรา</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-[3px] bg-blue-500"></span>
+              <span>เส้นสีน้ำเงิน = ค่ากึ่งกลาง (Median) ของสมาชิกทั้งหมด</span>
+            </div>
+          </div>  
+
+          {BUDGET_CATEGORIES.map(({ key, label, color }) => (
+            <RangeBar
+              key={key}
+              stats={budgetStats[key]}
+              label={label}
+              color={color}
+              currentValue={memberBudget.budget[key]}
+            />
+          ))}
+        </div>
+
         {/* History Log */}
         <div className="bg-white p-6 rounded-xl shadow-lg">
           <h3 className="text-lg font-bold text-gray-800 mb-3">ประวัติการแก้ไข</h3>
@@ -518,14 +532,213 @@ const VotePage: React.FC = () => {
     );
   };
 
+  // ---------------- STEP 4: PLACE VOTING ----------------
+  const StepPlace = () => {
+    const provinces = [
+      "กรุงเทพมหานคร","กระบี่","กาญจนบุรี","กาฬสินธุ์","กำแพงเพชร",
+      "ขอนแก่น","จันทบุรี","ฉะเชิงเทรา","ชลบุรี","ชัยนาท",
+      "ชัยภูมิ","ชุมพร","เชียงราย","เชียงใหม่","ตรัง",
+      "ตราด","ตาก","นครนายก","นครปฐม","นครพนม",
+      "นครราชสีมา","นครศรีธรรมราช","นครสวรรค์","นนทบุรี","นราธิวาส",
+      "น่าน","บึงกาฬ","บุรีรัมย์","ปทุมธานี","ประจวบคีรีขันธ์",
+      "ปราจีนบุรี","ปัตตานี","พระนครศรีอยุธยา","พะเยา","พังงา",
+    "พัทลุง","พิจิตร","พิษณุโลก","เพชรบุรี","เพชรบูรณ์",
+    "แพร่","ภูเก็ต","มหาสารคาม","มุกดาหาร","แม่ฮ่องสอน",
+    "ยโสธร","ยะลา","ร้อยเอ็ด","ระนอง","ระยอง",
+    "ราชบุรี","ลพบุรี","ลำปาง","ลำพูน","เลย",
+    "ศรีสะเกษ","สกลนคร","สงขลา","สตูล","สมุทรปราการ",
+    "สมุทรสงคราม","สมุทรสาคร","สระแก้ว","สระบุรี","สิงห์บุรี",
+    "สุโขทัย","สุพรรณบุรี","สุราษฎร์ธานี","สุรินทร์","หนองคาย",
+    "หนองบัวลำภู","อ่างทอง","อุดรธานี","อุทัยธานี","อุตรดิตถ์",
+    "อุบลราชธานี"
+  ];
+
+    const weights = [3, 2, 1];
+    const [globalScores, setGlobalScores] = useState<{ [key: string]: number }>({});
+    const [myVote, setMyVote] = useState<(string | "")[]>(["", "", ""]);
+    const [error, setError] = useState("");
+    const [submitted, setSubmitted] = useState(false);
+    const [voteHistory, setVoteHistory] = useState<string[]>([]);
+
+    const handleSelect = (index: number, value: string) => {
+      if (myVote.includes(value)) return;
+      const updated = [...myVote];
+      updated[index] = value;
+      setMyVote(updated);
+    };
+
+    const submitVotes = () => {
+      if (myVote.includes("")) {
+        setError("กรุณาเลือกครบ 3 อันดับก่อนส่งคะแนน");
+        return;
+      }
+      setError("");
+
+      const newScores = { ...globalScores };
+
+      if (submitted) {
+        // ลบคะแนนเก่า
+        myVote.forEach((province, index) => {
+          newScores[province] = (newScores[province] || 0) - weights[index];
+          if (newScores[province] <= 0) delete newScores[province];
+        });
+      }
+
+      // เพิ่มคะแนนใหม่
+      myVote.forEach((province, index) => {
+        newScores[province] = (newScores[province] || 0) + weights[index];
+      });
+
+      setGlobalScores(newScores);
+      setSubmitted(true);
+
+      // เพิ่ม log
+      const logEntry = `คุณ: 🥇${myVote[0]} 🥈${myVote[1]} 🥉${myVote[2]}`;
+      setVoteHistory(prev => [logEntry, ...prev]);
+    };
+
+    const sortedProvinces = Object.entries(globalScores)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+
+    return (
+      <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-lg">
+        <h2 className="text-2xl font-bold mb-6 text-gray-800">
+          เลือกจังหวัดที่อยากไป (อันดับ 1–3)
+        </h2>
+
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+          <p className="font-semibold text-blue-900">วิธีคำนวณคะแนน (Borda Count):</p>
+          <ul className="mt-2 space-y-1 text-blue-800">
+            <li>• อันดับ 1 = 3 คะแนน</li>
+            <li>• อันดับ 2 = 2 คะแนน</li>
+            <li>• อันดับ 3 = 1 คะแนน</li>
+          </ul>
+        </div>
+
+        {[0,1,2].map(i => (
+          <div key={i} className="mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              {i===0?'🥇':i===1?'🥈':'🥉'} อันดับ {i+1} ({weights[i]} คะแนน):
+            </label>
+            <select
+              value={myVote[i]}
+              onChange={e => handleSelect(i, e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none transition"
+            >
+              <option value="">-- เลือกจังหวัด --</option>
+              {provinces.map(p => (
+                <option key={p} value={p} disabled={myVote.includes(p) && myVote[i] !== p}>{p}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded">
+            <p className="text-red-700 font-medium">{error}</p>
+          </div>
+        )}
+
+        <button
+          onClick={submitVotes}
+          className="w-full mt-4 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition shadow-lg"
+        >
+          {submitted ? "แก้ไขโหวต" : "ยืนยันโหวต"}
+        </button>
+
+        <h3 className="text-xl font-bold mt-8 mb-4 text-gray-800 flex items-center">
+          <span className="mr-2">🏆</span> Top 3 จังหวัด
+        </h3>
+
+        {sortedProvinces.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              {sortedProvinces.map(([name, value], index) => (
+                <div
+                  key={name}
+                  className={`p-4 rounded-lg border-2 ${
+                    index===0 ? 'border-yellow-400 bg-yellow-50' :
+                    index===1 ? 'border-gray-400 bg-gray-50' :
+                    'border-orange-400 bg-orange-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{index===0?'🥇':index===1?'🥈':'🥉'}</span>
+                      <div>
+                        <p className="font-bold text-lg text-gray-800">{name}</p>
+                        <p className="text-sm text-gray-600">อันดับ {index+1}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-gray-800">{value}</p>
+                      <p className="text-sm text-gray-600">คะแนน</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={sortedProvinces.map(([name,value])=>({name,value}))}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+
+            {sortedProvinces.length >= 2 &&
+              sortedProvinces[0][1] === sortedProvinces[1][1] && (
+                <div className="mt-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+                  <p className="font-semibold text-amber-900">⚠️ คะแนนเสมอกัน!</p>
+                  <p className="text-amber-800 text-sm mt-1">คะแนนอันดับ 1 เสมอกัน! แนะนำให้โหวตเพิ่ม</p>
+                </div>
+              )}
+          </>
+        ) : (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-lg">ยังไม่มีการโหวต</p>
+            <p className="text-sm mt-2">กรุณาเลือกจังหวัดและกดยืนยันโหวต</p>
+          </div>
+        )}
+
+        {/* Log History */}
+        <div className="mt-6">
+          <h4 className="font-bold mb-2 text-gray-700">ประวัติการโหวต</h4>
+          <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
+            {voteHistory.length > 0 ? voteHistory.map((entry, idx)=>(
+              <p key={idx} className="text-sm text-gray-800">{entry}</p>
+            )) : (
+              <p className="text-gray-400 text-sm">ยังไม่มีประวัติการโหวต</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+    // ---------------- STEP 5: SUMMARY ----------------
+  const StepSummary = () => {
+    return (
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h2 className="text-2xl font-bold mb-4">สรุปผลการโหวต</h2>
+        <p className="text-gray-700">ฟีเจอร์สรุปผลการโหวตจะถูกพัฒนาขึ้นในอนาคต</p>
+      </div>
+    );
+  };
+
   // Step configuration
   const stepLabels = ["สร้างทริป", "เลือกวันที่", "งบประมาณ", "สถานที่", "สรุปผล"];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Header */}
+      <Header onLogout={handleLogout} />
+      {/* Trip Code and Share */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <Header /> 
 
         <div className="flex items-center justify-between mt-4">
           <button
@@ -611,6 +824,8 @@ const VotePage: React.FC = () => {
         <div className="mb-8">
           {step === 2 && <StepVote />}
           {step === 3 && <StepBudget />}
+          {step === 4 && <StepPlace />}
+          {step === 5 && <StepSummary />}
         </div>
 
         {/* Navigation Buttons */}
