@@ -1,5 +1,5 @@
 import { pool } from "../config/db.js";
-import { v4 as uuidv4 } from 'uuid';
+import type { RowDataPacket } from "mysql2";
 
 export interface Trip {
     trip_id: string;
@@ -23,6 +23,30 @@ export interface TripMember {
     role: 'owner' | 'member';
     joined_at?: Date;
     is_active?: boolean;
+}
+
+export interface MyTrip {
+    trip_id: string;
+    trip_name: string;
+    owner_id: string;
+    status: string;
+    created_at: Date;
+    num_members: number;
+    days_left_7: number;
+}
+
+
+export interface TripDetail extends RowDataPacket {
+    trip_id: string;
+    owner_id: string;
+    trip_name: string;
+    description: string | null;
+    num_days: number;
+    invite_code: string;
+    invite_link: string;
+    status: string;
+    created_at: Date;
+    member_count: number;
 }
 
 export async function createTrip(trip_id:string, owner_id:string, trip_name:string, description:string | null, num_days:number, invite_code:string, invite_link:string, status:'planning' | 'voting' | 'confirmed' | 'completed' | 'archived'): Promise<void> {
@@ -124,6 +148,73 @@ export async function archiveTrip(tripId: string): Promise<void> {
         ['archived', tripId]
     );
 }
+/*
+export async function getTripByInviteCode(inviteCode: string): Promise<Trip | null> {
+    const [rows] = await pool.query('SELECT * FROM trips WHERE invite_code = ?', [inviteCode]);
+    const trips = rows as Trip[];
+    return trips[0] || null;
+}
+*/
+/*
+export async function getTripByInviteLink(inviteLink: string): Promise<Trip | null> {
+    const [rows] = await pool.query('SELECT * FROM trips WHERE invite_link = ?', [inviteLink]);
+    const trips = rows as Trip[];
+    return trips[0] || null;
+}
+*/
+
+//รายการทริปทั้งหมดที่ user เข้าร่วม + ถูกเชิญ + เป็นเจ้าของ
+export async function getMyTrips(userId: string): Promise<MyTrip[]> {
+    const sql = `
+        SELECT 
+            t.trip_id,
+            t.trip_name,
+            t.owner_id,
+            t.status,
+            t.created_at,
+            COUNT(tm2.user_id) AS num_members,
+            DATEDIFF(t.created_at + INTERVAL 7 DAY, NOW()) AS days_left_7
+        FROM trips t
+        JOIN trip_members tm ON tm.trip_id = t.trip_id
+        LEFT JOIN trip_members tm2 ON tm2.trip_id = t.trip_id AND tm2.is_active = TRUE
+        WHERE tm.user_id = ? 
+          AND t.is_active = TRUE
+        GROUP BY t.trip_id
+        ORDER BY t.created_at DESC
+    `;
+
+    const [rows] = await pool.query<RowDataPacket[]>(sql, [userId]);
+
+    return rows as MyTrip[];   
+}
+
+//ข้อมูลทริปแบบละเอียดของทริปหนึ่ง
+export async function getTripDetail(tripId: string): Promise<TripDetail | null> {
+    const sql = `
+        SELECT 
+            t.trip_id,
+            t.owner_id,
+            t.trip_name,
+            t.description,
+            t.num_days,
+            t.invite_code,
+            t.invite_link,
+            t.status,
+            t.created_at,
+            COUNT(tm.user_id) AS member_count
+        FROM trips t
+        LEFT JOIN trip_members tm 
+            ON t.trip_id = tm.trip_id AND tm.is_active = TRUE
+        WHERE t.trip_id = ?
+        GROUP BY t.trip_id
+    `;
+
+    const [rows] = await pool.query<TripDetail[]>(sql, [tripId]);
+
+    if (rows.length === 0) return null;
+
+    return rows[0] || null;  // ✔ ไม่ต้อง || null
+}
 
 export default {
     createTrip,
@@ -139,8 +230,6 @@ export default {
     confirmTrip,
     completeTrip,
     archiveTrip,
+    getMyTrips,
+    getTripDetail,
 };
-
-export function initializeTrip(tripData: { user_id: string; trip_name: string; description: string; num_days: number; }) {
-    throw new Error("Function not implemented.");
-}

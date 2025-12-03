@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import { googleLoginService } from "../services/authService.js";
-import user from "../routes/user.js";
 
 export const googleLogin = async (req: Request, res: Response) => {
   try {

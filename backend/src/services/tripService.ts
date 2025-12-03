@@ -1,8 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { createTrip, generateInviteCode, generateInviteLink  } from "../models/tripModel.js";
-import type { Trip } from '../models/tripModel.js';
-
-
+import { createTrip, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips } from "../models/tripModel.js";
+import type { Trip,MyTrip, TripDetail  } from '../models/tripModel.js';
 
 export const tripService = async (userId: string,trip_name: string, description?: string | null, num_days?: number) => {
     const response = await fetch('/api/trips/AddTrip', {
@@ -45,4 +43,22 @@ export async function deleteTrip(trip_id: string, owner_id: string): Promise<voi
 }
 
 
-export default {tripService, deleteTrip};
+export async function getTripsByUserId(user_id: string): Promise<Trip[]> {
+    return await getTripsByUserId(user_id);
+}
+
+/*
+export async function getTripDetail(trip_id: string): Promise<Trip | null> {
+    return await getTripById(trip_id);
+}
+*/
+
+export async function fetchMyTrips(userId: string): Promise<MyTrip[]> {
+    return await getMyTrips(userId);
+}
+
+export async function fetchTripDetail(tripId: string): Promise<TripDetail | null> {
+    return await getTripDetail(tripId);
+}
+
+export default {tripService, deleteTrip, initializeTrip, getTripsByUserId};

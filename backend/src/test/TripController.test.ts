@@ -1,74 +1,99 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { getMyTrips, getTripDetail } from "../controllers/TripController.js";
+import { fetchMyTrips, fetchTripDetail } from "../services/tripService.js";
+
+// mock services
+vi.mock("../services/tripService.js", () => ({
+  fetchMyTrips: vi.fn(),
+  fetchTripDetail: vi.fn(),
+}));
 
 describe("Trip Controller Tests", () => {
+  let req: any;
+  let res: any;
 
-  it("should login successfully", async () => {
-    const req: any = {
-      body: {
-        email: "testuser@example.com"
-      }
+  beforeEach(() => {
+    req = { params: {}, body: {} };
+
+    res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
     };
 
-    const res: any = {
-      status: () => ({
-        json: (data: any) => data
-      })
-    };
-
-    expect(req.body.email).toBe("testuser@example.com");
+    vi.clearAllMocks();
   });
 
-  it("should add a trip successfully", async () => {
+  // ------------------------------
+  // getMyTrips Tests
+  // ------------------------------
+  it("should return 401 if user_id is missing", async () => {
+    req.body = {}; // ไม่มี user_id
 
-    const UserId = "test-user-id";   // ← แก้นี่
+    await getMyTrips(req, res);
 
-    const req: any = {
-      body: {
-        user_id: UserId,
-        trip_name: "Test Trip",
-        description: "This is a test trip",
-        num_days: 4
-      }
-    };
-
-    const res: any = {
-      status: () => ({
-        json: (data: any) => data
-      })
-    };
-
-    const { addTripController } = await import("../controllers/TripController.js");
-
-    const result = await addTripController(req, res);
-
-    console.log(result);
-
-    expect(result).toBeDefined();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: "Unauthorized" });
   });
 
-  it("should delete a trip successfully", async () => {
-  const req: any = {
-    params: { tripId: "test-trip-id" },
-    user: { user_id: "test-user-id" }  // ถ้า controller ใช้ ownerId จาก user
+  it("should return 200 and trips when user_id exists", async () => {
+    req.body = { user_id: 123 };
+
+    const mockTrips = [
+      { trip_id: 1, trip_name: "Japan Trip" },
+    ];
+
+    // mock service response
+    (fetchMyTrips as any).mockResolvedValue(mockTrips);
+
+    await getMyTrips(req, res);
+
+    expect(fetchMyTrips).toHaveBeenCalledWith(123);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      data: mockTrips,
+    });
+  });
+
+  // ------------------------------
+  // getTripDetail Tests
+  // ------------------------------
+  it("should return trip detail by tripId", async () => {
+  req.params = { trip_Id: 345 };
+
+  const mockTrip = {
+    trip_id: 1,
+    user_id: 345,
+    trip_name: "Japan Trip",
   };
 
-  let jsonResponse: any;
-  const res: any = {
-    status: () => ({
-      json: (data: any) => {
-        jsonResponse = data;
-        return data;
-      }
-    })
-  };
+  (fetchTripDetail as any).mockResolvedValue(mockTrip);
 
-  const { deleteTripController } = await import("../controllers/TripController.js");
+  await getTripDetail(req, res);
 
-  await deleteTripController(req, res);
+  expect(fetchTripDetail).toHaveBeenCalledWith(345);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith({
+    success: true,
+    data: mockTrip,
+  });
+});
 
-  console.log(jsonResponse);
+  // ------------------------------
+  // getTripDetail Tests
+  // ------------------------------
+  it("should return 400 if trip_id is missing", async () => {
+    req.params = {}; // ไม่มี trip_id
 
-  expect(jsonResponse.message).toBe("Trip deleted successfully");
+    await getTripDetail(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: "tripId is required" });
 });
 
 });
+
+
+
+
+
