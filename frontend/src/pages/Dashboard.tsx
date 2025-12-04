@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check } from "lucide-react";
+import { useEffect } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -32,11 +33,34 @@ const Dashboard: React.FC = () => {
     setRoomCode("");
   };
 
-  const dashboardData = [
-    { name: "ทริปเชียงใหม่", joined: 2, notFilled: 2 },
-    { name: "ทริปหัวหิน", joined: 6, notFilled: 0 },
-    { name: "ทริปพัทยา", joined: 3, notFilled: 2 },
-  ];
+  // ✅ โหลดข้อมูลจริงจาก localStorage
+  const [dashboardData, setDashboardData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadTrips = () => {
+      const trips = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('trip_')) {
+          const tripData = JSON.parse(localStorage.getItem(key) || '{}');
+          const filled = tripData.members?.filter((m: any) => 
+            m.budget?.accommodation > 0 && 
+            m.budget?.transport > 0 && 
+            m.budget?.food > 0
+          ).length || 0;
+          
+          trips.push({
+            name: tripData.name,
+            joined: filled,
+            notFilled: (tripData.members?.length || 0) - filled
+          });
+        }
+      }
+      setDashboardData(trips);
+    };
+    
+    loadTrips();
+  }, []);
   const totalJoined = dashboardData.reduce((sum, t) => sum + t.joined, 0);
   const totalNotFilled = dashboardData.reduce((sum, t) => sum + t.notFilled, 0);
   const pieData = [
@@ -70,9 +94,8 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
 
-        {/* สร้างทริป / เข้าร่วม */}
+      {/* สร้างทริป / เข้าร่วม */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
-          {/* ปุ่มสร้างทริปใหม่ */}
           <button
             onClick={handleCreateTrip}
             className="md:flex-[2] flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-4 rounded-lg transition"
@@ -81,15 +104,32 @@ const Dashboard: React.FC = () => {
             สร้างทริปใหม่
           </button>
 
-          {/* Input + ปุ่มเข้าร่วม */}
           <div className="md:flex-1 flex gap-2 w-full">
             <input
               type="text"
-              placeholder="กรอกเลขห้องเพื่อเข้าร่วม"
-              className="flex-1 border border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="XXXX-XXXX-XXXX-XXXX"
+              maxLength={19}
+              className="flex-1 border border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono uppercase"
               value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value)}
-              onPaste={(e) => setRoomCode(e.clipboardData.getData("text"))}
+              onChange={(e) => {
+                let value = e.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9-]/g, '');
+                
+                if (!value.includes('-')) {
+                  value = value.replace(/(.{4})/g, '$1-').slice(0, -1);
+                }
+                
+                setRoomCode(value);
+              }}
+              onPaste={(e) => {
+                e.preventDefault();
+                let pastedText = e.clipboardData.getData("text").toUpperCase().replace(/[^A-HJ-NP-Z2-9-]/g, '');
+                
+                if (!pastedText.includes('-')) {
+                  pastedText = pastedText.replace(/(.{4})/g, '$1-').slice(0, -1);
+                }
+                
+                setRoomCode(pastedText.slice(0, 19));
+              }}
             />
             <button
               onClick={() => handleJoinTrip(roomCode)}

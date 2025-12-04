@@ -13,9 +13,10 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/homePage" element={<HomePage />} /> 
           <Route path="/dashboard" element={<Dashboard />} />  
-          <Route path="/votePage" element={<VotePage />} />
-          <Route path="/summaryPage" element={<SummaryPage />} />
+          <Route path="/votePage/:tripCode" element={<VotePage />} />
+          <Route path="/summaryPage/:tripCode" element={<SummaryPage />} />
           <Route path="/" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     </BrowserRouter>
   );
