@@ -1,6 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
-import { createTrip, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips, findTripByInviteCode, addMemberIfNotExists, findTripById } from "../models/tripModel.js";
+import { createTrip, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips, findTripByInviteCode, addMemberIfNotExists, findTripById, findMemberInTrip, removeMemberById} from "../models/tripModel.js";
 import type { Trip,MyTrip, TripDetail  } from '../models/tripModel.js';
+
+interface RemoveMemberParams {
+  trip_id: string;
+  member_id: string;
+  owner_id: string;
+}
+
 
 export const tripService = async (userId: string,trip_name: string, description?: string | null, num_days?: number) => {
     const response = await fetch('/api/trips/AddTrip', {
@@ -81,4 +88,37 @@ export const joinTripServiceByLink = async (tripId: string, userId: string) => {
   return trip;
 };
 
-export default {tripService, deleteTrip, initializeTrip, getTripsByUserId, joinTripServiceByLink,joinTripServiceByCode};
+export const removeMemberService = async ({
+  trip_id,
+  member_id,
+  owner_id
+}: RemoveMemberParams) => {
+  // 1) ตรวจสอบ Trip
+  const trip = await findTripById(trip_id);
+
+  if (!trip) {
+    return { success: false, error: "Trip not found" };
+  }
+
+  if (trip.owner_id !== owner_id) {
+    return { success: false, error: "Only owner can remove members" };
+  }
+
+  // 2) ตรวจสอบ Member ใน trip
+  const member = await findMemberInTrip(trip_id, member_id);
+
+  if (!member) {
+    return { success: false, error: "Member not found in this trip" };
+  }
+
+  if (member.role === "owner") {
+    return { success: false, error: "Owner cannot remove themselves" };
+  }
+
+  // 3) ลบสมาชิก
+  await removeMemberById(trip_id, member_id);
+
+  return { success: true };
+};
+
+export default {tripService, deleteTrip, initializeTrip, getTripsByUserId, joinTripServiceByLink,joinTripServiceByCode,removeMemberService};

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { deleteTrip,} from "../models/tripModel.js";
-import { initializeTrip,fetchMyTrips,fetchTripDetail,joinTripServiceByCode, joinTripServiceByLink, } from "../services/tripService.js";
+import { initializeTrip,fetchMyTrips,fetchTripDetail,joinTripServiceByCode, joinTripServiceByLink, removeMemberService,} from "../services/tripService.js";
 
 export const addTripController = async (req: Request, res: Response) => {
   try{
@@ -134,6 +134,31 @@ export const joinTripByLink = async (req: Request, res: Response) => {
   }
 };
 
+export const removeMemberController = async (req: Request, res: Response) => {
+  try {
+    const { trip_id, member_id } = req.params;
+    const owner_id = req.body.owner_id;
+
+    if (!trip_id || !member_id) {
+      return res.status(400).json({ message: "tripId and memberId are required" });
+    }
+    if(!owner_id){
+      return res.status(400).json({ message: "OwnerId are required" });
+    }
+
+    const result = await removeMemberService({ trip_id, member_id, owner_id });
+
+    if (!result.success) {
+      return res.status(400).json({ message: result.error });
+    }
+
+    return res.status(200).json({ message: "Member removed successfully" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
 
 /*
 export const updateTripController = async (req: Request, res: Response) => {

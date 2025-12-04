@@ -16,7 +16,7 @@ export interface Trip {
     is_active?: boolean;
 }
 
-export interface TripMember {
+export interface TripMember extends RowDataPacket{
     member_id: string;
     trip_id: string;
     user_id: string;
@@ -243,6 +243,21 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
     return rows[0] || null;  // ✔ ไม่ต้อง || null
 }
 
+export const findMemberInTrip = async (trip_id: string, member_id: string) => {
+  const [rows] = await pool.query<TripMember[]>(
+    `SELECT * FROM trip_members WHERE trip_id = ? AND member_id = ? AND is_active = 1`,
+    [trip_id, member_id]
+  );
+  return rows.length > 0 ? rows[0] : null;
+};
+
+export const removeMemberById = async (trip_id: string, member_id: string) => {
+  return pool.query(
+    `UPDATE trip_members SET is_active = 0 WHERE trip_id = ? AND member_id = ?`,
+    [trip_id, member_id]
+  );
+};
+
 export default {
     createTrip,
     getTripById,
@@ -259,4 +274,7 @@ export default {
     archiveTrip,
     getMyTrips,
     getTripDetail,
+    findTripById,
+    findMemberInTrip,
+    removeMemberById
 };
