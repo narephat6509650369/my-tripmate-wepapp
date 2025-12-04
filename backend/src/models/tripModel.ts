@@ -148,20 +148,47 @@ export async function archiveTrip(tripId: string): Promise<void> {
         ['archived', tripId]
     );
 }
-/*
-export async function getTripByInviteCode(inviteCode: string): Promise<Trip | null> {
-    const [rows] = await pool.query('SELECT * FROM trips WHERE invite_code = ?', [inviteCode]);
-    const trips = rows as Trip[];
-    return trips[0] || null;
-}
-*/
-/*
-export async function getTripByInviteLink(inviteLink: string): Promise<Trip | null> {
-    const [rows] = await pool.query('SELECT * FROM trips WHERE invite_link = ?', [inviteLink]);
-    const trips = rows as Trip[];
-    return trips[0] || null;
-}
-*/
+/**/ 
+
+export const findTripById = async (tripId: string) => {
+  const [rows] = await pool.execute("SELECT * FROM trips WHERE trip_id = ?", [tripId]);
+  return (rows as any[])[0];
+};
+
+export const updateInviteInfo = async (tripId: string, inviteCode: string, inviteLink: string) => {
+  await pool.execute(
+    `UPDATE trips SET invite_code = ?, invite_link = ? WHERE trip_id = ?`,
+    [inviteCode, inviteLink, tripId]
+  );
+};
+
+export const findTripByInviteCode = async (inviteCode: string) => {
+  const [rows] = await pool.execute(
+    "SELECT * FROM trips WHERE invite_code = ?",
+    [inviteCode]
+  );
+  return (rows as any[])[0];
+};
+
+export const addMemberIfNotExists = async (tripId: string, userId: string) => {
+  const [rows] = await pool.execute(
+    "SELECT * FROM tripmember WHERE trip_id = ? AND user_id = ?",
+    [tripId, userId]
+  );
+
+  if ((rows as any[]).length > 0) return (rows as any[])[0];
+
+  const role = "member";
+  await pool.execute(
+    `INSERT INTO tripmember (member_id, trip_id, user_id, role) VALUES (UUID(), ?, ?, ?)`,
+    [tripId, userId, role]
+  );
+
+  return { trip_id: tripId, user_id: userId, role };
+};
+
+/**/
+
 
 //รายการทริปทั้งหมดที่ user เข้าร่วม + ถูกเชิญ + เป็นเจ้าของ
 export async function getMyTrips(userId: string): Promise<MyTrip[]> {

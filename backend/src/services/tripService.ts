@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { createTrip, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips } from "../models/tripModel.js";
+import { createTrip, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips, findTripByInviteCode, addMemberIfNotExists, findTripById } from "../models/tripModel.js";
 import type { Trip,MyTrip, TripDetail  } from '../models/tripModel.js';
 
 export const tripService = async (userId: string,trip_name: string, description?: string | null, num_days?: number) => {
@@ -61,4 +61,24 @@ export async function fetchTripDetail(tripId: string): Promise<TripDetail | null
     return await getTripDetail(tripId);
 }
 
-export default {tripService, deleteTrip, initializeTrip, getTripsByUserId};
+export const joinTripServiceByCode = async (inviteCode: string, userId: string) => {
+
+  const trip = await findTripByInviteCode(inviteCode);
+  if (!trip) throw new Error("Invalid invite code");
+
+  await addMemberIfNotExists(trip.trip_id, userId);
+
+  return trip;
+};
+
+export const joinTripServiceByLink = async (tripId: string, userId: string) => {
+
+  const trip = await findTripById(tripId);
+  if (!trip) throw new Error("Invalid invite link");
+
+  await addMemberIfNotExists(tripId, userId);
+
+  return trip;
+};
+
+export default {tripService, deleteTrip, initializeTrip, getTripsByUserId, joinTripServiceByLink,joinTripServiceByCode};

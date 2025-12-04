@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { deleteTrip } from "../models/tripModel.js";
-import { initializeTrip,fetchMyTrips,fetchTripDetail } from "../services/tripService.js";
+import { deleteTrip,} from "../models/tripModel.js";
+import { initializeTrip,fetchMyTrips,fetchTripDetail,joinTripServiceByCode, joinTripServiceByLink, } from "../services/tripService.js";
 
 export const addTripController = async (req: Request, res: Response) => {
   try{
@@ -84,6 +84,57 @@ export const deleteTripController = async (req: Request, res: Response) => {
   }
 }
 
+export const joinTripByCode = async (req: Request, res: Response) => {
+  try {
+    const { invite_code } = req.body;
+    const {user_id} = req.body;
+
+    if (!invite_code) {
+      return res.status(400).json({ error: "invite code is required" });
+    }
+    if (!user_id) {
+      return res.status(400).json({ error: "user id is required" });
+    }
+
+    const result = await joinTripServiceByCode(invite_code, user_id!);
+
+    return res.status(200).json({
+      success: true,
+      message: "Joined trip successfully",
+      data: result,
+    });
+
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+export const joinTripByLink = async (req: Request, res: Response) => {
+  try {
+    const { trip_id } = req.params;
+    const user_id = req.body;
+
+     if (!trip_id) {
+      return res.status(400).json({ error: "trip id is required" });
+    }
+    if (!user_id) {
+      return res.status(400).json({ error: "user id is required" });
+    }
+    
+    const result = await joinTripServiceByLink(trip_id, user_id!);
+
+    return res.status(200).json({
+      success: true,
+      message: "Joined trip successfully",
+      data: result,
+    });
+
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+
 /*
 export const updateTripController = async (req: Request, res: Response) => {
   try {
@@ -104,4 +155,4 @@ export const updateTripController = async (req: Request, res: Response) => {
 };
 */
 
-export default {addTripController, deleteTripController, getMyTrips, getTripDetail};
+export default {addTripController, deleteTripController, getMyTrips, getTripDetail, joinTripByCode, joinTripByLink};
