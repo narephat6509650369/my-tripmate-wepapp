@@ -1,5 +1,6 @@
 import express from 'express';
-import { addTripController } from "../controllers/TripController.js";
+import { addTripController, getMyTrips, getTripDetail, deleteTripController} from "../controllers/TripController.js";
+
 
 const router = express.Router();
 
@@ -12,9 +13,10 @@ router.put('/UpdateTrip', (req, res) => {
     // Implementation for updating a trip
     res.status(200).json({ message: "Trip updated successfully" });
 });
-router.delete('/DeleteTrip', (req, res) => {
-    // Implementation for deleting a trip
-    res.status(200).json({ message: "Trip deleted successfully" });
-});
+router.delete('/DeleteTrip', deleteTripController);
+
+router.get("/my-trips", getMyTrips);
+
+router.get("/:tripId", getTripDetail);
 
 export default router;
