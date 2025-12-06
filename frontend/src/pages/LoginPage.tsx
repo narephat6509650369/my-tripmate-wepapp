@@ -6,9 +6,12 @@ import axios from 'axios';
 import bgImage from '../assets/login-bg.jpg';
 import '../styles/login.css';
 
-interface GoogleAuthResponse {
+interface GoogleLoginResult {
   token: string;
-  user?: { id: string; email: string };
+  user: {
+    user_id: string;
+    email: string;
+  };
 }
 
 function LoginPage() {
@@ -25,13 +28,12 @@ function LoginPage() {
     setError('');
     try {
       // ส่ง token ไปที่ backend เพื่อรับ JWT
-      const res = await axios.post<GoogleAuthResponse>(
-        `${API_BASE_URL}/auth/google`,
-        { access_token: tokenResponse.access_token }
-      );
+      const res = await axios.post<GoogleLoginResult>(`${API_BASE_URL}/auth/google`,{ access_token: tokenResponse.access_token });
       const { token , user} = res.data;
       localStorage.setItem('jwtToken', token);
-      window.user_id = user?.id || '';
+      // เก็บ user ไปใช้ตอนหน้า HomePage
+      localStorage.setItem("userId", user.user_id);
+      localStorage.setItem("userEmail", user.email);
       navigate('/HomePage');
     } catch (err) {
       console.error('Login failed:', err);

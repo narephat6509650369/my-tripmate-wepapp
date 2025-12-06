@@ -1,12 +1,19 @@
 import type { Request, Response } from "express";
-import { deleteTrip,} from "../models/tripModel.js";
-import { initializeTrip,fetchMyTrips,fetchTripDetail,joinTripServiceByCode, joinTripServiceByLink, removeMemberService,} from "../services/tripService.js";
+import { initializeTrip,fetchMyTrips,fetchTripDetail,joinTripServiceByCode, joinTripServiceByLink, removeMemberService, deleteTripService} from "../services/tripService.js";
+import type { JwtPayload } from "../express.d.js"
 
 export const addTripController = async (req: Request, res: Response) => {
   try{
-    const { user_id, trip_name, description, num_days } = req.body;
-    const newTrip = await initializeTrip({ user_id, trip_name, description, num_days });
-    res.status(200).json({ message: "Trip added successfully", trip: newTrip });
+    const { trip_name, description, num_days } = req.body;
+    const user_id = (req.user as JwtPayload).user_id;
+    if (!trip_name || typeof trip_name !== 'string' || trip_name.trim() === '') {
+      return res.status(400).json({ message: "Trip name is required and must be a string." });
+    }
+    if (!num_days || typeof num_days !== 'number' || num_days < 1) {
+      return res.status(400).json({ message: "Number of days must be a number greater than 0." });
+    }
+    const newTrip = await initializeTrip( user_id, trip_name, description, num_days );
+    res.status(201).json({ message: "Trip added successfully", trip: newTrip });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
@@ -17,9 +24,9 @@ export const addTripController = async (req: Request, res: Response) => {
   }
 }
 
-export async function getMyTrips(req: Request, res: Response) {
+export const getMyTrips = async (req: Request, res: Response) => {
     try {
-        const {user_id} = req.body;
+        const user_id = (req.user as JwtPayload).user_id;
 
         if (!user_id) {
             return res.status(401).json({ message: "Unauthorized" });
@@ -38,10 +45,11 @@ export async function getMyTrips(req: Request, res: Response) {
     }
 }
 
+/*
 export async function getTripDetail(req: Request, res: Response) {
     try {
         const { trip_Id } = req.params;
-
+      
         if (!trip_Id) {
             return res.status(400).json({ message: "tripId is required" });
         }
@@ -62,7 +70,7 @@ export async function getTripDetail(req: Request, res: Response) {
         return res.status(500).json({ message: "Server error" });
     }
 }
-
+*/
 export const deleteTripController = async (req: Request, res: Response) => {
   try {
     const tripId = req.params.tripId;
@@ -72,7 +80,7 @@ export const deleteTripController = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "tripId is required" });
     }
 
-    await deleteTrip(tripId, ownerId);
+    await deleteTripService(tripId, ownerId);
 
     res.status(200).json({ message: "Trip deleted successfully" });
   } catch (error) {
@@ -180,4 +188,4 @@ export const updateTripController = async (req: Request, res: Response) => {
 };
 */
 
-export default {addTripController, deleteTripController, getMyTrips, getTripDetail, joinTripByCode, joinTripByLink};
+export default {addTripController, deleteTripController, getMyTrips, joinTripByCode, joinTripByLink};

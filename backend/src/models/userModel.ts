@@ -73,6 +73,13 @@ export async function findOrCreateUser(userData: {
   }
 }
 
-
+export default{
+  getUserByEmail,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  findOrCreateUser,
+};
 
 

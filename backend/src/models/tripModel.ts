@@ -49,25 +49,60 @@ export interface TripDetail extends RowDataPacket {
     member_count: number;
 }
 
-export async function createTrip(trip_id:string, owner_id:string, trip_name:string, description:string | null, num_days:number, invite_code:string, invite_link:string, status:'planning' | 'voting' | 'confirmed' | 'completed' | 'archived'): Promise<void> {
-    await pool.query(
-        'INSERT INTO trips (trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status]
-    );
-}
+export async function createTripWithMember(
+    tripData: Trip, 
+    member_id: string
+): Promise<void> {
+    const connection = await pool.getConnection(); // ขอ Connection แยกมาเพื่อทำ Transaction
 
+    try {
+        await connection.beginTransaction(); // เริ่มต้น Transaction
+
+        // 1. สร้าง Trip
+        await connection.query(
+            'INSERT INTO trips (trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                tripData.trip_id, 
+                tripData.owner_id, 
+                tripData.trip_name, 
+                tripData.description, 
+                tripData.num_days, 
+                tripData.invite_code, 
+                tripData.invite_link, 
+                tripData.status
+            ]
+        );
+
+        // 2. สร้าง Member (Owner)
+        // Hardcode role='owner' และ is_active=1 ได้เลย เพราะฟังก์ชันนี้ใช้ตอนสร้างทริปใหม่เท่านั้น
+        await connection.query(
+            'INSERT INTO trip_members (member_id, trip_id, user_id, role, is_active) VALUES (?, ?, ?, ?, ?)',
+            [member_id, tripData.trip_id, tripData.owner_id, 'owner', 1]
+        );
+
+        await connection.commit(); // บันทึกจริงเมื่อผ่านทั้งคู่
+    } catch (error) {
+        await connection.rollback(); // ย้อนกลับถ้ามีอะไรพัง
+        throw error; // ส่ง error กลับไปให้ Controller
+    } finally {
+        connection.release(); // คืน Connection เสมอ
+    }
+}
+/*
 export async function getTripById(tripId: string): Promise<Trip | null> {
     const [rows] = await pool.query('SELECT * FROM trips WHERE trip_id = ?', [tripId]);
     const trips = rows as Trip[];
     return trips[0] || null;
 }
-
+*/
+/*
 export async function updateTrip(trip: Trip): Promise<void> {
     await pool.query(
         'UPDATE trips SET owner_id = ?, trip_name = ?, description = ?, num_days = ?, invite_code = ?, invite_link = ?, status = ? WHERE trip_id = ?',
         [trip.owner_id, trip.trip_name, trip.description, trip.num_days, trip.invite_code, trip.invite_link, trip.status, trip.trip_id]
     );
 }
+*/
 
 export async function deleteTrip(tripId: string,owner_id: string): Promise<void> {
     await pool.query('DELETE FROM trips WHERE trip_id = ? AND owner_id = ?', [tripId, owner_id]);
@@ -83,21 +118,23 @@ export async function generateInviteLink(tripId: string): Promise<string> {
     return `${baseUrl}/join/${tripId}`;
 }
 
-
+/*
 export async function deactivateTrip(tripId: string): Promise<void> {
     await pool.query(
         'UPDATE trips SET is_active = ? WHERE trip_id = ?',
         [false, tripId]
     );
 }
-
+*/
+/*
 export async function activateTrip(tripId: string): Promise<void> {
     await pool.query(
         'UPDATE trips SET is_active = ? WHERE trip_id = ?',
         [true, tripId]
     );
 }
-
+*/
+/*
 export async function addMemberToTrip(tripId: string, userId: string, role: 'owner' | 'member'): Promise<void> {
     const member_id = crypto.randomUUID();
     await pool.query(
@@ -105,19 +142,21 @@ export async function addMemberToTrip(tripId: string, userId: string, role: 'own
         [member_id, tripId, userId, role]
     );
 }
-
+*/
+/*
 export async function removeMemberFromTrip(tripId: string, userId: string): Promise<void> {
     await pool.query(
         'DELETE FROM trip_members WHERE trip_id = ? AND user_id = ?',
         [tripId, userId]
     );
-}   
-
+}  */ 
+/*
 export async function getTripMembers(tripId: string): Promise<TripMember[]> {
     const [rows] = await pool.query('SELECT * FROM trip_members WHERE trip_id = ?', [tripId]);
     return rows as TripMember[];
 }
-
+*/
+/*
 export async function getTripsByUserId(userId: string): Promise<Trip[]> {
     const [rows] = await pool.query(
         `SELECT t.* FROM trips t
@@ -127,29 +166,31 @@ export async function getTripsByUserId(userId: string): Promise<Trip[]> {
     );
     return rows as Trip[];
 }   
-
+*/
+/*
 export async function confirmTrip(tripId: string): Promise<void> {
     await pool.query(
         'UPDATE trips SET status = ?, confirmed_at = ? WHERE trip_id = ?',
         ['confirmed', new Date(), tripId]
     );
 }
-
+*/
+/*
 export async function completeTrip(tripId: string): Promise<void> {
     await pool.query(
         'UPDATE trips SET status = ? WHERE trip_id = ?',
         ['completed', tripId]
     );
 }
-
+*/
+/*
 export async function archiveTrip(tripId: string): Promise<void> {
     await pool.query(
         'UPDATE trips SET status = ? WHERE trip_id = ?',
         ['archived', tripId]
     );
 }
-/**/ 
-
+*/
 export const findTripById = async (tripId: string) => {
   const [rows] = await pool.execute("SELECT * FROM trips WHERE trip_id = ?", [tripId]);
   return (rows as any[])[0];
@@ -259,10 +300,25 @@ export const removeMemberById = async (trip_id: string, member_id: string) => {
 };
 
 export default {
-    createTrip,
-    getTripById,
-    updateTrip,
+    generateInviteCode,
+    generateInviteLink,
+    getTripDetail,
+    getMyTrips,
+    findTripByInviteCode,
+    addMemberIfNotExists,
+    findTripById,
+    findMemberInTrip,
+    removeMemberById,
     deleteTrip,
+    createTripWithMember,
+
+   
+        
+};
+/*
+ getTripById,
+    updateTrip,
+    
     deactivateTrip,
     activateTrip,
     addMemberToTrip,
@@ -272,9 +328,4 @@ export default {
     confirmTrip,
     completeTrip,
     archiveTrip,
-    getMyTrips,
-    getTripDetail,
-    findTripById,
-    findMemberInTrip,
-    removeMemberById
-};
+*/
