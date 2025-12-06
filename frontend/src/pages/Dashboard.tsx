@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check } from "lucide-react";
 import { useEffect } from "react";
+import { tripAPI } from "../services/api";
 import {
   ResponsiveContainer,
   BarChart,
@@ -25,43 +26,93 @@ const Dashboard: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem("jwtToken");
+    localStorage.removeItem("userId"); 
     navigate("/");
   };
-  const handleCreateTrip = () => console.log("สร้างทริปใหม่");
-  const handleJoinTrip = (code: string) => {
-    if (!code) return alert("กรุณากรอกเลขห้อง");
-    console.log("เข้าร่วมทริปด้วยเลขห้อง:", code);
-    setRoomCode("");
+
+  const handleCreateTrip = () => {
+    navigate("/homepage"); // ไปหน้า homepage เพื่อสร้างทริป
   };
 
-  // ✅ โหลดข้อมูลจริงจาก localStorage
+  const handleJoinTrip = async (code: string) => {
+    const cleanCode = code.trim().toUpperCase();
+    
+    if (!cleanCode) {
+      alert("กรุณากรอกรหัสห้อง");
+      return;
+    }
+    
+    try {
+      const response = await tripAPI.joinTrip(cleanCode);
+      
+      if (response.success) {
+        alert('เข้าร่วมทริปสำเร็จ!');
+        navigate(`/votePage/${response.data.tripId}`);
+        setRoomCode("");
+      } else {
+        alert(response.message || 'ไม่สามารถเข้าร่วมทริปได้');
+      }
+    } catch (error) {
+      console.error('Error joining trip:', error);
+      alert('เกิดข้อผิดพลาดในการเข้าร่วมทริป');
+    }
+  };
+
+  // โหลดข้อมูลจริงจาก localStorage
   const [dashboardData, setDashboardData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadTrips = () => {
-      const trips = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith('trip_')) {
-          const tripData = JSON.parse(localStorage.getItem(key) || '{}');
-          const filled = tripData.members?.filter((m: any) => 
+    const loadTrips = async () => {
+      try {
+        setLoading(true);
+        const response = await tripAPI.getMyTrips();
+        
+        // ตรวจสอบ response
+        if (!response || !response.success) {
+          throw new Error(response?.message || 'Failed to load trips');
+        }
+        
+        // ตรวจสอบ data
+        if (!response.data || !Array.isArray(response.data)) {
+          throw new Error('Invalid data format from server');
+        }
+        
+        const formattedData = response.data.map((trip: any) => {
+          const filled = trip.members?.filter((m: any) => 
             m.budget?.accommodation > 0 && 
             m.budget?.transport > 0 && 
             m.budget?.food > 0
           ).length || 0;
           
-          trips.push({
-            name: tripData.name,
+          return {
+            name: trip.name,
             joined: filled,
-            notFilled: (tripData.members?.length || 0) - filled
-          });
-        }
+            notFilled: (trip.members?.length || 0) - filled
+          };
+        });
+        
+        setDashboardData(formattedData);
+      } catch (error) {
+        console.error('Error loading trips:', error);
+        
+        // แสดง error message
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : 'ไม่สามารถโหลดข้อมูล Dashboard ได้';
+        
+        alert(`เกิดข้อผิดพลาด: ${errorMessage}\nกรุณาลองใหม่อีกครั้ง`);
+        
+        // ตั้งค่าเป็น array ว่าง
+        setDashboardData([]);
+      } finally {
+        setLoading(false);
       }
-      setDashboardData(trips);
     };
     
     loadTrips();
   }, []);
+
   const totalJoined = dashboardData.reduce((sum, t) => sum + t.joined, 0);
   const totalNotFilled = dashboardData.reduce((sum, t) => sum + t.notFilled, 0);
   const pieData = [
@@ -79,12 +130,11 @@ const Dashboard: React.FC = () => {
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => navigate("/homepage")}
-            className={`px-6 py-3 rounded-lg font-medium transition ${
-              activeTab === "overview" ? "bg-blue-600 text-white" : "bg-blue-200 text-blue-800 hover:bg-blue-300"
-            }`}
+            className="px-6 py-3 rounded-lg font-medium transition bg-blue-200 text-blue-800 hover:bg-blue-300"
           >
             ทริปทั้งหมด
           </button>
+
           <button
             onClick={() => setActiveTab("stats")}
             className={`px-6 py-3 rounded-lg font-medium transition ${
@@ -143,50 +193,58 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Content */}
-        {activeTab === "stats" && (
-          <>
-            <h2 className="text-xl font-semibold mb-2 text-blue-900">รายละเอียดแต่ละทริป</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={dashboardData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="joined" stackId="a" fill="#4f46e5" name="กรอกแล้ว" />
-                <Bar dataKey="notFilled" stackId="a" fill="#f59e0b" name="ยังไม่กรอก" />
-              </BarChart>
-            </ResponsiveContainer>
-
-            <h2 className="text-xl font-semibold mt-10 mb-2 text-blue-900">สัดส่วนผู้เข้าร่วมทั้งหมด</h2>
-            <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={pieData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                label={({ name, value }: { name: string; value: number }) => `${name}: ${value}`}
-              >
-                {pieData.map((entry: typeof pieData[number], index: number) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}  // ใช้สีจาก COLORS ที่กำหนดไว้
-                  />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-          </>
-        )}
-
-        {activeTab === "overview" && (
-          <div className="text-blue-900 text-center py-10">
-            <p>รายการทริปทั้งหมดจะแสดงที่นี่</p>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
+        ) : (
+          <>
+            {activeTab === "stats" && (
+              <>
+                <h2 className="text-xl font-semibold mb-2 text-blue-900">รายละเอียดแต่ละทริป</h2>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={dashboardData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="joined" stackId="a" fill="#4f46e5" name="กรอกแล้ว" />
+                    <Bar dataKey="notFilled" stackId="a" fill="#f59e0b" name="ยังไม่กรอก" />
+                  </BarChart>
+                </ResponsiveContainer>
+
+                <h2 className="text-xl font-semibold mt-10 mb-2 text-blue-900">สัดส่วนผู้เข้าร่วมทั้งหมด</h2>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={({ name, value }: { name: string; value: number }) => `${name}: ${value}`}
+                    >
+                      {pieData.map((entry: typeof pieData[number], index: number) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </>
+            )}
+            
+            {activeTab === "overview" && (
+              <div className="text-blue-900 text-center py-10">
+                <p>รายการทริปทั้งหมดจะแสดงที่นี่</p>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

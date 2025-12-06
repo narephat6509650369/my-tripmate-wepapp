@@ -2,6 +2,7 @@
   import { Check, X, Copy, Plus, Info } from "lucide-react";
   import Header from "../components/Header";
   import { useNavigate, useParams } from "react-router-dom";
+  import { tripAPI } from "../services/api";
  
   import {
     ResponsiveContainer,
@@ -249,44 +250,42 @@
 
     // โหลดข้อมูลทริปและตรวจสอบ
     useEffect(() => {
-      if (tripCode === "UNKNOWN") {
-        alert("ไม่พบรหัสทริป");
-        navigate("/homepage");
-        return;
-      }
-
-      const savedTrip = localStorage.getItem(`trip_${tripCode}`);
-      
-      if (!savedTrip) {
-        alert("ไม่พบข้อมูลทริปนี้ กรุณาตรวจสอบรหัสห้องอีกครั้ง");
-        navigate("/homepage");
-        return;
-      }
-      
-      try {
-        const tripData = JSON.parse(savedTrip);
-        console.log("โหลดทริปสำเร็จ:", tripData);
-        
-        // อัพเดท state ด้วยข้อมูลที่โหลดมา
-        setTrip({
-          members: tripData.members || mockMembers,
-          voteOptions: tripData.voteOptions || [],
-          selectedDate: tripData.selectedDate || null
-        });
-        
-        // ตรวจสอบว่าทริปปิดแล้วหรือยัง
-        if (tripData.isCompleted) {
-          alert("ทริปนี้ปิดการโหวตแล้ว กำลังนำไปหน้าสรุปผล...");
-          navigate(`/summaryPage/${tripCode}`);
+      const loadTripData = async () => {
+        if (tripCode === "UNKNOWN") {
+          alert("ไม่พบรหัสทริป");
+          navigate("/homepage");
           return;
         }
-        
-        // อัพเดท state ตามต้องการ
-      } catch (error) {
-        console.error("Error loading trip:", error);
-        alert("เกิดข้อผิดพลาดในการโหลดข้อมูลทริป");
-        navigate("/homepage");
-      }
+
+        try {
+          // เรียก API แทน localStorage
+          const response = await tripAPI.getTripDetail(tripCode);
+          
+          if (!response || !response.success) {
+            throw new Error('ไม่พบข้อมูลทริป');
+          }
+
+          const tripData = response.data;
+          
+          setTrip({
+            members: tripData.members || [],
+            voteOptions: tripData.voteOptions || [],
+            selectedDate: tripData.selectedDate || null
+          });
+          
+          if (tripData.isCompleted) {
+            alert("ทริปนี้ปิดการโหวตแล้ว กำลังนำไปหน้าสรุปผล...");
+            navigate(`/summaryPage/${tripCode}`);
+            return;
+          }
+        } catch (error) {
+          console.error("Error loading trip:", error);
+          alert("ไม่สามารถโหลดข้อมูลทริปได้");
+          navigate("/homepage");
+        }
+      };
+      
+      loadTripData();
     }, [tripCode, navigate]);
 
     const debouncedMember = useDebounce(memberBudget, 1000);
@@ -435,13 +434,20 @@
     const StepBudget = () => {
       const updateBudget = (key: keyof Member["budget"], value: number) => {
 
-      // ✅ เช็คให้ครอบคลุมมากขึ้น
+      // เช็คให้ครอบคลุมมากขึ้น
       if (["accommodation", "transport", "food"].includes(key)) {
         if (value === 0 || isNaN(value)) {
           alert(`กรุณากรอกจำนวนเงินใน${BUDGET_CATEGORIES.find(c => c.key === key)?.label || key}`);
           return;
         }
       }
+
+      // เพิ่มการตรวจสอบค่าสูงสุดต่อหมวด
+      const MAX_PER_CATEGORY = 100000; // ตัวอย่าง
+        if (value > MAX_PER_CATEGORY) {
+          alert(`จำนวนเงินต่อหมวดไม่ควรเกิน ฿${formatCurrency(MAX_PER_CATEGORY)}`);
+          return;
+        }
 
         if (!memberBudget) return;
 
@@ -624,7 +630,7 @@
         }));
       };
 
-      const submitVotes = () => {
+      const submitVotes = async () => {  // ← เพิ่ม async
         if (myVote.includes("")) {
           setError("กรุณาเลือกครบ 3 อันดับก่อนส่งคะแนน");
           return;
@@ -634,14 +640,12 @@
         const newScores = { ...globalScores };
 
         if (submitted) {
-          // ลบคะแนนเก่า
           myVote.forEach((province, index) => {
             newScores[province] = (newScores[province] || 0) - weights[index];
             if (newScores[province] <= 0) delete newScores[province];
           });
         }
 
-        // เพิ่มคะแนนใหม่
         myVote.forEach((province, index) => {
           newScores[province] = (newScores[province] || 0) + weights[index];
         });
@@ -649,39 +653,22 @@
         setGlobalScores(newScores);
         setSubmitted(true);
 
-        // เพิ่ม log
         const logEntry = `คุณ: 🥇${myVote[0]} 🥈${myVote[1]} 🥉${myVote[2]}`;
         setVoteHistory(prev => [logEntry, ...prev]);
 
-        // บันทึกผลโหวตลง localStorage
-        const savedTrip = localStorage.getItem(`trip_${tripCode}`);
-        if (savedTrip) {
-          try {
-            const tripData = JSON.parse(savedTrip);
-            
-            // อัพเดทผลโหวตจังหวัด
-            const sortedProvincesForSave = Object.entries(newScores)
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 5)
-              .map(([name, score]) => ({ name, score }));
-            
-            // ✅ เพิ่มการบันทึก dates ด้วย
-            const sortedDatesForSave = Object.entries(dateVotes)
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 5)
-              .map(([date, votes]) => ({ date, votes }));
-
-            tripData.voteResults = {
-              ...tripData.voteResults,
-              provinces: sortedProvincesForSave,
-              dates: sortedDatesForSave  // ✅ เพิ่มบรรทัดนี้
-            };
-            
-            localStorage.setItem(`trip_${tripCode}`, JSON.stringify(tripData));
+        // ส่งผลโหวตไปยัง Backend
+        try {
+          const response = await tripAPI.submitProvinceVotes(tripCode, {
+            votes: myVote,
+            scores: newScores
+          });
+          
+          if (response.success) {
             console.log("บันทึกผลโหวตสำเร็จ");
-          } catch (error) {
-            console.error("Error saving vote results:", error);
           }
+        } catch (error) {
+          console.error("Error saving votes:", error);
+          alert("เกิดข้อผิดพลาดในการบันทึกผลโหวต");
         }
       };
 
@@ -810,42 +797,37 @@
 
     // ---------------- STEP 5: SUMMARY ----------------
     const StepSummary = () => {
-      const handleCloseVoting = () => {
-        if (!confirm("ต้องการปิดการโหวตและบันทึกผลหรือไม่?\n\nเมื่อปิดแล้ว สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก")) {
-          // ✅ ตรวจสอบว่ากรอกงบประมาณครบหรือยัง
-          const incompleteBudgets = trip.members.filter(m => 
-            m.budget.accommodation === 0 || 
-            m.budget.transport === 0 || 
-            m.budget.food === 0
-          );
+      const handleCloseVoting = async () => {  // ← เพิ่ม async
+      // เช็คงบประมาณก่อน
+      const incompleteBudgets = trip.members.filter(m => 
+        m.budget.accommodation === 0 || 
+        m.budget.transport === 0 || 
+        m.budget.food === 0
+      );
 
-          if (incompleteBudgets.length > 0) {
-            alert(`ยังมีสมาชิก ${incompleteBudgets.length} คนที่ยังกรอกงบประมาณไม่ครบ!\nกรุณาให้ทุกคนกรอกข้อมูลให้ครบก่อน`);
-            return;
-          }
-          return;
-        }
+      if (incompleteBudgets.length > 0) {
+        alert(`ยังมีสมาชิก ${incompleteBudgets.length} คนที่ยังกรอกงบประมาณไม่ครบ!\n\nกรุณาให้ทุกคนกรอกข้อมูลให้ครบก่อน`);
+        return;
+      }
+
+      if (!confirm("ต้องการปิดการโหวตและบันทึกผลหรือไม่?\n\nเมื่อปิดแล้ว สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก")) {
+        return;
+      }
+      
+      try {
+        const response = await tripAPI.closeTrip(tripCode);
         
-        const savedTrip = localStorage.getItem(`trip_${tripCode}`);
-        if (savedTrip) {
-          try {
-            const tripData = JSON.parse(savedTrip);
-            
-            // อัพเดทสถานะเป็นเสร็จสิ้น
-            tripData.isCompleted = true;
-            tripData.closedAt = Date.now();
-            
-            // บันทึกกลับ localStorage
-            localStorage.setItem(`trip_${tripCode}`, JSON.stringify(tripData));
-            
-            alert("ปิดการโหวตเรียบร้อย! กำลังนำไปหน้าสรุปผล...");
-            navigate(`/summaryPage/${tripCode}`);
-          } catch (error) {
-            console.error("Error closing trip:", error);
-            alert("เกิดข้อผิดพลาดในการปิดการโหวต");
-          }
+        if (response.success) {
+          alert("ปิดการโหวตเรียบร้อย! กำลังนำไปหน้าสรุปผล...");
+          navigate(`/summaryPage/${tripCode}`);
+        } else {
+          throw new Error(response.message || 'ไม่สามารถปิดการโหวตได้');
         }
-      };
+      } catch (error) {
+        console.error("Error closing trip:", error);
+        alert("เกิดข้อผิดพลาดในการปิดการโหวต");
+      }
+    };
 
       return (
         <div className="bg-white p-6 rounded-xl shadow-lg">
