@@ -17,6 +17,7 @@ import {
   Cell,
 } from "recharts";
 
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"overview" | "stats">("stats");
@@ -167,7 +168,7 @@ const Dashboard: React.FC = () => {
                 cx="50%"
                 cy="50%"
                 outerRadius={80}
-                label={({ name, value }) => `${name}: ${value}`}
+                label={({ name, value }: { name: string; value: number }) => `${name}: ${value}`}
               >
                 {pieData.map((entry: typeof pieData[number], index: number) => (
                   <Cell
