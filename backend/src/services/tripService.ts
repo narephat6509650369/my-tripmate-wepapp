@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { createTripWithMember, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips, findTripByInviteCode, addMemberIfNotExists, findTripById, findMemberInTrip, removeMemberById, deleteTrip, } from "../models/tripModel.js";
+import { createTripWithMember, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips, findTripByInviteCode, addMemberIfNotExists, findTripById, findMemberInTrip, removeMemberById, deleteTrip, findAllTripsByUserId} from "../models/tripModel.js";
 import type { Trip, MyTrip, TripDetail,  } from '../models/tripModel.js';
 
 interface RemoveMemberParams {
@@ -7,19 +7,25 @@ interface RemoveMemberParams {
   member_id: string;
   owner_id: string;
 }
+//ผู้ใช้ fetch ข้อมูลหลังจากทำการ login ครั้งแรก
 
-export const tripService = async (user_id: string,trip_name: string, description: string | null, num_days: number) => {
-    const response = await fetch('/api/trips/AddTrip', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(await initializeTrip( user_id, trip_name, description, num_days )),
-    });
-    return response.json();
-  };
   
-export const initializeTrip = async( user_id: string, trip_name: string, description: string | null, num_days: number): Promise<Trip> => {
+export const getUserTrips = async (user_id: string) => {
+    // เรียก Database โดยตรง (ไม่ต้อง fetch)
+    const allTrips = await findAllTripsByUserId(user_id);
+
+    // ถ้าต้องการแยกข้อมูลให้ Frontend ใช้ง่ายๆ สามารถทำ Data Transformation ตรงนี้ได้
+    const myTrips = allTrips.filter(t => t.role === 'owner');
+    const joinedTrips = allTrips.filter(t => t.role === 'member');
+
+    return {
+        all: allTrips,     // ส่งไปทั้งหมด
+        owned: myTrips,    // หรือจะแยกอาเรย์ให้เลยก็ได้
+        joined: joinedTrips
+    };
+}
+
+export const addTrip = async( user_id: string, trip_name: string, description: string | null, num_days: number): Promise<Trip> => {
     const trip_id = uuidv4();
     const member_id = uuidv4();
     const invite_code = await generateInviteCode();
@@ -105,4 +111,4 @@ export const deleteTripService = async (tripId: string, ownerId: string) => {
 }
 
 
-export default {tripService, initializeTrip, getTripsByUserId, joinTripServiceByLink,joinTripServiceByCode,removeMemberService,deleteTripService};
+export default { findAllTripsByUserId, getTripsByUserId, joinTripServiceByLink,joinTripServiceByCode,removeMemberService,deleteTripService};

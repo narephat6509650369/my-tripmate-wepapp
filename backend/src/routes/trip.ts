@@ -1,5 +1,5 @@
 import express from 'express';
-import { addTripController, getMyTrips, deleteTripController,joinTripByCode, removeMemberController} from "../controllers/TripController.js";
+import { addTripController, getMyTripsController, deleteTripController,joinTripByCode, removeMemberController} from "../controllers/TripController.js";
 import { auth } from "../middleware/auth.js"
 import { generateInviteCode } from '../models/tripModel.js';
 
@@ -9,7 +9,7 @@ router.post('/AddTrip', auth, addTripController);
 
 router.delete('/DeleteTrip', auth, deleteTripController);
 
-router.get("/my-trips", auth, getMyTrips);
+router.get("/all-my-trips", auth, getMyTripsController);
 
 //router.get("/:tripId", auth, getTripDetail);
 

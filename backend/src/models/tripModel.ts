@@ -25,6 +25,14 @@ export interface TripMember extends RowDataPacket{
     is_active?: boolean;
 }
 
+export interface TripSummary extends RowDataPacket {
+    trip_id: string;
+    trip_name: string;
+    status: string;
+    role: 'owner' | 'member'; // สำคัญมาก เอาไว้แยก Tab หน้าบ้าน
+    num_members: number;
+}
+
 export interface MyTrip {
     trip_id: string;
     trip_name: string;
@@ -49,10 +57,7 @@ export interface TripDetail extends RowDataPacket {
     member_count: number;
 }
 
-export async function createTripWithMember(
-    tripData: Trip, 
-    member_id: string
-): Promise<void> {
+export async function createTripWithMember( tripData: Trip, member_id: string ): Promise<void> {
     const connection = await pool.getConnection(); // ขอ Connection แยกมาเพื่อทำ Transaction
 
     try {
@@ -88,6 +93,27 @@ export async function createTripWithMember(
         connection.release(); // คืน Connection เสมอ
     }
 }
+
+export async function findAllTripsByUserId(user_id: string): Promise<TripSummary[]> {
+    // Query นี้จะ Join ตาราง trips กับ trip_members
+    // เพื่อหาทุกทริปที่ user_id นี้มีชื่ออยู่ในสมาชิก
+    const sql = `
+        SELECT 
+            t.trip_id, 
+            t.trip_name, 
+            t.status, 
+            tm.role,
+            (SELECT COUNT(*) FROM trip_members WHERE trip_id = t.trip_id AND is_active = 1) as num_members
+        FROM trips t
+        JOIN trip_members tm ON t.trip_id = tm.trip_id
+        WHERE tm.user_id = ? AND tm.is_active = 1
+        ORDER BY t.created_at DESC
+    `;
+    
+    const [rows] = await pool.query<TripSummary[]>(sql, [user_id]);
+    return rows;
+}
+
 /*
 export async function getTripById(tripId: string): Promise<Trip | null> {
     const [rows] = await pool.query('SELECT * FROM trips WHERE trip_id = ?', [tripId]);
