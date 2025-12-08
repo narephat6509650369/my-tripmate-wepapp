@@ -25,6 +25,16 @@ export interface TripMember extends RowDataPacket{
     is_active?: boolean;
 }
 
+export interface TripDashboardItem {
+    trip_id: string;
+    trip_name: string;
+    status: string;        // planning, voting, etc.
+    role: 'owner' | 'member';
+    num_members: number;   // จำนวนคนในทริป
+    days_left: number;     // (Optional) เหลืออีกกี่วันจะถึงวันไป
+    created_at: Date;
+}
+
 export interface TripSummary extends RowDataPacket {
     trip_id: string;
     trip_name: string;
@@ -114,6 +124,31 @@ export async function findAllTripsByUserId(user_id: string): Promise<TripSummary
     return rows;
 }
 
+export async function getDashboardTrips(user_id: string): Promise<TripDashboardItem[]> {
+    const sql = `
+        SELECT 
+            t.trip_id,
+            t.trip_name,
+            t.status,
+            t.start_date,
+            tm_user.role, -- Role ของเรา (Owner/Member)
+            
+            (SELECT COUNT(*) FROM trip_members WHERE trip_id = t.trip_id AND is_active = 1) as num_members,
+            
+            DATEDIFF(t.start_date, CURDATE()) as days_left
+
+        FROM trips t
+        JOIN trip_members tm_user ON t.trip_id = tm_user.trip_id
+        
+        WHERE tm_user.user_id = ? 
+          AND tm_user.is_active = 1
+        ORDER BY t.created_at DESC
+    `;
+
+    const [rows] = await pool.query<TripDashboardItem[] & RowDataPacket[]>(sql, [user_id]);
+    return rows;
+}
+
 /*
 export async function getTripById(tripId: string): Promise<Trip | null> {
     const [rows] = await pool.query('SELECT * FROM trips WHERE trip_id = ?', [tripId]);
@@ -130,8 +165,8 @@ export async function updateTrip(trip: Trip): Promise<void> {
 }
 */
 
-export async function deleteTrip(tripId: string,owner_id: string): Promise<void> {
-    await pool.query('DELETE FROM trips WHERE trip_id = ? AND owner_id = ?', [tripId, owner_id]);
+export async function deleteTrip(tripId: string): Promise<void> {
+    await pool.query('DELETE FROM trips WHERE trip_id = ? AND owner_id = ?', [tripId]);
 }   
 
 export async function generateInviteCode(): Promise<string> {

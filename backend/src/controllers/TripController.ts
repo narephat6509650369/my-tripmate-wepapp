@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { getUserTrips,joinTripServiceByCode, joinTripServiceByLink, removeMemberService, deleteTripService,addTrip} from "../services/tripService.js";
 import type { JwtPayload } from "../express.d.js"
 
+//เพิ่มสมาชิก
 export const addTripController = async (req: Request, res: Response) => {
   try{
     const { trip_name, description, num_days } = req.body;
@@ -24,6 +25,7 @@ export const addTripController = async (req: Request, res: Response) => {
   }
 }
 
+//ดึงข้อมูล trip ทั้ง trip ที่ถูกเชิญและสร้างเอง
 export const getMyTripsController = async (req: Request, res: Response) => {
     try {
         const user_id = (req.user as JwtPayload).user_id;
@@ -50,13 +52,12 @@ export const getMyTripsController = async (req: Request, res: Response) => {
 export const deleteTripController = async (req: Request, res: Response) => {
   try {
     const tripId = req.params.tripId;
-    const ownerId = req.params.ownerId||""; 
 
     if (!tripId) {
       return res.status(400).json({ message: "tripId is required" });
     }
 
-    await deleteTripService(tripId, ownerId);
+    await deleteTripService(tripId);
 
     res.status(200).json({ message: "Trip deleted successfully" });
   } catch (error) {

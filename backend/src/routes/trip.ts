@@ -1,13 +1,14 @@
 import express from 'express';
 import { addTripController, getMyTripsController, deleteTripController,joinTripByCode, removeMemberController} from "../controllers/TripController.js";
 import { auth } from "../middleware/auth.js"
+import { requireTripOwner } from "../middleware/role.js"
 import { generateInviteCode } from '../models/tripModel.js';
 
 const router = express.Router();
 
 router.post('/AddTrip', auth, addTripController);
 
-router.delete('/DeleteTrip', auth, deleteTripController);
+router.delete('/DeleteTrip', auth, requireTripOwner,deleteTripController);
 
 router.get("/all-my-trips", auth, getMyTripsController);
 

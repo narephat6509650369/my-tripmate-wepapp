@@ -106,8 +106,8 @@ export const removeMemberService = async ({trip_id, member_id, owner_id}: Remove
   return { success: true };
 };
 
-export const deleteTripService = async (tripId: string, ownerId: string) => {
-   await deleteTrip(tripId,ownerId);
+export const deleteTripService = async (tripId: string) => {
+   await deleteTrip(tripId);
 }
 
 
