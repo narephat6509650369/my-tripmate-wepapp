@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { createTripWithMember, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips, findTripByInviteCode, addMemberIfNotExists, findTripById, findMemberInTrip, removeMemberById, deleteTrip, findAllTripsByUserId} from "../models/tripModel.js";
+import { createTripWithMember, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips, findTripByInviteCode, addMemberIfNotExists, findTripById, findMemberInTrip, removeMemberById, deleteTrip, findAllTripsByUserId, getTripStatus} from "../models/tripModel.js";
 import type { Trip, MyTrip, TripDetail,  } from '../models/tripModel.js';
 
 interface RemoveMemberParams {
@@ -78,7 +78,7 @@ export const joinTripServiceByLink = async (tripId: string, userId: string) => {
 };
 
 export const removeMemberService = async ({trip_id, member_id, owner_id}: RemoveMemberParams) => {
-  // 1) ตรวจสอบ Trip
+  // 1. ตรวจสอบ Trip
   const trip = await findTripById(trip_id);
 
   if (!trip) {
@@ -89,7 +89,7 @@ export const removeMemberService = async ({trip_id, member_id, owner_id}: Remove
     return { success: false, error: "Only owner can remove members" };
   }
 
-  // 2) ตรวจสอบ Member ใน trip
+  // 2. ตรวจสอบ Member ใน trip
   const member = await findMemberInTrip(trip_id, member_id);
 
   if (!member) {
@@ -100,7 +100,20 @@ export const removeMemberService = async ({trip_id, member_id, owner_id}: Remove
     return { success: false, error: "Owner cannot remove themselves" };
   }
 
-  // 3) ลบสมาชิก
+  // 3. ดึงสถานะปัจจุบันมาก่อน
+  const currentStatus = await getTripStatus(trip_id);
+
+  // 4. ถ้าไม่เจอทริป (อาจจะถูกลบไปแล้ว หรือ id มั่ว)
+  if (!currentStatus) {
+    throw new Error("Trip not found");
+  }
+
+  // 6. เช็คเงื่อนไข FR2.5: ห้ามลบถ้า Confirmed หรือ Completed
+  if (currentStatus === 'confirmed' || currentStatus === 'completed') {
+    // โยน Error ออกไปพร้อมข้อความเฉพาะเจาะจง
+    throw new Error("Cannot delete trip that is already confirmed or completed.");
+  }
+  // 7. ลบสมาชิก
   await removeMemberById(trip_id, member_id);
 
   return { success: true };

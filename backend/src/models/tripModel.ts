@@ -149,21 +149,15 @@ export async function getDashboardTrips(user_id: string): Promise<TripDashboardI
     return rows;
 }
 
-/*
-export async function getTripById(tripId: string): Promise<Trip | null> {
-    const [rows] = await pool.query('SELECT * FROM trips WHERE trip_id = ?', [tripId]);
-    const trips = rows as Trip[];
-    return trips[0] || null;
-}
-*/
-/*
-export async function updateTrip(trip: Trip): Promise<void> {
-    await pool.query(
-        'UPDATE trips SET owner_id = ?, trip_name = ?, description = ?, num_days = ?, invite_code = ?, invite_link = ?, status = ? WHERE trip_id = ?',
-        [trip.owner_id, trip.trip_name, trip.description, trip.num_days, trip.invite_code, trip.invite_link, trip.status, trip.trip_id]
-    );
-}
-*/
+// ฟังก์ชันดึงเฉพาะสถานะของทริป (ใช้เช็คก่อนลบ)
+export const getTripStatus = async (trip_id: string): Promise<string | null> => {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    'SELECT status FROM trips WHERE trip_id = ?',
+    [trip_id]
+  );
+  
+  return rows.length > 0 ? rows[0]?.status : null;
+};
 
 export async function deleteTrip(tripId: string): Promise<void> {
     await pool.query('DELETE FROM trips WHERE trip_id = ? AND owner_id = ?', [tripId]);
@@ -289,9 +283,6 @@ export const addMemberIfNotExists = async (tripId: string, userId: string) => {
   return { trip_id: tripId, user_id: userId, role };
 };
 
-/**/
-
-
 //รายการทริปทั้งหมดที่ user เข้าร่วม + ถูกเชิญ + เป็นเจ้าของ
 export async function getMyTrips(userId: string): Promise<MyTrip[]> {
     const sql = `
@@ -372,7 +363,7 @@ export default {
     removeMemberById,
     deleteTrip,
     createTripWithMember,
-
+    getTripStatus,
    
         
 };
