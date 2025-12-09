@@ -1,18 +1,20 @@
-  import React, { useState, useEffect, useMemo } from "react"; 
-  import { Check, X, Copy, Plus, Info } from "lucide-react";
-  import Header from "../components/Header";
-  import { useNavigate, useParams } from "react-router-dom";
-  import { tripAPI } from "../services/api";
+import React, { useState, useEffect, useMemo } from "react"; 
+import { Check, X, Copy, Plus, Info } from "lucide-react";
+import Header from "../components/Header";
+import { useNavigate, useParams } from "react-router-dom";
+import { tripAPI } from "../services/api";
+import { CONFIG, log } from "../config/config";
+import { MOCK_TRIP_DATA, MOCK_SUBMIT_VOTES_RESPONSE, MOCK_CLOSE_TRIP_RESPONSE } from "../data/mockData";
  
-  import {
-    ResponsiveContainer,
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-  } from "recharts";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
 
   // ---------------- Interfaces ----------------
   interface Member {
@@ -258,8 +260,16 @@
         }
 
         try {
-          // เรียก API แทน localStorage
-          const response = await tripAPI.getTripDetail(tripCode);
+          let response;
+          
+          if (CONFIG.USE_MOCK_DATA) {
+            log.mock('Loading trip data from mock');
+            response = MOCK_TRIP_DATA;
+            await new Promise(resolve => setTimeout(resolve, 500)); // จำลอง delay
+          } else {
+            log.api('Loading trip data from API');
+            response = await tripAPI.getTripDetail(tripCode);
+          }
           
           if (!response || !response.success) {
             throw new Error('ไม่พบข้อมูลทริป');
@@ -279,7 +289,7 @@
             return;
           }
         } catch (error) {
-          console.error("Error loading trip:", error);
+          log.error("Error loading trip:", error);
           alert("ไม่สามารถโหลดข้อมูลทริปได้");
           navigate("/homepage");
         }
@@ -433,27 +443,37 @@
     // ---------------- Budget Step ----------------
     const StepBudget = () => {
       const updateBudget = (key: keyof Member["budget"], value: number) => {
-
-      // เช็คให้ครอบคลุมมากขึ้น
-      if (["accommodation", "transport", "food"].includes(key)) {
-        if (value === 0 || isNaN(value)) {
-          alert(`กรุณากรอกจำนวนเงินใน${BUDGET_CATEGORIES.find(c => c.key === key)?.label || key}`);
-          return;
-        }
-      }
-
-      // เพิ่มการตรวจสอบค่าสูงสุดต่อหมวด
-      const MAX_PER_CATEGORY = 100000; // ตัวอย่าง
-        if (value > MAX_PER_CATEGORY) {
-          alert(`จำนวนเงินต่อหมวดไม่ควรเกิน ฿${formatCurrency(MAX_PER_CATEGORY)}`);
-          return;
-        }
-
         if (!memberBudget) return;
 
         // Validation
+        if (isNaN(value)) {
+          alert("กรุณากรอกตัวเลขที่ถูกต้อง");
+          return;
+        }
+
         if (value < 0) {
-          alert("จำนวนเงินต้องมากกว่าหรือเท่ากับ 0");
+          alert("จำนวนเงินต้องไม่ติดลบ");
+          return;
+        }
+
+        // เช็คหมวดบังคับ (ต้อง > 0)
+        const requiredCategories = ["accommodation", "transport", "food"];
+        if (requiredCategories.includes(key)) {
+          if (value <= 0 || isNaN(value)) {
+            alert(`${BUDGET_CATEGORIES.find(c => c.key === key)?.label} ต้องมากกว่า 0 บาท`);
+            return;
+          }
+        }
+
+        // เช็คหมวด "other" (อนุญาตให้เป็น 0 ได้ แต่ไม่ติดลบ)
+        if (key === "other" && value < 0) {
+          alert("เงินสำรองต้องไม่ติดลบ");
+          return;
+        }
+
+        const MAX_PER_CATEGORY = 100000;
+        if (value > MAX_PER_CATEGORY) {
+          alert(`จำนวนเงินต่อหมวดไม่ควรเกิน ฿${formatCurrency(MAX_PER_CATEGORY)}`);
           return;
         }
 
@@ -630,7 +650,13 @@
         }));
       };
 
-      const submitVotes = async () => {  // ← เพิ่ม async
+      const submitVotes = async () => {
+        const uniqueVotes = new Set(myVote);
+        if (uniqueVotes.size !== 3) {
+          setError("กรุณาเลือกจังหวัดที่ต่างกัน 3 จังหวัด");
+          return;
+        }
+
         if (myVote.includes("")) {
           setError("กรุณาเลือกครบ 3 อันดับก่อนส่งคะแนน");
           return;
@@ -656,19 +682,29 @@
         const logEntry = `คุณ: 🥇${myVote[0]} 🥈${myVote[1]} 🥉${myVote[2]}`;
         setVoteHistory(prev => [logEntry, ...prev]);
 
-        // ส่งผลโหวตไปยัง Backend
         try {
-          const response = await tripAPI.submitProvinceVotes(tripCode, {
-            votes: myVote,
-            scores: newScores
-          });
+          let response;
+          
+          if (CONFIG.USE_MOCK_DATA) {
+            log.mock('Submitting votes (mock)');
+            response = MOCK_SUBMIT_VOTES_RESPONSE;
+            await new Promise(resolve => setTimeout(resolve, 300));
+          } else {
+            log.api('Submitting votes to API');
+            response = await tripAPI.submitProvinceVotes(tripCode, {
+              votes: myVote,
+              scores: newScores
+            });
+          }
           
           if (response.success) {
-            console.log("บันทึกผลโหวตสำเร็จ");
+            log.success("บันทึกผลโหวตสำเร็จ");
+          } else {
+            throw new Error(response.message || 'ไม่สามารถบันทึกได้');
           }
-        } catch (error) {
-          console.error("Error saving votes:", error);
-          alert("เกิดข้อผิดพลาดในการบันทึกผลโหวต");
+        } catch (error: any) {
+          log.error("Error saving votes:", error);
+          alert("เกิดข้อผิดพลาด: " + (error.message || "ไม่สามารถบันทึกผลโหวต"));
         }
       };
 
@@ -797,37 +833,46 @@
 
     // ---------------- STEP 5: SUMMARY ----------------
     const StepSummary = () => {
-      const handleCloseVoting = async () => {  // ← เพิ่ม async
-      // เช็คงบประมาณก่อน
-      const incompleteBudgets = trip.members.filter(m => 
-        m.budget.accommodation === 0 || 
-        m.budget.transport === 0 || 
-        m.budget.food === 0
-      );
+      const handleCloseVoting = async () => {
+        const incompleteBudgets = trip.members.filter(m => 
+          !m.budget.accommodation || m.budget.accommodation <= 0 ||
+          !m.budget.transport || m.budget.transport <= 0 ||
+          !m.budget.food || m.budget.food <= 0
+        );
 
-      if (incompleteBudgets.length > 0) {
-        alert(`ยังมีสมาชิก ${incompleteBudgets.length} คนที่ยังกรอกงบประมาณไม่ครบ!\n\nกรุณาให้ทุกคนกรอกข้อมูลให้ครบก่อน`);
-        return;
-      }
-
-      if (!confirm("ต้องการปิดการโหวตและบันทึกผลหรือไม่?\n\nเมื่อปิดแล้ว สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก")) {
-        return;
-      }
-      
-      try {
-        const response = await tripAPI.closeTrip(tripCode);
-        
-        if (response.success) {
-          alert("ปิดการโหวตเรียบร้อย! กำลังนำไปหน้าสรุปผล...");
-          navigate(`/summaryPage/${tripCode}`);
-        } else {
-          throw new Error(response.message || 'ไม่สามารถปิดการโหวตได้');
+        if (incompleteBudgets.length > 0) {
+          const names = incompleteBudgets.map(m => m.name).join(", ");
+          alert(`สมาชิกเหล่านี้ยังกรอกงบประมาณไม่ครบ:\n${names}\n\nกรุณาให้ทุกคนกรอกข้อมูลให้ครบก่อน`);
+          return;
         }
-      } catch (error) {
-        console.error("Error closing trip:", error);
-        alert("เกิดข้อผิดพลาดในการปิดการโหวต");
-      }
-    };
+
+        if (!confirm("ต้องการปิดการโหวตและบันทึกผลหรือไม่?\n\nเมื่อปิดแล้ว สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก")) {
+          return;
+        }
+        
+        try {
+          let response;
+          
+          if (CONFIG.USE_MOCK_DATA) {
+            log.mock('Closing trip (mock)');
+            response = MOCK_CLOSE_TRIP_RESPONSE;
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } else {
+            log.api('Closing trip via API');
+            response = await tripAPI.closeTrip(tripCode);
+          }
+          
+          if (response.success) {
+            alert("ปิดการโหวตเรียบร้อย! กำลังนำไปหน้าสรุปผล...");
+            navigate(`/summaryPage/${tripCode}`);
+          } else {
+            throw new Error(response.message || 'ไม่สามารถปิดการโหวตได้');
+          }
+        } catch (error: any) {
+          log.error("Error closing trip:", error);
+          alert("เกิดข้อผิดพลาดในการปิดการโหวต");
+        }
+      };
 
       return (
         <div className="bg-white p-6 rounded-xl shadow-lg">

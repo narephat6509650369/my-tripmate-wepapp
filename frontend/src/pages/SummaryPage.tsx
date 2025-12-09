@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Copy, Calendar, Users, DollarSign, MapPin, Sparkles, Check, X } from "lucide-react";
 import Header from "../components/Header";
 import { tripAPI } from "../services/api";
+import { CONFIG, log } from "../config/config";
+import { MOCK_SUMMARY_DATA } from "../data/mockData";
 import {
   ResponsiveContainer,
   BarChart,
@@ -63,6 +65,7 @@ const SummaryPage: React.FC = () => {
   const navigate = useNavigate();
   const [tripData, setTripData] = useState<TripData | null>(null);
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const handleLogout = () => {
     localStorage.removeItem("jwtToken");
@@ -79,30 +82,75 @@ const SummaryPage: React.FC = () => {
       }
 
       try {
-        const response = await tripAPI.getTripDetail(tripCode);
+        setLoading(true);
+        let response;
+        
+        if (CONFIG.USE_MOCK_DATA) {
+          log.mock('Loading trip summary from mock');
+          response = MOCK_SUMMARY_DATA;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          log.api('Loading trip summary from API');
+          response = await tripAPI.getTripDetail(tripCode);
+        }
         
         if (!response || !response.success) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
 
         setTripData(response.data);
-        console.log("โหลดข้อมูลสรุปผล:", response.data);
+        log.success("โหลดข้อมูลสรุปผล:", response.data);
       } catch (error) {
-        console.error("Error loading trip:", error);
+        log.error("Error loading trip:", error);
         alert("ไม่สามารถโหลดข้อมูลทริปได้");
         navigate("/homepage");
+      } finally {
+        setLoading(false);
       }
     };
 
     loadTripSummary();
   }, [tripCode, navigate]);
 
-  if (!tripData) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tripData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-xl text-gray-700 mb-4">ไม่พบข้อมูลทริป</p>
+          <button
+            onClick={() => navigate('/homepage')}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg"
+          >
+            กลับหน้าหลัก
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // เพิ่มการตรวจสอบว่า trip ถูกปิดแล้วหรือยัง
+  if (!tripData.closedAt) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-xl text-gray-700 mb-4">ทริปนี้ยังไม่ได้ปิดการโหวต</p>
+          <button
+            onClick={() => navigate('/homepage')}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg"
+          >
+            กลับหน้าหลัก
+          </button>
         </div>
       </div>
     );
@@ -204,7 +252,6 @@ ${topProvinces.map((p, i) => `${i + 1}. ${p.name} (${p.score} คะแนน)`)
               <Users className="w-5 h-5" />
               {members.length} สมาชิก
             </span>
-            {/* ⬇️ เพิ่มส่วนนี้ */}
             <button
               onClick={() => navigate("/homepage")}
               className="ml-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold transition-colors"

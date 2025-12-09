@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check } from "lucide-react";
-import { useEffect } from "react";
 import { tripAPI } from "../services/api";
+import { CONFIG, log } from "../config/config";
+import { MOCK_MY_TRIPS, MOCK_JOIN_TRIP_RESPONSE } from "../data/mockData";
 import {
   ResponsiveContainer,
   BarChart,
@@ -18,11 +19,18 @@ import {
   Cell,
 } from "recharts";
 
+interface DashboardData {
+  name: string;
+  joined: number;
+  notFilled: number;
+}
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"overview" | "stats">("stats");
   const [roomCode, setRoomCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [dashboardData, setDashboardData] = useState<DashboardData[]>([]);
 
   const handleLogout = () => {
     localStorage.removeItem("jwtToken");
@@ -31,7 +39,7 @@ const Dashboard: React.FC = () => {
   };
 
   const handleCreateTrip = () => {
-    navigate("/homepage"); // ไปหน้า homepage เพื่อสร้างทริป
+    navigate("/homepage");
   };
 
   const handleJoinTrip = async (code: string) => {
@@ -43,7 +51,16 @@ const Dashboard: React.FC = () => {
     }
     
     try {
-      const response = await tripAPI.joinTrip(cleanCode);
+      let response;
+      
+      if (CONFIG.USE_MOCK_DATA) {
+        log.mock('Joining trip (mock)');
+        response = MOCK_JOIN_TRIP_RESPONSE;
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } else {
+        log.api('Joining trip via API');
+        response = await tripAPI.joinTrip(cleanCode);
+      }
       
       if (response.success) {
         alert('เข้าร่วมทริปสำเร็จ!');
@@ -53,21 +70,26 @@ const Dashboard: React.FC = () => {
         alert(response.message || 'ไม่สามารถเข้าร่วมทริปได้');
       }
     } catch (error) {
-      console.error('Error joining trip:', error);
+      log.error('Error joining trip:', error);
       alert('เกิดข้อผิดพลาดในการเข้าร่วมทริป');
     }
   };
-
-  // โหลดข้อมูลจริงจาก localStorage
-  const [dashboardData, setDashboardData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadTrips = async () => {
       try {
         setLoading(true);
-        const response = await tripAPI.getMyTrips();
+        let response;
         
+        if (CONFIG.USE_MOCK_DATA) {
+          log.mock('Loading trips from mock');
+          response = MOCK_MY_TRIPS;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          log.api('Loading trips from API');
+          response = await tripAPI.getMyTrips();
+        }
+
         // ตรวจสอบ response
         if (!response || !response.success) {
           throw new Error(response?.message || 'Failed to load trips');
@@ -96,14 +118,12 @@ const Dashboard: React.FC = () => {
       } catch (error) {
         console.error('Error loading trips:', error);
         
-        // แสดง error message
         const errorMessage = error instanceof Error 
           ? error.message 
           : 'ไม่สามารถโหลดข้อมูล Dashboard ได้';
         
         alert(`เกิดข้อผิดพลาด: ${errorMessage}\nกรุณาลองใหม่อีกครั้ง`);
         
-        // ตั้งค่าเป็น array ว่าง
         setDashboardData([]);
       } finally {
         setLoading(false);
@@ -145,7 +165,7 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
 
-      {/* สร้างทริป / เข้าร่วม */}
+        {/* สร้างทริป / เข้าร่วม */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <button
             onClick={handleCreateTrip}

@@ -11,9 +11,9 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
         <Routes>
-          <Route path="/homePage" element={<HomePage />} /> 
+          <Route path="/homepage" element={<HomePage />} /> 
           <Route path="/dashboard" element={<Dashboard />} />  
-          <Route path="/votePage/:tripCode" element={<VotePage />} />
+          <Route path="/votepage/:tripCode" element={<VotePage />} />
           <Route path="/summaryPage/:tripCode" element={<SummaryPage />} />
           <Route path="/" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

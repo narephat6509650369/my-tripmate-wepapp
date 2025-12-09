@@ -22,32 +22,35 @@ function LoginPage() {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
   const handleGoogleLogin = useGoogleLogin({
-  flow: 'implicit',
-  onSuccess: async (tokenResponse) => {
-    setLoading(true);
-    setError('');
-    try {
-      // ส่ง token ไปที่ backend เพื่อรับ JWT
-      const res = await axios.post<GoogleLoginResult>(`${API_BASE_URL}/auth/google`,{ access_token: tokenResponse.access_token });
-      const { token , user} = res.data;
-      localStorage.setItem('jwtToken', token);
-      // เก็บ user ไปใช้ตอนหน้า HomePage
-      localStorage.setItem("userId", user.user_id);
-      localStorage.setItem("userEmail", user.email);
-      navigate('/HomePage');
-    } catch (err) {
-      console.error('Login failed:', err);
-      setError('Login failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  },
-  onError: () => {
-    setError('Google login was unsuccessful. Please try again.');
-  },
-});
-
-
+    flow: 'implicit',
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await axios.post<GoogleLoginResult>(`${API_BASE_URL}/auth/google`, { access_token: tokenResponse.access_token });   
+        const { token, user } = res.data;
+        
+        // ตรวจสอบว่ามีข้อมูลครบหรือไม่
+        if (!token || !user?.user_id || !user?.email) {
+          throw new Error('Invalid response from server');
+        }
+        
+        localStorage.setItem('jwtToken', token);
+        localStorage.setItem('userId', user.user_id);
+        localStorage.setItem('userEmail', user.email);
+        
+        navigate('/homepage');
+      } catch (err) {
+        console.error('Login failed:', err);
+        setError('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => {
+      setError('การเข้าสู่ระบบด้วย Google ล้มเหลว กรุณาลองใหม่อีกครั้ง');
+    },
+  });
 
   return (
     <div className="wrap-login100">

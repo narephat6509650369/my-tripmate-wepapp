@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check, User } from "lucide-react";
 import { tripAPI } from "../services/api";
+import { CONFIG, log } from "../config/config";
+import { MOCK_MY_TRIPS, MOCK_CREATE_TRIP_RESPONSE, MOCK_INVITE_CODE_RESPONSE, MOCK_JOIN_TRIP_RESPONSE } from "../data/mockData";
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -25,38 +27,37 @@ const HomePage: React.FC = () => {
   const loadTrips = async () => {
     try {
       setLoading(true);
-      const response = await tripAPI.getMyTrips();
+      let response;
       
-      // ตรวจสอบ response
+      if (CONFIG.USE_MOCK_DATA) {
+        log.mock('Loading trips from mock');
+        response = MOCK_MY_TRIPS;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } else {
+        log.api('Loading trips from API');
+        response = await tripAPI.getMyTrips();
+      }
+      
       if (!response || !response.success) {
         throw new Error(response?.message || 'Failed to load trips');
       }
       
-      // ตรวจสอบ data
       if (!response.data || !Array.isArray(response.data)) {
         throw new Error('Invalid data format from server');
       }
       
-      // แยกทริปที่สร้างเองกับทริปที่ถูกเชิญ
       const userId = localStorage.getItem('userId');
-      
       const created = response.data.filter((trip: any) => trip.createdBy === userId);
       const invited = response.data.filter((trip: any) => trip.createdBy !== userId);
       
-      // Format ข้อมูลให้ตรงกับ UI
       setMyTrips(created.map((trip: any) => formatTripData(trip)));
       setInvitedTrips(invited.map((trip: any) => formatTripData(trip)));
     } catch (error) {
-      console.error('Error loading trips:', error);
-      
-      // ปรับข้อความ error ให้ชัดเจน
+      log.error('Error loading trips:', error);
       const errorMessage = error instanceof Error 
         ? error.message 
         : 'ไม่สามารถโหลดข้อมูลทริปได้';
-      
       alert(`เกิดข้อผิดพลาด: ${errorMessage}\nกรุณาลองใหม่อีกครั้ง`);
-      
-      // ตั้งค่าเป็น array ว่าง เพื่อป้องกัน undefined error
       setMyTrips([]);
       setInvitedTrips([]);
     } finally {
@@ -96,18 +97,27 @@ const HomePage: React.FC = () => {
     }
     
     try {
-      const response = await tripAPI.joinTrip(cleanCode);
+      let response;
+      
+      if (CONFIG.USE_MOCK_DATA) {
+        log.mock('Joining trip (mock)');
+        response = MOCK_JOIN_TRIP_RESPONSE;
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } else {
+        log.api('Joining trip via API');
+        response = await tripAPI.joinTrip(cleanCode);
+      }
       
       if (response.success) {
         alert('เข้าร่วมทริปสำเร็จ!');
         navigate(`/votePage/${response.data.tripId}`);
         setRoomCode("");
-        loadTrips(); // โหลดทริปใหม่
+        loadTrips();
       } else {
         alert(response.message || 'ไม่สามารถเข้าร่วมทริปได้');
       }
     } catch (error) {
-      console.error('Error joining trip:', error);
+      log.error('Error joining trip:', error);
       alert('เกิดข้อผิดพลาดในการเข้าร่วมทริป');
     }
   };
@@ -147,6 +157,20 @@ const HomePage: React.FC = () => {
           >
             <Plus className="w-5 h-5" />
             สร้างทริปใหม่
+          </button>
+          {/* เพิ่มปุ่มทดสอบ */}
+          <button
+            onClick={() => navigate("/votePage/TEST-DEMO-1234-5678")}
+            className="md:flex-[2] flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium py-4 rounded-lg transition"
+          >
+            🧪 ทดสอบหน้า VotePage
+          </button>
+
+          <button
+            onClick={() => navigate("/summaryPage/TEST-DEMO-1234-5678")}
+            className="md:flex-[2] flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-medium py-4 rounded-lg transition"
+          >
+            🧪 ทดสอบหน้า SummaryPage
           </button>
 
           <div className="md:flex-1 flex gap-2 w-full">
@@ -355,43 +379,49 @@ const HomePage: React.FC = () => {
                   }
                   
                   try {
-                    const response = await tripAPI.createTrip(newTrip);
-
-                    // ตรวจสอบ response
-                    if (!response || !response.success) {
-                      throw new Error(response?.message || 'Failed to create trip');
-                    }
-
-                    // ดึง tripId จาก response
-                    const tripId = response.data?._id || response.data?.id;
-                    if (!tripId) {
-                      throw new Error('Trip ID not found in response');
-                    }
+                    let response, inviteResponse;
                     
-                    // สร้าง invite code
-                    const inviteResponse = await tripAPI.generateInviteCode(tripId);
+                    if (CONFIG.USE_MOCK_DATA) {
+                      log.mock('Creating trip (mock)');
+                      response = MOCK_CREATE_TRIP_RESPONSE;
+                      await new Promise(resolve => setTimeout(resolve, 500));
+                      
+                      log.mock('Generating invite code (mock)');
+                      inviteResponse = MOCK_INVITE_CODE_RESPONSE;
+                    } else {
+                      log.api('Creating trip via API');
+                      response = await tripAPI.createTrip(newTrip);
 
-                    // ตรวจสอบ invite code response
-                    if (!inviteResponse || !inviteResponse.success) {
+                      if (!response?.success) {
+                        throw new Error(response?.message || 'Failed to create trip');
+                      }
+
+                      const tripId = response.data?._id || response.data?.id;
+                      if (!tripId) {
+                        throw new Error('Trip ID not found in response');
+                      }
+                      
+                      log.api('Generating invite code via API');
+                      inviteResponse = await tripAPI.generateInviteCode(tripId);
+                    }
+
+                    if (!inviteResponse?.success) {
                       throw new Error('Failed to generate invite code');
                     }
                     
-                    // แสดง alert พร้อมรหัสเชิญ
                     if (inviteResponse.data?.inviteCode) {
                       alert(`สร้างทริปสำเร็จ!\n\nรหัสเชิญ: ${inviteResponse.data.inviteCode}\n\nกรุณาบันทึกรหัสนี้ไว้`);
-                      navigate(`/votePage/${tripId}`);
+                      navigate(`/votePage/${response.data._id || response.data.id}`);
                     }
                     
                     setShowCreateModal(false);
                     setNewTrip({ name: "", days: "", detail: "" });
                     loadTrips();
                   } catch (error) {
-                    console.error('Error creating trip:', error);
-                    
+                    log.error('Error creating trip:', error);
                     const errorMessage = error instanceof Error 
                       ? error.message 
                       : 'เกิดข้อผิดพลาดในการสร้างทริป';
-                    
                     alert(`เกิดข้อผิดพลาด: ${errorMessage}\nกรุณาลองใหม่อีกครั้ง`);
                   }
                 }}
