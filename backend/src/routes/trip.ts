@@ -21,6 +21,6 @@ router.post("/:tripId/invite", auth, generateInviteCode);
 router.post("/join", auth, joinTripByCode);
 
 // Owner ลบสมาชิกออกจากทริป  
-router.delete("/:tripId/members/:memberId", auth, removeMemberController);
+router.delete("/:tripId/members/:memberId", auth, requireTripOwner, removeMemberController);
 
 export default router;

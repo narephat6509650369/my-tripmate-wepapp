@@ -48,7 +48,7 @@ export const getMyTripsController = async (req: Request, res: Response) => {
     }
 }
 
-
+//delete trip โดย owner
 export const deleteTripController = async (req: Request, res: Response) => {
   try {
     const tripId = req.params.tripId;
