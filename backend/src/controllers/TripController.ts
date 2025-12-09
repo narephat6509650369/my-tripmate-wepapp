@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
-import { initializeTrip,fetchMyTrips,fetchTripDetail,joinTripServiceByCode, joinTripServiceByLink, removeMemberService, deleteTripService} from "../services/tripService.js";
+import { getUserTrips,joinTripServiceByCode, joinTripServiceByLink, removeMemberService, deleteTripService,addTrip} from "../services/tripService.js";
 import type { JwtPayload } from "../express.d.js"
 
+//เพิ่มสมาชิก
 export const addTripController = async (req: Request, res: Response) => {
   try{
     const { trip_name, description, num_days } = req.body;
@@ -12,7 +13,7 @@ export const addTripController = async (req: Request, res: Response) => {
     if (!num_days || typeof num_days !== 'number' || num_days < 1) {
       return res.status(400).json({ message: "Number of days must be a number greater than 0." });
     }
-    const newTrip = await initializeTrip( user_id, trip_name, description, num_days );
+    const newTrip = await addTrip( user_id, trip_name, description, num_days );
     res.status(201).json({ message: "Trip added successfully", trip: newTrip });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -24,7 +25,8 @@ export const addTripController = async (req: Request, res: Response) => {
   }
 }
 
-export const getMyTrips = async (req: Request, res: Response) => {
+//ดึงข้อมูล trip ทั้ง trip ที่ถูกเชิญและสร้างเอง
+export const getMyTripsController = async (req: Request, res: Response) => {
     try {
         const user_id = (req.user as JwtPayload).user_id;
 
@@ -32,11 +34,12 @@ export const getMyTrips = async (req: Request, res: Response) => {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
-        const trips = await fetchMyTrips(user_id);
+        // เรียก Service ตัวที่ถูกต้อง (ไม่ต้องมี fetch)
+        const tripData = await getUserTrips(user_id);
 
         return res.status(200).json({
             success: true,
-            data: trips
+            data: tripData // ส่ง object ที่มี { all, owned, joined } กลับไป
         });
 
     } catch (error) {
@@ -45,42 +48,16 @@ export const getMyTrips = async (req: Request, res: Response) => {
     }
 }
 
-/*
-export async function getTripDetail(req: Request, res: Response) {
-    try {
-        const { trip_Id } = req.params;
-      
-        if (!trip_Id) {
-            return res.status(400).json({ message: "tripId is required" });
-        }
-
-        const tripDetail = await fetchTripDetail(trip_Id);
-
-        if (!tripDetail) {
-            return res.status(404).json({ message: "Trip not found" });
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: tripDetail
-        });
-
-    } catch (error) {
-        console.error("getTripDetail error:", error);
-        return res.status(500).json({ message: "Server error" });
-    }
-}
-*/
+//delete trip โดย owner
 export const deleteTripController = async (req: Request, res: Response) => {
   try {
     const tripId = req.params.tripId;
-    const ownerId = req.params.ownerId||""; 
 
     if (!tripId) {
       return res.status(400).json({ message: "tripId is required" });
     }
 
-    await deleteTripService(tripId, ownerId);
+    await deleteTripService(tripId);
 
     res.status(200).json({ message: "Trip deleted successfully" });
   } catch (error) {
@@ -168,24 +145,5 @@ export const removeMemberController = async (req: Request, res: Response) => {
   }
 };
 
-/*
-export const updateTripController = async (req: Request, res: Response) => {
-  try {
-    const { trip_id, trip_name, description, num_days } = req.body; 
-    if (!trip_id) {
-      return res.status(400).json({ message: "trip_id is required" });
-    }
-    // Assuming a function updateTrip exists in tripModel.ts
-    await updateTrip(trip_id, trip_name, description, num_days);
-    res.status(200).json({ message: "Trip updated successfully" });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return res.status(500).json({
-      message: "Failed to update trip",
-      error: message
-    });
-  }
-};
-*/
 
-export default {addTripController, deleteTripController, getMyTrips, joinTripByCode, joinTripByLink};
+export default {addTripController, deleteTripController, getMyTripsController, joinTripByCode, joinTripByLink};
