@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Copy, Calendar, Users, DollarSign, MapPin, Sparkles, Check, X } from "lucide-react";
+import { Copy, Calendar, Users, DollarSign, MapPin, Sparkles, Check, X, Loader2 } from "lucide-react";
 import Header from "../components/Header";
 import { tripAPI } from "../services/api";
 import { CONFIG, log } from "../config/config";
-import { MOCK_SUMMARY_DATA } from "../data/mockData";
+import { MOCK_SUMMARY_DATA, Member, TripData } from "../data/mockData";
 import {
   ResponsiveContainer,
   BarChart,
@@ -19,33 +19,11 @@ import {
   Legend
 } from "recharts";
 
-interface Member {
-  id: string;
-  name: string;
-  gender: "ชาย" | "หญิง";
-  availability: boolean[];
-  budget: {
-    accommodation: number;
-    transport: number;
-    food: number;
-    other: number;
-  };
-}
-
-interface TripData {
-  members: Member[];
-  voteResults?: {
-    provinces?: { name: string; score: number }[];
-    dates?: { date: string; votes: number }[];
-  };
-  closedAt?: number;
-}
-
 const BUDGET_CATEGORIES = [
-  { key: 'accommodation', label: 'ค่าที่พัก', color: '#3b82f6' },
-  { key: 'transport', label: 'ค่าเดินทาง', color: '#8b5cf6' },
-  { key: 'food', label: 'ค่าอาหาร', color: '#10b981' },
-  { key: 'other', label: 'เงินสำรอง', color: '#f59e0b' }
+  { key: 'accommodation' as const, label: 'ค่าที่พัก', color: '#3b82f6' },
+  { key: 'transport' as const, label: 'ค่าเดินทาง', color: '#8b5cf6' },
+  { key: 'food' as const, label: 'ค่าอาหาร', color: '#10b981' },
+  { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b' }
 ];
 
 const formatCurrency = (amount: number) => {
@@ -94,7 +72,7 @@ const SummaryPage: React.FC = () => {
           response = await tripAPI.getTripDetail(tripCode);
         }
         
-        if (!response || !response.success) {
+        if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
 
@@ -114,10 +92,11 @@ const SummaryPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">กำลังโหลดข้อมูล...</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        <Header onLogout={handleLogout} />
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+          <p className="text-gray-600 text-lg">กำลังโหลดข้อมูลสรุปผล...</p>
         </div>
       </div>
     );
@@ -139,12 +118,32 @@ const SummaryPage: React.FC = () => {
     );
   }
 
-  // เพิ่มการตรวจสอบว่า trip ถูกปิดแล้วหรือยัง
-  if (!tripData.closedAt) {
+  // ✅ เพิ่มการตรวจสอบว่า trip ถูกปิดแล้วหรือยัง
+  if (!tripData.isCompleted || !tripData.closedAt) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-xl text-gray-700 mb-4">ทริปนี้ยังไม่ได้ปิดการโหวต</p>
+          <button
+            onClick={() => navigate(`/vote/${tripCode}`)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg"
+          >
+            ไปหน้าโหวต
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const members = tripData.members || [];
+  const voteResults = tripData.voteResults || { provinces: [], dates: [] };
+
+  // ✅ เพิ่มการตรวจสอบว่ามีสมาชิกหรือไม่
+  if (members.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-xl text-gray-700 mb-4">ไม่พบข้อมูลสมาชิกในทริป</p>
           <button
             onClick={() => navigate('/homepage')}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg"
@@ -156,21 +155,18 @@ const SummaryPage: React.FC = () => {
     );
   }
 
-  const members = tripData.members || [];
-  const voteResults = tripData.voteResults || {};
-
   const dateHeaders = ["1 พย", "2 พย", "5 พย", "6 พย", "10 พย", "11 พย", "17 พย", "18 พย"];
   
   // คำนวณวันที่ที่ตรงกันมากที่สุด
   const dateAvailability = dateHeaders.map((date: string, idx: number) => ({
     date,
-    available: members.filter((m: Member) => m.availability[idx]).length,
+    available: members.filter((m: Member) => m.availability?.[idx]).length,
     total: members.length
   })).sort((a, b) => b.available - a.available);
 
   // คำนวณสถิติงบประมาณ
   const budgetStats = BUDGET_CATEGORIES.map(({ key, label, color }) => {
-    const values = members.map((m: Member) => m.budget[key as keyof Member['budget']]);
+    const values = members.map((m: Member) => m.budget[key]);
     const median = getMedian(values);
     const total = values.reduce((a: number, b: number) => a + b, 0);
     return { key, label, color, median, total, values };
@@ -189,37 +185,54 @@ const SummaryPage: React.FC = () => {
   // Top 3 จังหวัด
   const topProvinces = voteResults?.provinces?.slice(0, 3) || [];
 
-  // สร้าง AI Prompt
+  // ✅ ปรับปรุง AI Prompt Generation
   const generateAIPrompt = () => {
+    const maleCount = members.filter(m => m.gender === "ชาย").length;
+    const femaleCount = members.filter(m => m.gender === "หญิง").length;
+    const topDate = dateAvailability[0];
+    const duration = `${tripData.days} วัน`;
+
     const prompt = `สวัสดีค่ะ! ฉันกำลังวางแผนทริปท่องเที่ยวกับเพื่อน ๆ และต้องการคำแนะนำจากคุณ
 
 📊 **ข้อมูลสรุปทริปของเรา:**
 
-👥 **สมาชิก:** ${members.length} คน (${members.filter(m => m.gender === "ชาย").length} ชาย, ${members.filter(m => m.gender === "หญิง").length} หญิง)
+🎯 **ชื่อทริป:** ${tripData.name}
+📝 **รายละเอียด:** ${tripData.detail || 'ไม่มีรายละเอียด'}
 
-📅 **วันที่ที่ทุกคนว่าง:**
-- อันดับ 1: ${dateAvailability[0].date} (${dateAvailability[0].available}/${dateAvailability[0].total} คน)
-- อันดับ 2: ${dateAvailability[1].date} (${dateAvailability[1].available}/${dateAvailability[1].total} คน)
-- อันดับ 3: ${dateAvailability[2].date} (${dateAvailability[2].available}/${dateAvailability[2].total} คน)
+👥 **สมาชิก:** ${members.length} คน${maleCount > 0 ? ` (ชาย ${maleCount} คน` : ''}${femaleCount > 0 ? `, หญิง ${femaleCount} คน)` : ')'}
 
-💰 **งบประมาณ (ค่ากลาง):**
+📅 **วันที่ที่เหมาะสมที่สุด:**
+- ${topDate.date} (${topDate.available}/${topDate.total} คน ว่าง - ${Math.round((topDate.available / topDate.total) * 100)}%)
+${dateAvailability.slice(1, 3).map((d, i) => `- อันดับ ${i + 2}: ${d.date} (${d.available}/${d.total} คน)`).join('\n')}
+
+⏱️ **ระยะเวลา:** ${duration}
+
+💰 **งบประมาณ (ค่ากลางต่อคน):**
 - ค่าที่พัก: ฿${formatCurrency(Math.round(budgetStats[0].median))}
 - ค่าเดินทาง: ฿${formatCurrency(Math.round(budgetStats[1].median))}
 - ค่าอาหาร: ฿${formatCurrency(Math.round(budgetStats[2].median))}
 - เงินสำรอง: ฿${formatCurrency(Math.round(budgetStats[3].median))}
-- **รวม: ฿${formatCurrency(Math.round(totalMedian))}**
+- **รวมต่อคน: ฿${formatCurrency(Math.round(totalMedian))}**
+- **งบรวมทั้งกลุ่ม: ฿${formatCurrency(Math.round(totalMedian * members.length))}**
 
-📍 **จังหวัดที่สนใจ:**
-${topProvinces.map((p, i) => `${i + 1}. ${p.name} (${p.score} คะแนน)`).join('\n')}
+📍 **จังหวัดที่สนใจ (จากการโหวต):**
+${topProvinces.length > 0 
+  ? topProvinces.map((p, i) => `${i + 1}. ${p.name} (${p.score} คะแนน)`).join('\n')
+  : 'ยังไม่มีการโหวตจังหวัด'
+}
 
 ❓ **คำถาม:**
-1. จากข้อมูลด้านบน คุณแนะนำให้เราไปจังหวัดไหนดี? (พิจารณาจากงบประมาณและความนิยม)
-2. มีกิจกรรมหรือสถานที่ท่องเที่ยวไหนที่แนะนำสำหรับกลุ่มเราบ้าง?
-3. มีคำแนะนำเรื่องที่พักและการเดินทางไหม?
-4. งบประมาณที่เรามีเหมาะสมกับการท่องเที่ยวในจังหวัดนั้นไหม?
-5. ช่วยแนะนำแผนการเดินทาง 2-3 วันให้หน่อยได้ไหม?
+1. จากข้อมูลด้านบน จังหวัดไหนที่เหมาะสมที่สุดสำหรับกลุ่มเรา? (พิจารณาจากงบประมาณ, จำนวนคน, และความนิยม)
+2. มีกิจกรรมหรือสถานที่ท่องเที่ยวไหนที่แนะนำสำหรับกลุ่ม ${members.length} คนบ้าง?
+3. ช่วยแนะนำที่พักที่เหมาะสมในช่วงงบ ฿${formatCurrency(Math.round(budgetStats[0].median))}/คน/คืน
+4. แนะนำวิธีการเดินทางและประมาณค่าใช้จ่ายที่เหมาะสม
+5. งบประมาณรวม ฿${formatCurrency(Math.round(totalMedian * members.length))} เหมาะสมกับการท่องเที่ยวไหม? ควรปรับเพิ่ม/ลดไหม?
+6. ช่วยแนะนำแผนการเดินทาง ${duration} แบบละเอียดได้ไหม? (รวมถึงเวลา, สถานที่, และร้านอาหารแนะนำ)
 
-ขอบคุณมากค่ะ! 🙏`;
+ขอบคุณมากค่ะ! 🙏
+
+---
+*หมายเหตุ: งบประมาณข้างต้นเป็นค่ากลาง (median) จากการโหวตของสมาชิก*`;
 
     return prompt;
   };
