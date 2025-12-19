@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check, User } from "lucide-react";
 import { tripAPI } from "../services/api";
-import { CONFIG, log } from "../config/config";
+import { CONFIG, log } from '../config/app.config';
+import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils/helpers';
 import { MOCK_MY_TRIPS, MOCK_JOIN_TRIP_RESPONSE, MOCK_CREATE_TRIP_RESPONSE, MOCK_INVITE_CODE_RESPONSE } from "../data/mockData";
-import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils/utils';
 import type { TripData } from "../data/mockData";
 
 const HomePage: React.FC = () => {

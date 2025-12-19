@@ -1,10 +1,9 @@
-import React from 'react'
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import bgImage from '../assets/login-bg.jpg';
-import '../styles/login.css';
+import { CONFIG, log } from '../config/app.config';
 
 interface GoogleLoginResult {
   token: string;
@@ -19,15 +18,23 @@ function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  // ✅ ใช้ CONFIG แทนการ hardcode
+  const API_BASE_URL = CONFIG.API_BASE_URL;
 
   const handleGoogleLogin = useGoogleLogin({
     flow: 'implicit',
     onSuccess: async (tokenResponse) => {
       setLoading(true);
       setError('');
+      
       try {
-        const res = await axios.post<GoogleLoginResult>(`${API_BASE_URL}/auth/google`, { access_token: tokenResponse.access_token });   
+        log.info('Attempting Google login');
+        
+        const res = await axios.post<GoogleLoginResult>(
+          `${API_BASE_URL}/auth/google`, 
+          { access_token: tokenResponse.access_token }
+        );   
+        
         const { token, user } = res.data;
         
         // ตรวจสอบว่ามีข้อมูลครบหรือไม่
@@ -35,19 +42,29 @@ function LoginPage() {
           throw new Error('Invalid response from server');
         }
         
+        // บันทึกข้อมูลลง localStorage
         localStorage.setItem('jwtToken', token);
         localStorage.setItem('userId', user.user_id);
         localStorage.setItem('userEmail', user.email);
         
+        log.success('Login successful', { email: user.email });
         navigate('/homepage');
+        
       } catch (err) {
-        console.error('Login failed:', err);
-        setError('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        log.error('Login failed', err);
+        
+        const errorMessage = axios.isAxiosError(err)
+          ? err.response?.data?.message || err.message
+          : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
+        
+        setError(`เข้าสู่ระบบไม่สำเร็จ: ${errorMessage}`);
       } finally {
         setLoading(false);
       }
     },
+    
     onError: () => {
+      log.error('Google login error');
       setError('การเข้าสู่ระบบด้วย Google ล้มเหลว กรุณาลองใหม่อีกครั้ง');
     },
   });
@@ -93,7 +110,7 @@ function LoginPage() {
         </form>
       </div>
     </div>
-  )
+  );
 }
 
-export default LoginPage
+export default LoginPage;

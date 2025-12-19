@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Copy, Calendar, Users, DollarSign, MapPin, Sparkles, Check, X, Loader2 } from "lucide-react";
 import Header from "../components/Header";
 import { tripAPI } from "../services/api";
-import { CONFIG, log } from "../config/config";
+import { CONFIG, log } from '../config/app.config';
 import { MOCK_SUMMARY_DATA, Member, TripData } from "../data/mockData";
 import {
   ResponsiveContainer,

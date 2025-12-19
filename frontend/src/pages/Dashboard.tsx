@@ -2,9 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check, Loader2, AlertCircle } from "lucide-react";
-import { tripAPI } from "../services/api";
-import { CONFIG, log } from "../config/config";
+// ✅ แก้ imports
+import { CONFIG, log } from '../config/app.config';
+import { validateInviteCode, formatInviteCode } from '../utils/helpers';
 import { MOCK_MY_TRIPS, MOCK_JOIN_TRIP_RESPONSE, TripData } from "../data/mockData";
+import { tripAPI } from "../services/api";
 import {
   ResponsiveContainer,
   BarChart,
@@ -18,7 +20,6 @@ import {
   Pie,
   Cell,
 } from "recharts";
-
 
 interface DashboardData {
   name: string;
@@ -53,8 +54,8 @@ const Dashboard: React.FC = () => {
       return;
     }
 
-    const codePattern = /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/;
-    if (!codePattern.test(cleanCode)) {
+    // ✅ ใช้ validateInviteCode จาก helpers
+    if (!validateInviteCode(cleanCode)) {
       alert("รูปแบบรหัสห้องไม่ถูกต้อง\nกรุณากรอกในรูปแบบ XXXX-XXXX-XXXX-XXXX");
       return;
     }
@@ -167,11 +168,10 @@ const Dashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       <Header onLogout={handleLogout} />
-      {/* ✅ เพิ่ม: แสดงแถบแจ้งเตือนเมื่ออยู่ใน Mock Mode */}
       {CONFIG.USE_MOCK_DATA && (
         <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 text-center text-sm">
           <strong>⚠️ โหมดทดสอบ:</strong> กำลังใช้ข้อมูลจำลอง (Mock Data) 
-          - เปลี่ยนเป็น <code>USE_MOCK_DATA: false</code> ใน config.ts เพื่อใช้ API จริง
+          - เปลี่ยนเป็น <code>USE_MOCK_DATA: false</code> ใน app.config.ts เพื่อใช้ API จริง
         </div>
       )}
 
@@ -213,23 +213,13 @@ const Dashboard: React.FC = () => {
               className="flex-1 border-2 border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono uppercase transition"
               value={roomCode}
               onChange={(e) => {
-                let value = e.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9-]/g, '');
-                
-                if (!value.includes('-')) {
-                  value = value.replace(/(.{4})/g, '$1-').slice(0, -1);
-                }
-                
-                setRoomCode(value);
+                // ✅ ใช้ formatInviteCode จาก helpers
+                setRoomCode(formatInviteCode(e.target.value));
               }}
               onPaste={(e) => {
                 e.preventDefault();
-                let pastedText = e.clipboardData.getData("text").toUpperCase().replace(/[^A-HJ-NP-Z2-9-]/g, '');
-                
-                if (!pastedText.includes('-')) {
-                  pastedText = pastedText.replace(/(.{4})/g, '$1-').slice(0, -1);
-                }
-                
-                setRoomCode(pastedText.slice(0, 19));
+                const pastedText = e.clipboardData.getData("text");
+                setRoomCode(formatInviteCode(pastedText));
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && roomCode) {

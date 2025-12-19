@@ -1,11 +1,42 @@
-import React, { useState, useEffect, useMemo } from "react"; 
-import { Check, X, Copy, Plus, Info, AlertCircle, Loader2 } from "lucide-react";
+// ============================================================================
+// VotePage.tsx - PART 1/7: IMPORTS & TYPES (แก้ไขแล้ว)
+// ============================================================================
+
+import React, { useState, useEffect, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+
+// ✅ เพิ่ม icons ที่ขาดหาย
+import { 
+  Check, 
+  Loader2, 
+  Users, 
+  Copy, 
+  Plus, 
+  X, 
+  Calendar, 
+  MapPin, 
+  AlertCircle, 
+  Info 
+} from "lucide-react";
+
+// ✅ เพิ่ม Header
 import Header from "../components/Header";
-import { useNavigate, useParams } from "react-router-dom";
+
 import { tripAPI } from "../services/api";
-import { CONFIG, log } from "../config/config";
-import { MOCK_TRIP_DATA } from "../data/mockData";
-import type { Member, TripData as TripDataFull } from "../data/mockData";
+
+// ✅ เพิ่ม BudgetPriority
+import { 
+  MOCK_TRIP_DATA, 
+  TripData as TripDataFull, 
+  Member, 
+  DateRange, 
+  BudgetPriority 
+} from "../data/mockData";
+
+import { CONFIG, log } from '../config/app.config';
+
+// ✅ Import formatCurrency จาก helpers
+import { formatCurrency } from '../utils/helpers';
 
 import {
   ResponsiveContainer,
@@ -17,7 +48,8 @@ import {
   Tooltip,
 } from "recharts";
 
-type TripData = Partial<TripDataFull>;
+// ============ TYPES ============
+type TripData = TripDataFull;
 
 interface BudgetStats {
   min: number;
@@ -40,12 +72,13 @@ const BUDGET_CATEGORIES = [
 
 const MAX_TOTAL_BUDGET = 1000000;
 const MAX_PER_CATEGORY = 100000;
-const EDIT_COOLDOWN_MS = 10 * 60 * 1000;
+const EDIT_COOLDOWN_MS = 2 * 60 * 1000;
 
-// ============ HELPER FUNCTIONS ============
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('th-TH').format(amount);
-};
+// ============================================================================
+// VotePage.tsx - PART 2/7: HELPER FUNCTIONS & HOOKS
+// ============================================================================
+
+// ✅ ลบฟังก์ชัน formatCurrency ออก (ใช้จาก helpers แทน)
 
 const getSummary = (values: number[]): BudgetStats => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -78,19 +111,9 @@ const useDebounce = <T,>(value: T, delay: number): T => {
   return debounced;
 };
 
-const formatThaiDate = (dateStr: string): string => {
-  if (!dateStr) return '';
-  
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-    return dateStr;
-  }
-  
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
-  
-  const thaiYear = date.getFullYear() + 543;
-  return `${date.getDate()}/${date.getMonth() + 1}/${thaiYear}`;
-};
+// ============================================================================
+// VotePage.tsx - PART 3/7: SHARED COMPONENTS (RangeBar, TripProgress, OwnerControls)
+// ============================================================================
 
 // ============ RANGEBAR COMPONENT ============
 interface RangeBarProps {
@@ -183,23 +206,221 @@ const RangeBar: React.FC<RangeBarProps> = ({
   );
 };
 
-// ============ MAIN COMPONENT ============
+// ============ TRIP PROGRESS COMPONENT ============
+interface TripProgressProps {
+  trip: TripData;
+  currentMemberId: string;
+}
+
+const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) => {
+  const members = trip.members || [];
+  const totalMembers = members.length;
+
+  const progress = {
+    budget: {
+      completed: members.filter(m => 
+        m.budget.accommodation > 0 && 
+        m.budget.transport > 0 && 
+        m.budget.food > 0
+      ).length,
+      percentage: 0
+    },
+    dateVote: {
+      completed: trip.dateVotes?.length || 0,
+      percentage: 0
+    },
+    provinceVote: {
+      completed: trip.provinceVotes?.length || 0,
+      percentage: 0
+    },
+    priority: {
+      completed: members.filter(m => m.budgetPriorities).length,
+      percentage: 0
+    }
+  };
+
+  Object.keys(progress).forEach(key => {
+    const item = progress[key as keyof typeof progress];
+    item.percentage = totalMembers > 0 ? Math.round((item.completed / totalMembers) * 100) : 0;
+  });
+
+  const overallProgress = Math.round(
+    (progress.budget.percentage + 
+     progress.dateVote.percentage + 
+     progress.provinceVote.percentage + 
+     progress.priority.percentage) / 4
+  );
+
+  const currentMember = members.find(m => m.id === currentMemberId);
+  const myProgress = {
+    budget: currentMember && 
+      currentMember.budget.accommodation > 0 && 
+      currentMember.budget.transport > 0 && 
+      currentMember.budget.food > 0,
+    dateVote: trip.dateVotes?.some(v => v.memberId === currentMemberId),
+    provinceVote: trip.provinceVotes?.some(v => v.memberId === currentMemberId),
+    priority: currentMember?.budgetPriorities !== undefined
+  };
+
+  const myTasksComplete = Object.values(myProgress).filter(Boolean).length;
+  const myTotalTasks = Object.keys(myProgress).length;
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <Users className="w-6 h-6 text-blue-600" />
+          ความคืบหน้าของทริป
+        </h3>
+        <div className="text-right">
+          <div className="text-3xl font-bold text-blue-600">{overallProgress}%</div>
+          <div className="text-xs text-gray-500">เสร็จสมบูรณ์</div>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500"
+            style={{ width: `${overallProgress}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-semibold text-blue-900">✏️ งานของคุณ</h4>
+          <span className="text-sm text-blue-700 font-medium">
+            {myTasksComplete}/{myTotalTasks} งาน
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className={`flex items-center gap-2 ${myProgress.budget ? 'text-green-700' : 'text-gray-600'}`}>
+            {myProgress.budget ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
+            <span>กรอกงบประมาณ</span>
+          </div>
+          <div className={`flex items-center gap-2 ${myProgress.priority ? 'text-green-700' : 'text-gray-600'}`}>
+            {myProgress.priority ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
+            <span>เลือก Priority</span>
+          </div>
+          <div className={`flex items-center gap-2 ${myProgress.dateVote ? 'text-green-700' : 'text-gray-600'}`}>
+            {myProgress.dateVote ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
+            <span>โหวตวันที่</span>
+          </div>
+          <div className={`flex items-center gap-2 ${myProgress.provinceVote ? 'text-green-700' : 'text-gray-600'}`}>
+            {myProgress.provinceVote ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
+            <span>โหวตจังหวัด</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h4 className="font-semibold text-gray-800 mb-2">📊 ความคืบหน้ารายหมวด</h4>
+
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-sm text-gray-700">💰 งบประมาณ</span>
+            <span className="text-sm font-semibold text-gray-800">
+              {progress.budget.completed}/{totalMembers} คน ({progress.budget.percentage}%)
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-blue-500 transition-all duration-300"
+              style={{ width: `${progress.budget.percentage}%` }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-sm text-gray-700">⭐ Priority Voting</span>
+            <span className="text-sm font-semibold text-gray-800">
+              {progress.priority.completed}/{totalMembers} คน ({progress.priority.percentage}%)
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-purple-500 transition-all duration-300"
+              style={{ width: `${progress.priority.percentage}%` }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-sm text-gray-700">📅 โหวตวันที่</span>
+            <span className="text-sm font-semibold text-gray-800">
+              {progress.dateVote.completed}/{totalMembers} คน ({progress.dateVote.percentage}%)
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-green-500 transition-all duration-300"
+              style={{ width: `${progress.dateVote.percentage}%` }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-sm text-gray-700">🗺️ โหวตจังหวัด</span>
+            <span className="text-sm font-semibold text-gray-800">
+              {progress.provinceVote.completed}/{totalMembers} คน ({progress.provinceVote.percentage}%)
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-amber-500 transition-all duration-300"
+              style={{ width: `${progress.provinceVote.percentage}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {overallProgress === 100 && (
+        <div className="mt-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
+          <p className="text-green-800 font-semibold flex items-center gap-2">
+            <Check className="w-5 h-5" />
+            ทุกคนกรอกข้อมูลครบแล้ว! พร้อมปิดการโหวต
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// VotePage.tsx - PART 4/7: MAIN COMPONENT & STATE MANAGEMENT
+// ============================================================================
+
 const VotePage: React.FC = () => {
   const { tripCode: urlCode } = useParams<{ tripCode: string }>();
   const tripCode = urlCode || "UNKNOWN";
   const navigate = useNavigate();
 
+  // ============ STATE ============
   const [step, setStep] = useState(2);
   const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ แก้ไข: เพิ่ม voteResults ใน initial state
   const [trip, setTrip] = useState<TripData>({ 
+    _id: "",
+    tripCode: "",
+    name: "",
+    days: 0,
+    detail: "",
+    createdBy: "",
+    createdAt: 0,
+    isCompleted: false,
     members: [], 
     voteOptions: [], 
     selectedDate: null,
-    voteResults: undefined
+    voteResults: { provinces: [], dates: [] },
+    dateRanges: [],
+    dateVotes: [],
+    provinceVotes: []
   });
 
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -208,7 +429,7 @@ const VotePage: React.FC = () => {
   const [memberBudget, setMemberBudget] = useState<Member | null>(null);
   const [history, setHistory] = useState<string[]>([]);
 
-  // โหลดข้อมูลทริป
+  // ============ LOAD TRIP DATA ============
   useEffect(() => {
     const loadTripData = async () => {
       if (tripCode === "UNKNOWN") {
@@ -231,14 +452,12 @@ const VotePage: React.FC = () => {
           response = await tripAPI.getTripDetail(tripCode);
         }
         
-        // ✅ แก้ไข: ตรวจสอบ response.data
         if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
 
         const tripData = response.data;
         
-        // ✅ แก้ไข: ใช้ Optional Chaining
         if (tripData?.inviteCode) {
           setInviteCode(tripData.inviteCode);
         } else if (tripData?.tripCode) {
@@ -247,29 +466,13 @@ const VotePage: React.FC = () => {
           setInviteCode(tripCode);
         }
         
-        const { 
-          members = [], 
-          voteOptions = [], 
-          selectedDate = null, 
-          isCompleted = false, 
-          voteResults 
-        } = tripData || {};
-        
-        setTrip({
-          inviteCode: tripData?.inviteCode,     
-          tripCode: tripData?.tripCode,         
-          members,
-          voteOptions,
-          selectedDate,
-          isCompleted,
-          voteResults
-        });
+        setTrip(tripData);
         
         const memberId = localStorage.getItem("memberId") || "";
-        let member = members.find((m: Member) => m.id === memberId) || null;
+        let member = tripData.members.find((m: Member) => m.id === memberId) || null;
         
-        if (!member && members.length > 0) {
-          member = members[0];
+        if (!member && tripData.members.length > 0) {
+          member = tripData.members[0];
           log.info(`No memberId found, using first member: ${member.name}`);
           localStorage.setItem("memberId", member.id);
         }
@@ -279,6 +482,7 @@ const VotePage: React.FC = () => {
             id: "temp-member-" + Date.now(),
             name: "คุณ",
             gender: "ชาย",
+            role: "member",
             availability: Array(8).fill(true),
             budget: {
               accommodation: 0,
@@ -304,8 +508,7 @@ const VotePage: React.FC = () => {
     loadTripData();
   }, [tripCode, navigate]);
 
-  const debouncedMember = useDebounce(memberBudget, 1000);
-
+  // ============ COMPUTED VALUES ============
   const budgetStats = useMemo(() => {
     const result: Record<string, BudgetStats> = {};
     BUDGET_CATEGORIES.forEach(({ key }) => {
@@ -320,6 +523,7 @@ const VotePage: React.FC = () => {
     return BUDGET_CATEGORIES.reduce((sum, { key }) => sum + memberBudget.budget[key], 0);
   }, [memberBudget]);
 
+  // ============ HANDLERS ============
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
     setCopied(type);
@@ -334,153 +538,324 @@ const VotePage: React.FC = () => {
   const next = () => { if (step < 5) setStep(step + 1); };
   const back = () => { if (step > 1) setStep(step - 1); };
 
-  // ============ LOADING STATE ============
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-        <Header onLogout={handleLogout} />
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-          <p className="text-gray-600 text-lg">กำลังโหลดข้อมูลทริป...</p>
-        </div>
-      </div>
-    );
-  }
+  // ============================================================================
+// VotePage.tsx - PART 5B/7: STEP 3 - BUDGET (Part 1/2)
+// ============================================================================
 
-  // ============ ERROR STATE ============
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-        <Header onLogout={handleLogout} />
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
-          <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
-          <p className="text-red-600 text-xl font-semibold mb-2">{error}</p>
-          <p className="text-gray-500">กำลังนำคุณกลับหน้าหลัก...</p>
-        </div>
-      </div>
-    );
-  }
+// ============ STEP 2: DATE VOTING ============
+const StepVote = () => {
+  const [dateRanges, setDateRanges] = useState<DateRange[]>(trip.dateRanges || []);
+  const [newStartDate, setNewStartDate] = useState("");
+  const [newEndDate, setNewEndDate] = useState("");
+  const [myVotes, setMyVotes] = useState<Record<string, boolean>>({});
+  
+  // โหลดคะแนนโหวตของตัวเอง
+  useEffect(() => {
+    const myVote = trip.dateVotes?.find(v => v.memberId === memberBudget?.id);
+    if (myVote) {
+      setMyVotes(myVote.votes);
+    }
+  }, [trip.dateVotes, memberBudget]);
 
-  // ============ STEP 2: VOTE ============
-  const StepVote = () => {
-    const [selectedDate, setSelectedDate] = useState("");
-    const [dates, setDates] = useState<string[]>(["5/11/2568", "6/11/2568", "18/11/2568"]);
-    const dateHeaders = ["1 พย", "2 พย", "5 พย", "6 พย", "10 พย", "11 พย", "17 พย", "18 พย"];
+  // ฟังก์ชันเพิ่มช่วงวันที่
+  const addDateRange = async () => {
+    if (!newStartDate || !newEndDate) {
+      alert("กรุณาเลือกวันที่เริ่มต้นและสิ้นสุด");
+      return;
+    }
 
-    const addVoteDate = () => {
-      if (!selectedDate) {
-        alert("กรุณาเลือกวันที่ก่อน");
-        return;
-      }
-      const formatted = formatThaiDate(selectedDate);
-      if (!dates.includes(formatted)) {
-        setDates(prev => [...prev, formatted]);
-        setSelectedDate("");
-      } else {
-        alert("วันที่นี้มีอยู่แล้ว");
-      }
+    if (new Date(newStartDate) > new Date(newEndDate)) {
+      alert("วันที่เริ่มต้นต้องมาก่อนวันที่สิ้นสุด");
+      return;
+    }
+
+    const newRange: DateRange = {
+      id: `range-${Date.now()}`,
+      memberId: memberBudget?.id || "",
+      memberName: memberBudget?.name || "Unknown",
+      startDate: newStartDate,
+      endDate: newEndDate,
+      createdAt: Date.now()
     };
 
-    const availableCount = dateHeaders.map((_, colIdx) => 
-      (trip.members || []).filter(m => m.availability[colIdx]).length
-    );
+    try {
+      if (CONFIG.USE_MOCK_DATA) {
+        await new Promise(r => setTimeout(r, 300));
+      } else {
+        await tripAPI.addDateRange(tripCode, newRange);
+      }
 
-    return (
-      <div className="bg-white p-6 rounded-xl shadow-lg mb-6 border border-gray-200">
-        <div className="flex items-center gap-2 mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">📅 ตารางความว่าง</h2>
-          <Info className="w-5 h-5 text-blue-500" />
-        </div>
+      setDateRanges(prev => [...prev, newRange]);
+      setTrip(prev => ({
+        ...prev,
+        dateRanges: [...(prev.dateRanges || []), newRange]
+      }));
 
-        <div className="overflow-x-auto relative rounded-lg border border-gray-200">
-          <table className="w-full min-w-[700px] border-collapse">
-            <thead className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-              <tr>
-                <th className="py-3 px-4 text-left sticky left-0 bg-blue-600 z-20">
-                  ชื่อสมาชิก
-                </th>
-                {dateHeaders.map((d, idx) => (
-                  <th key={d} className="py-3 px-2 text-center">
-                    <div className="font-semibold">{d}</div>
-                    <div className="text-xs font-normal opacity-90">
-                      ({availableCount[idx]}/{(trip.members || []).length})
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white">
-              {(trip.members || []).map((m, idx) => (
-                <tr key={idx} className="hover:bg-blue-50 transition-colors border-b border-gray-100">
-                  <td className="py-3 px-4 text-left sticky left-0 bg-white z-10">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        m.gender === "ชาย" 
-                          ? "bg-blue-100 text-blue-700" 
-                          : "bg-pink-100 text-pink-700"
-                      }`}>
-                        {m.gender}
-                      </span>
-                      <span className="font-medium text-gray-800">{m.name}</span>
-                    </div>
-                  </td>
-                  {m.availability.map((a, i) => (
-                    <td key={i} className="py-3 text-center">
-                      <div className="flex justify-center">
-                        <div className={`${
-                          a ? "bg-green-100" : "bg-red-100"
-                        } rounded-full p-1.5`}>
-                          {a ? (
-                            <Check className="text-green-600 w-5 h-5" />
-                          ) : (
-                            <X className="text-red-600 w-5 h-5" />
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <Plus className="w-5 h-5 text-blue-600" />
-            เพิ่มวันที่โหวต
-          </h3>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input 
-              type="date" 
-              className="border-2 border-blue-300 rounded-lg px-4 py-3 flex-1 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" 
-              value={selectedDate} 
-              onChange={e => setSelectedDate(e.target.value)}
-            />
-            <button 
-              onClick={addVoteDate} 
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!selectedDate}
-            >
-              เพิ่มโหวต
-            </button>
-          </div>
-          {dates.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {dates.map((d, i) => (
-                <span 
-                  key={i} 
-                  className="px-4 py-2 bg-white hover:bg-blue-100 rounded-full text-blue-900 font-medium transition-colors cursor-pointer border border-blue-200 shadow-sm"
-                >
-                  {d}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+      setNewStartDate("");
+      setNewEndDate("");
+    } catch (error) {
+      alert("เกิดข้อผิดพลาดในการเพิ่มช่วงวันที่");
+    }
   };
+
+  // ฟังก์ชันลบช่วงวันที่
+  const removeRange = async (rangeId: string) => {
+    if (!confirm("ต้องการลบช่วงวันที่นี้?")) return;
+
+    try {
+      if (CONFIG.USE_MOCK_DATA) {
+        await new Promise(r => setTimeout(r, 300));
+      } else {
+        await tripAPI.removeDateRange(tripCode, rangeId);
+      }
+
+      setDateRanges(prev => prev.filter(r => r.id !== rangeId));
+      setTrip(prev => ({
+        ...prev,
+        dateRanges: prev.dateRanges?.filter(r => r.id !== rangeId) || []
+      }));
+    } catch (error) {
+      alert("เกิดข้อผิดพลาดในการลบช่วงวันที่");
+    }
+  };
+
+  // ฟังก์ชันโหวต
+  const toggleVote = async (rangeId: string) => {
+    const newVotes = { ...myVotes, [rangeId]: !myVotes[rangeId] };
+    setMyVotes(newVotes);
+
+    try {
+      if (CONFIG.USE_MOCK_DATA) {
+        await new Promise(r => setTimeout(r, 300));
+      } else {
+        await tripAPI.submitDateVotes?.(tripCode, newVotes);
+      }
+
+      // อัปเดต trip.dateVotes
+      setTrip(prev => {
+        const existingVoteIndex = prev.dateVotes?.findIndex(v => v.memberId === memberBudget?.id);
+        const newVote = {
+          memberId: memberBudget?.id || "",
+          memberName: memberBudget?.name || "",
+          votes: newVotes,
+          timestamp: Date.now()
+        };
+
+        if (existingVoteIndex !== undefined && existingVoteIndex >= 0) {
+          const updated = [...(prev.dateVotes || [])];
+          updated[existingVoteIndex] = newVote;
+          return { ...prev, dateVotes: updated };
+        } else {
+          return { ...prev, dateVotes: [...(prev.dateVotes || []), newVote] };
+        }
+      });
+    } catch (error) {
+      alert("เกิดข้อผิดพลาดในการบันทึกคะแนนโหวต");
+      setMyVotes(myVotes); // rollback
+    }
+  };
+
+  // คำนวณคะแนนโหวต
+  const getVoteCount = (rangeId: string) => {
+    return trip.dateVotes?.filter(v => v.votes[rangeId]).length || 0;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* เพิ่มช่วงวันที่ */}
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <Calendar className="w-6 h-6 text-blue-600" />
+          เพิ่มช่วงวันที่ที่คุณว่าง
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              วันที่เริ่มต้น
+            </label>
+            <input
+              type="date"
+              value={newStartDate}
+              onChange={(e) => setNewStartDate(e.target.value)}
+              className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              วันที่สิ้นสุด
+            </label>
+            <input
+              type="date"
+              value={newEndDate}
+              onChange={(e) => setNewEndDate(e.target.value)}
+              className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={addDateRange}
+          className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition flex items-center justify-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          เพิ่มช่วงวันที่
+        </button>
+      </div>
+
+      {/* รายการช่วงวันที่ทั้งหมด */}
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">
+          📅 ช่วงวันที่ที่สมาชิกเสนอ
+        </h3>
+
+        {dateRanges.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <Calendar className="w-16 h-16 mx-auto mb-3 text-gray-300" />
+            <p>ยังไม่มีช่วงวันที่</p>
+            <p className="text-sm mt-1">เพิ่มช่วงวันที่ที่คุณว่างได้เลย!</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {dateRanges.map((range) => {
+              const voteCount = getVoteCount(range.id);
+              const hasVoted = myVotes[range.id] || false;
+              const isMyRange = range.memberId === memberBudget?.id;
+
+              return (
+                <div
+                  key={range.id}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    hasVoted
+                      ? "border-green-500 bg-green-50"
+                      : "border-gray-200 bg-white hover:border-blue-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-semibold text-gray-800">
+                          {range.memberName}
+                        </span>
+                        {isMyRange && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                            คุณ
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {new Date(range.startDate).toLocaleDateString("th-TH", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric"
+                        })}
+                        {" - "}
+                        {new Date(range.endDate).toLocaleDateString("th-TH", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric"
+                        })}
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Users className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm text-gray-600">
+                          {voteCount}/{trip.members?.length || 0} คนว่าง
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleVote(range.id)}
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                          hasVoted
+                            ? "bg-green-500 text-white hover:bg-green-600"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                      >
+                        {hasVoted ? "✓ ว่าง" : "โหวต"}
+                      </button>
+
+                      {isMyRange && (
+                        <button
+                          onClick={() => removeRange(range.id)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* สรุปผลโหวต */}
+      {dateRanges.length > 0 && (
+        <div className="bg-white p-6 rounded-xl shadow-lg">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">
+            🏆 ช่วงวันที่ที่คนว่างมากที่สุด (Top 3)
+          </h3>
+
+          {dateRanges
+            .map((range) => ({
+              ...range,
+              votes: getVoteCount(range.id)
+            }))
+            .sort((a, b) => b.votes - a.votes)
+            .slice(0, 3)
+            .map((range, idx) => (
+              <div
+                key={range.id}
+                className={`p-4 mb-3 rounded-lg border-2 ${
+                  idx === 0
+                    ? "border-yellow-400 bg-yellow-50"
+                    : idx === 1
+                    ? "border-gray-400 bg-gray-50"
+                    : "border-orange-400 bg-orange-50"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">
+                      {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}
+                    </span>
+                    <div>
+                      <p className="font-semibold text-gray-800">
+                        {new Date(range.startDate).toLocaleDateString("th-TH", {
+                          month: "short",
+                          day: "numeric"
+                        })}
+                        {" - "}
+                        {new Date(range.endDate).toLocaleDateString("th-TH", {
+                          month: "short",
+                          day: "numeric"
+                        })}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        เสนอโดย {range.memberName}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {range.votes}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      /{trip.members?.length || 0} คน
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
   // ============ STEP 3: BUDGET ============
   const StepBudget = () => {
@@ -493,7 +868,51 @@ const VotePage: React.FC = () => {
     }
 
     const [isSaving, setIsSaving] = useState(false);
+    const [priorities, setPriorities] = useState<{
+      accommodation: BudgetPriority;
+      transport: BudgetPriority;
+      food: BudgetPriority;
+    }>(
+      memberBudget.budgetPriorities || {
+        accommodation: 2,
+        transport: 2,
+        food: 2
+      }
+    );
 
+    // อัปเดต Priority
+    const updatePriority = async (
+      category: keyof typeof priorities,
+      value: BudgetPriority
+    ) => {
+      const newPriorities = { ...priorities, [category]: value };
+      setPriorities(newPriorities);
+
+      try {
+        if (CONFIG.USE_MOCK_DATA) {
+          await new Promise(r => setTimeout(r, 300));
+        } else {
+          await tripAPI.updateBudgetPriority?.(tripCode, memberBudget.id, newPriorities);
+        }
+
+        setMemberBudget(prev => prev ? {
+          ...prev,
+          budgetPriorities: newPriorities
+        } : null);
+
+        setTrip(prev => ({
+          ...prev,
+          members: prev.members?.map(m =>
+            m.id === memberBudget.id ? { ...m, budgetPriorities: newPriorities } : m
+          ) || []
+        }));
+      } catch (error) {
+        alert("เกิดข้อผิดพลาดในการบันทึก Priority");
+        setPriorities(memberBudget.budgetPriorities || priorities);
+      }
+    };
+
+    // อัปเดตงบประมาณ
     const updateBudget = async (
       key: keyof Member["budget"], 
       value: number
@@ -514,7 +933,6 @@ const VotePage: React.FC = () => {
         return;
       }
 
-      // คำนวณ total ใหม่
       const currentBudget = { ...memberBudget.budget };
       const newTotal = Object.keys(currentBudget).reduce((sum, k) => {
         if (k === 'lastUpdated') return sum;
@@ -537,7 +955,6 @@ const VotePage: React.FC = () => {
         return;
       }
 
-      // เก็บค่าเดิม
       const oldValue = memberBudget.budget[key];
       const oldLastUpdated = memberBudget.budget.lastUpdated;
 
@@ -566,11 +983,9 @@ const VotePage: React.FC = () => {
         let response;
 
         if (CONFIG.USE_MOCK_DATA) {
-          log.mock("Updating budget (mock)");
           await new Promise(r => setTimeout(r, 300));
           response = { success: true };
         } else {
-          log.api("Updating budget via API");
           response = await tripAPI.updateMemberBudget(tripCode, memberBudget.id, {
             [key]: value
           });
@@ -582,13 +997,11 @@ const VotePage: React.FC = () => {
             `${memberBudget.name} แก้ไข${categoryLabel}เป็น ฿${formatCurrency(value)} เวลา ${new Date().toLocaleTimeString("th-TH")}`,
             ...prev
           ]);
-          log.success("บันทึกงบประมาณสำเร็จ");
         } else {
           throw new Error(response.message || 'ไม่สามารถบันทึกได้');
         }
 
       } catch (err) {
-        log.error("Error updating budget:", err);
         alert("เกิดข้อผิดพลาดในการบันทึกงบประมาณ กลับไปใช้ค่าเดิม");
         
         // Rollback
@@ -614,8 +1027,31 @@ const VotePage: React.FC = () => {
       }
     };
 
+    const getPriorityLabel = (priority: BudgetPriority): string => {
+      switch (priority) {
+        case 1: return "⭐⭐⭐ สำคัญมาก";
+        case 2: return "⭐⭐ สำคัญปานกลาง";
+        case 3: return "⭐ สำคัญน้อย";
+      }
+    };
+
+    const getPriorityColor = (priority: BudgetPriority): string => {
+      switch (priority) {
+        case 1: return "bg-red-100 text-red-700 border-red-300";
+        case 2: return "bg-yellow-100 text-yellow-700 border-yellow-300";
+        case 3: return "bg-green-100 text-green-700 border-green-300";
+      }
+    };
+
+// ============================================================================
+// VotePage.tsx - PART 5C/7: STEP 3 - BUDGET (Part 2/2 - UI)
+// ============================================================================
+
+    // ต่อจาก Part 5B...
+
     return (
       <div className="space-y-6">
+        {/* แก้ไขงบประมาณ */}
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
           <h3 className="text-xl font-bold text-gray-800 mb-4">💰 แก้ไขงบประมาณ</h3>
           <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -645,7 +1081,7 @@ const VotePage: React.FC = () => {
                         min={0}
                         step={100}
                         value={memberBudget.budget[key]}
-                        className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100"
+                        className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100"
                         onChange={e => updateBudget(key, Number(e.target.value))}
                       />
                     </td>
@@ -669,6 +1105,63 @@ const VotePage: React.FC = () => {
           )}
         </div>
 
+        {/* Priority Voting */}
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">
+            ⭐ ระดับความสำคัญของงบประมาณ
+          </h3>
+          
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+            <p className="text-sm text-blue-800">
+              💡 <strong>คำแนะนำ:</strong> เลือกว่าคุณต้องการให้งบประมาณรวมของกลุ่ม
+              จัดสรรไปที่หมวดไหนมากที่สุด
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {(['accommodation', 'transport', 'food'] as const).map((key) => {
+              const category = BUDGET_CATEGORIES.find(c => c.key === key);
+              if (!category) return null;
+
+              return (
+                <div key={key} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-4 h-4 rounded-full" 
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <span className="font-semibold text-gray-800">
+                        {category.label}
+                      </span>
+                    </div>
+                    <span className={`px-4 py-2 rounded-full text-sm font-medium border-2 ${getPriorityColor(priorities[key])}`}>
+                      {getPriorityLabel(priorities[key])}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1, 2, 3].map((priority) => (
+                      <button
+                        key={priority}
+                        onClick={() => updatePriority(key, priority as BudgetPriority)}
+                        className={`py-2 px-3 rounded-lg font-medium transition-all ${
+                          priorities[key] === priority
+                            ? getPriorityColor(priority as BudgetPriority) + " border-2"
+                            : "bg-white border-2 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        {getPriorityLabel(priority as BudgetPriority)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* การกระจายงบประมาณ */}
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
           <h3 className="text-xl font-bold text-gray-800 mb-4">📊 การกระจายงบประมาณของสมาชิกทั้งหมด</h3>
           
@@ -694,6 +1187,7 @@ const VotePage: React.FC = () => {
           ))}
         </div>
 
+        {/* ประวัติการแก้ไข */}
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
           <h3 className="text-lg font-bold text-gray-800 mb-3">📝 ประวัติการแก้ไข</h3>
           <div className="bg-gray-50 p-4 rounded-lg h-48 overflow-y-auto border border-gray-200">
@@ -736,134 +1230,156 @@ const VotePage: React.FC = () => {
       "อุบลราชธานี"
     ];
 
-    const weights = [3, 2, 1];
-    
-    // ✅ แก้ไข: Initialize จาก trip.voteResults
-    const initialProvinces = trip.voteResults?.provinces || [];
-    const [globalScores, setGlobalScores] = useState<{ [key: string]: number }>(() => {
-      const scores: { [key: string]: number } = {};
-      initialProvinces.forEach(p => {
-        scores[p.name] = p.score;
-      });
-      return scores;
+  // ✅ ปรับปรุง Step 4: Place Voting - แสดงกราฟตลอดเวลา
+
+  const weights = [3, 2, 1];
+  
+  const initialProvinces = trip.voteResults?.provinces || [];
+  const [globalScores, setGlobalScores] = useState<{ [key: string]: number }>(() => {
+    const scores: { [key: string]: number } = {};
+    initialProvinces.forEach(p => {
+      scores[p.name] = p.score;
     });
-    
-    const [myVote, setMyVote] = useState<(string | "")[]>(["", "", ""]);
-    const [error, setError] = useState("");
-    const [submitted, setSubmitted] = useState(false);
-    const [voteHistory, setVoteHistory] = useState<string[]>([]);
+    return scores;
+  });
+  
+  const [myVote, setMyVote] = useState<(string | "")[]>(["", "", ""]);
+  const [error, setError] = useState("");
+  const [hasVoted, setHasVoted] = useState(false); // ✅ ตรวจสอบว่าเคยโหวตแล้วหรือยัง
+  const [voteHistory, setVoteHistory] = useState<string[]>([]);
 
-    const handleSelect = (index: number, value: string) => {
-      if (myVote.includes(value)) return;
-      const updated = [...myVote];
-      updated[index] = value;
-      setMyVote(updated);
-    };
+  // ✅ โหลดข้อมูลโหวตของตัวเอง
+  useEffect(() => {
+    const myVoteData = trip.provinceVotes?.find(v => v.memberId === memberBudget?.id);
+    if (myVoteData && myVoteData.votes) {
+      setMyVote(myVoteData.votes);
+      setHasVoted(true);
+    }
+  }, [trip.provinceVotes, memberBudget]);
 
-    const submitVotes = async () => {
-      const uniqueVotes = new Set(myVote);
-      if (uniqueVotes.size !== 3) {
-        setError("กรุณาเลือกจังหวัดที่ต่างกัน 3 จังหวัด");
-        return;
-      }
+  const handleSelect = (index: number, value: string) => {
+    if (myVote.includes(value)) return;
+    const updated = [...myVote];
+    updated[index] = value;
+    setMyVote(updated);
+  };
 
-      if (myVote.includes("")) {
-        setError("กรุณาเลือกครบ 3 อันดับก่อนส่งคะแนน");
-        return;
-      }
-      setError("");
+  const submitVotes = async () => {
+    // Validation
+    const uniqueVotes = new Set(myVote);
+    if (uniqueVotes.size !== 3) {
+      setError("กรุณาเลือกจังหวัดที่ต่างกัน 3 จังหวัด");
+      return;
+    }
+    if (myVote.includes("")) {
+      setError("กรุณาเลือกครบ 3 อันดับก่อนส่งคะแนน");
+      return;
+    }
+    setError("");
 
-      const oldScores = { ...globalScores };
-      const wasSubmitted = submitted;
+    const oldScores = { ...globalScores };
+    const wasVoted = hasVoted;
 
-      const newScores = { ...globalScores };
+    const newScores = { ...globalScores };
 
-      if (submitted) {
-        myVote.forEach((province, index) => {
-          if (province) {
-            newScores[province] = (newScores[province] || 0) - weights[index];
-            if (newScores[province] <= 0) delete newScores[province];
-          }
-        });
-      }
-
+    // ถ้าเคยโหวตแล้ว ให้ลบคะแนนเดิมออก
+    if (hasVoted) {
       myVote.forEach((province, index) => {
         if (province) {
-          newScores[province] = (newScores[province] || 0) + weights[index];
+          newScores[province] = (newScores[province] || 0) - weights[index];
+          if (newScores[province] <= 0) delete newScores[province];
         }
       });
+    }
 
-      setGlobalScores(newScores);
-      setSubmitted(true);
-
-      const logEntry = `คุณ: 🥇${myVote[0]} 🥈${myVote[1]} 🥉${myVote[2]}`;
-      setVoteHistory(prev => [logEntry, ...prev]);
-
-      try {
-        let response;
-        
-        if (CONFIG.USE_MOCK_DATA) {
-          log.mock('Submitting votes (mock)');
-          await new Promise(resolve => setTimeout(resolve, 300));
-          response = { success: true, message: 'บันทึกผลโหวตสำเร็จ' };
-        } else {
-          log.api('Submitting votes to API');
-          response = await tripAPI.submitProvinceVotes(tripCode, {
-            votes: myVote as string[],
-            scores: newScores
-          });
-        }
-        
-        if (response.success) {
-          // ✅ แก้ไข: ตรวจสอบ prev.voteResults ก่อน
-          setTrip(prev => ({
-            ...prev,
-            voteResults: {
-              ...(prev.voteResults || {}),
-              provinces: Object.entries(newScores)
-                .map(([name, score]) => ({ name, score: score as number }))
-                .sort((a, b) => b.score - a.score),
-              dates: prev.voteResults?.dates || []
-            }
-          }));
-          
-          log.success("บันทึกผลโหวตสำเร็จ");
-        } else {
-          throw new Error(response.message || 'ไม่สามารถบันทึกได้');
-        }
-      } catch (error: any) {
-        log.error("Error saving votes:", error);
-        alert("เกิดข้อผิดพลาด: " + (error.message || "ไม่สามารถบันทึกผลโหวต"));
-        
-        setGlobalScores(oldScores);
-        setSubmitted(wasSubmitted);
-        setVoteHistory(prev => prev.slice(1));
+    // เพิ่มคะแนนใหม่
+    myVote.forEach((province, index) => {
+      if (province) {
+        newScores[province] = (newScores[province] || 0) + weights[index];
       }
-    };
+    });
 
-    const sortedProvinces = Object.entries(globalScores)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
+    setGlobalScores(newScores);
+    setHasVoted(true);
 
-    return (
-      <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-lg">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">
-          เลือกจังหวัดที่อยากไป (อันดับ 1–3)
+    const logEntry = `คุณ: 🥇${myVote[0]} 🥈${myVote[1]} 🥉${myVote[2]} (${new Date().toLocaleTimeString('th-TH')})`;
+    setVoteHistory(prev => [logEntry, ...prev]);
+
+    try {
+      let response;
+      
+      if (CONFIG.USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        response = { success: true };
+      } else {
+        response = await tripAPI.submitProvinceVotes(tripCode, {
+          votes: myVote as string[],
+          scores: newScores
+        });
+      }
+      
+      if (response.success) {
+        setTrip(prev => ({
+          ...prev,
+          voteResults: {
+            ...(prev.voteResults || {}),
+            provinces: Object.entries(newScores)
+              .map(([name, score]) => ({ name, score: score as number }))
+              .sort((a, b) => b.score - a.score),
+            dates: prev.voteResults?.dates || []
+          }
+        }));
+        
+        log.success("บันทึกผลโหวตสำเร็จ");
+      }
+    } catch (error: any) {
+      log.error("Error saving votes:", error);
+      alert("เกิดข้อผิดพลาด: " + (error.message || "ไม่สามารถบันทึกผลโหวต"));
+      
+      setGlobalScores(oldScores);
+      setHasVoted(wasVoted);
+      setVoteHistory(prev => prev.slice(1));
+    }
+  };
+
+  const sortedProvinces = Object.entries(globalScores)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10); // ✅ แสดง Top 10 แทน Top 3
+
+  return (
+    <div className="space-y-6">
+      {/* ส่วนโหวต */}
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">
+          🗳️ เลือกจังหวัดที่อยากไป (อันดับ 1–3)
         </h2>
 
         <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
           <p className="font-semibold text-blue-900">วิธีคำนวณคะแนน (Borda Count):</p>
-          <ul className="mt-2 space-y-1 text-blue-800">
+          <ul className="mt-2 space-y-1 text-blue-800 text-sm">
             <li>• อันดับ 1 = 3 คะแนน</li>
             <li>• อันดับ 2 = 2 คะแนน</li>
             <li>• อันดับ 3 = 1 คะแนน</li>
           </ul>
         </div>
 
-        {[0,1,2].map(i => (
+        {/* ✅ แสดงสถานะการโหวต */}
+        {hasVoted && (
+          <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
+            <p className="text-green-800">
+              ✓ คุณโหวตแล้ว: 🥇 {myVote[0]} • 🥈 {myVote[1]} • 🥉 {myVote[2]}
+            </p>
+            <p className="text-green-700 text-sm mt-1">
+              คุณสามารถแก้ไขโหวตได้ตลอดเวลา
+            </p>
+          </div>
+        )}
+
+        {/* Dropdowns */}
+        {[0, 1, 2].map(i => (
           <div key={i} className="mb-4">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              {i===0?'🥇':i===1?'🥈':'🥉'} อันดับ {i+1} ({weights[i]} คะแนน):
+              {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'} อันดับ {i + 1} ({weights[i]} คะแนน):
             </label>
             <select
               value={myVote[i]}
@@ -872,7 +1388,13 @@ const VotePage: React.FC = () => {
             >
               <option value="">-- เลือกจังหวัด --</option>
               {provinces.map(p => (
-                <option key={p} value={p} disabled={myVote.includes(p) && myVote[i] !== p}>{p}</option>
+                <option 
+                  key={p} 
+                  value={p} 
+                  disabled={myVote.includes(p) && myVote[i] !== p}
+                >
+                  {p}
+                </option>
               ))}
             </select>
           </div>
@@ -888,101 +1410,159 @@ const VotePage: React.FC = () => {
           onClick={submitVotes}
           className="w-full mt-4 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition shadow-lg"
         >
-          {submitted ? "แก้ไขโหวต" : "ยืนยันโหวต"}
+          {hasVoted ? "แก้ไขโหวต" : "ยืนยันโหวต"}
         </button>
+      </div>
 
-        <div className="mt-8 p-6 bg-white rounded-lg shadow-lg">
-          <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
-            <span className="mr-2">🏆</span> Top 3 จังหวัด
-          </h3>
+      {/* ✅ แสดงผลโหวตตลอดเวลา (ไม่จำเป็นต้องรอจนกว่าจะโหวต) */}
+      {sortedProvinces.length > 0 && (
+        <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-blue-200">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="bg-blue-100 p-2 rounded-full">
+              <BarChart className="w-5 h-5 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800">
+              🏆 ผลโหวตปัจจุบัน (Real-time)
+            </h3>
+          </div>
 
-          {sortedProvinces.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                {sortedProvinces.map(([name, value], index) => (
-                  <div
-                    key={name}
-                    className={`p-4 rounded-lg border-2 ${
-                      index===0 ? 'border-yellow-400 bg-yellow-50' :
-                      index===1 ? 'border-gray-400 bg-gray-50' :
-                      'border-orange-400 bg-orange-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">
-                          {index===0?'🥇':index===1?'🥈':'🥉'}
-                        </span>
-                        <div>
-                          <p className="font-bold text-lg text-gray-800">{name}</p>
-                          <p className="text-sm text-gray-600">อันดับ {index+1}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-gray-800">{value}</p>
-                        <p className="text-sm text-gray-600">คะแนน</p>
-                      </div>
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+            <p className="text-blue-800 text-sm">
+              <strong>📊 อัปเดตแบบเรียลไทม์:</strong> ผลโหวตนี้แสดงคะแนนล่าสุดจากสมาชิกทั้งหมด
+              {hasVoted && " (รวมคะแนนของคุณด้วย)"}
+            </p>
+          </div>
+
+          {/* Top 3 Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            {sortedProvinces.slice(0, 3).map(([name, value], index) => (
+              <div
+                key={name}
+                className={`p-4 rounded-lg border-2 ${
+                  index === 0 ? 'border-yellow-400 bg-yellow-50' :
+                  index === 1 ? 'border-gray-400 bg-gray-50' :
+                  'border-orange-400 bg-orange-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">
+                      {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                    </span>
+                    <div>
+                      <p className="font-bold text-lg text-gray-800">{name}</p>
+                      <p className="text-sm text-gray-600">อันดับ {index + 1}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={sortedProvinces.map(([name,value])=>({name,value}))}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#3b82f6" />
-                </BarChart>
-              </ResponsiveContainer>
-
-              {sortedProvinces.length >= 2 &&
-                sortedProvinces[0][1] === sortedProvinces[1][1] && (
-                  <div className="mt-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
-                    <p className="font-semibold text-amber-900">⚠️ คะแนนเสมอกัน!</p>
-                    <p className="text-amber-800 text-sm mt-1">คะแนนอันดับ 1 เสมอกัน! แนะนำให้โหวตเพิ่ม</p>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-gray-800">{value}</p>
+                    <p className="text-sm text-gray-600">คะแนน</p>
                   </div>
-                )}
-            </>
-          ) : (
-            <div className="text-center py-12 text-gray-400">
-              <p className="text-lg">ยังไม่มีการโหวต</p>
-              <p className="text-sm mt-2">กรุณาเลือกจังหวัดและกดยืนยันโหวต</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bar Chart */}
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={sortedProvinces.map(([name, value]) => ({ name, value }))}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={120}
+                interval={0}
+              />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="value" fill="#3b82f6" />
+            </BarChart>
+          </ResponsiveContainer>
+
+          {/* Tie Warning */}
+          {sortedProvinces.length >= 2 && sortedProvinces[0][1] === sortedProvinces[1][1] && (
+            <div className="mt-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+              <p className="font-semibold text-amber-900">⚠️ คะแนนเสมอกัน!</p>
+              <p className="text-amber-800 text-sm mt-1">
+                {sortedProvinces[0][0]} และ {sortedProvinces[1][0]} มีคะแนนเท่ากัน! 
+                แนะนำให้สมาชิกที่ยังไม่ได้โหวตเข้ามาโหวตเพิ่ม
+              </p>
             </div>
           )}
         </div>
+      )}
 
-        <div className="mt-8 p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-          <h3 className="text-lg font-bold text-gray-800 mb-3">📝 ประวัติการโหวต</h3>
-          <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
-            {voteHistory.length > 0 ? voteHistory.map((entry, idx)=>(
-              <p key={idx} className="text-sm text-gray-800">{entry}</p>
-            )) : (
-              <p className="text-gray-500 text-center py-8">ยังไม่มีประวัติการโหวต</p>
-            )}
+      {/* ✅ แสดง Message เมื่อยังไม่มีใครโหวต */}
+      {sortedProvinces.length === 0 && (
+        <div className="bg-gray-50 p-8 rounded-lg border-2 border-dashed border-gray-300 text-center">
+          <div className="text-gray-400 mb-3">
+            <MapPin className="w-16 h-16 mx-auto" />
           </div>
+          <p className="text-lg font-semibold text-gray-600 mb-2">
+            ยังไม่มีใครโหวต
+          </p>
+          <p className="text-sm text-gray-500">
+            เป็นคนแรกที่เลือกจังหวัดที่อยากไปกัน!
+          </p>
+        </div>
+      )}
+
+      {/* Vote History */}
+      <div className="bg-white p-6 rounded-xl shadow-lg">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">📝 ประวัติการโหวต</h3>
+        <div className="max-h-40 overflow-y-auto border rounded p-3 bg-gray-50">
+          {voteHistory.length > 0 ? (
+            voteHistory.map((entry, idx) => (
+              <p key={idx} className="text-sm text-gray-800 mb-1">{entry}</p>
+            ))
+          ) : (
+            <p className="text-gray-500 text-center py-4">ยังไม่มีประวัติการโหวต</p>
+          )}
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   // ============ STEP 5: SUMMARY ============
-  const StepSummary = () => {
-    const handleCloseVoting = async () => {
-      const incompleteBudgets = (trip.members || []).filter(m => 
-        !m.budget.accommodation || m.budget.accommodation <= 0 ||
-        !m.budget.transport || m.budget.transport <= 0 ||
-        !m.budget.food || m.budget.food <= 0
-      );
 
-      if (incompleteBudgets.length > 0) {
-        const names = incompleteBudgets.map(m => m.name).join(", ");
-        alert(`สมาชิกเหล่านี้ยังกรอกงบประมาณไม่ครบ:\n${names}\n\nกรุณาให้ทุกคนกรอกข้อมูลให้ครบก่อน`);
+  const StepSummary = () => {
+    const [showPreview, setShowPreview] = useState(false);
+
+    // สถิติสมาชิก
+    const memberStats = {
+      total: trip.members?.length || 0,
+      completedBudget: trip.members?.filter(m => 
+        m.budget.accommodation > 0 && 
+        m.budget.transport > 0 && 
+        m.budget.food > 0
+      ).length || 0,
+      votedProvince: trip.provinceVotes?.length || 0,
+      votedDate: trip.dateVotes?.length || 0
+    };
+
+    const allDataComplete = 
+      memberStats.completedBudget === memberStats.total &&
+      memberStats.votedProvince === memberStats.total &&
+      memberStats.votedDate === memberStats.total;
+
+    const handleCloseVoting = async () => {
+      // ตรวจสอบความครบถ้วน
+      if (!allDataComplete) {
+        alert(`⚠️ ข้อมูลยังไม่ครบ!\n\n` +
+          `งบประมาณ: ${memberStats.completedBudget}/${memberStats.total} คน\n` +
+          `โหวตจังหวัด: ${memberStats.votedProvince}/${memberStats.total} คน\n` +
+          `โหวตวันที่: ${memberStats.votedDate}/${memberStats.total} คน\n\n` +
+          `กรุณาให้ทุกคนกรอกข้อมูลให้ครบก่อนปิดการโหวต`
+        );
         return;
       }
 
-      if (!confirm("ต้องการปิดการโหวตและบันทึกผลหรือไม่?\n\nเมื่อปิดแล้ว สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก")) {
+      if (!confirm(
+        "ต้องการปิดการโหวตและบันทึกผลหรือไม่?\n\n" +
+        "⚠️ เมื่อปิดแล้ว สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก"
+      )) {
         return;
       }
       
@@ -992,14 +1572,14 @@ const VotePage: React.FC = () => {
         if (CONFIG.USE_MOCK_DATA) {
           log.mock('Closing trip (mock)');
           await new Promise(resolve => setTimeout(resolve, 500));
-          response = { success: true, message: 'ปิดการโหวตสำเร็จ' };
+          response = { success: true };
         } else {
           log.api('Closing trip via API');
           response = await tripAPI.closeTrip(tripCode);
         }
         
         if (response.success) {
-          alert("ปิดการโหวตเรียบร้อย! กำลังนำไปหน้าสรุปผล...");
+          alert("✓ ปิดการโหวตเรียบร้อย! กำลังนำไปหน้าสรุปผล...");
           navigate(`/summaryPage/${tripCode}`);
         } else {
           throw new Error(response.message || 'ไม่สามารถปิดการโหวตได้');
@@ -1010,41 +1590,400 @@ const VotePage: React.FC = () => {
       }
     };
 
+    // คำนวณ Top 3 วันที่
+    const topDates = (trip.dateRanges || [])
+      .map(range => ({
+        ...range,
+        votes: trip.dateVotes?.filter(v => v.votes[range.id]).length || 0
+      }))
+      .sort((a, b) => b.votes - a.votes)
+      .slice(0, 3);
+
+    // คำนวณ Top 3 จังหวัด
+    const topProvinces = (trip.voteResults?.provinces || []).slice(0, 3);
+
+    // คำนวณงบประมาณเฉลี่ย
+    const avgBudget = {
+      accommodation: 0,
+      transport: 0,
+      food: 0,
+      other: 0,
+      total: 0
+    };
+
+    if (trip.members && trip.members.length > 0) {
+      trip.members.forEach(m => {
+        avgBudget.accommodation += m.budget.accommodation;
+        avgBudget.transport += m.budget.transport;
+        avgBudget.food += m.budget.food;
+        avgBudget.other += m.budget.other;
+      });
+
+      Object.keys(avgBudget).forEach(key => {
+        avgBudget[key as keyof typeof avgBudget] /= trip.members!.length;
+      });
+
+      avgBudget.total = avgBudget.accommodation + avgBudget.transport + avgBudget.food + avgBudget.other;
+    }
+
     return (
-      <div className="bg-white p-6 rounded-xl shadow-lg">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">พร้อมปิดการโหวตหรือยัง?</h2>
-        
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
-          <p className="font-semibold text-blue-900 mb-2">📋 สิ่งที่ควรตรวจสอบก่อนปิดการโหวต:</p>
-          <ul className="space-y-2 text-blue-800 text-sm">
-            <li>✓ สมาชิกกรอกข้อมูลความว่างครบแล้ว (Step 2)</li>
-            <li>✓ สมาชิกกรอกงบประมาณครบแล้ว (Step 3)</li>
-            <li>✓ สมาชิกโหวตเลือกจังหวัดครบแล้ว (Step 4)</li>
-          </ul>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-white p-6 rounded-xl shadow-lg">
+          <h2 className="text-2xl font-bold mb-4 text-gray-800">
+            ✅ พร้อมปิดการโหวตหรือยัง?
+          </h2>
+          
+          {/* สถานะความครบถ้วน */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className={`p-4 rounded-lg border-2 ${
+              memberStats.completedBudget === memberStats.total
+                ? 'border-green-500 bg-green-50'
+                : 'border-amber-500 bg-amber-50'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">งบประมาณ</div>
+                  <div className="text-2xl font-bold">
+                    {memberStats.completedBudget}/{memberStats.total}
+                  </div>
+                </div>
+                {memberStats.completedBudget === memberStats.total ? (
+                  <Check className="w-8 h-8 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-8 h-8 text-amber-600" />
+                )}
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-lg border-2 ${
+              memberStats.votedProvince === memberStats.total
+                ? 'border-green-500 bg-green-50'
+                : 'border-amber-500 bg-amber-50'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">โหวตจังหวัด</div>
+                  <div className="text-2xl font-bold">
+                    {memberStats.votedProvince}/{memberStats.total}
+                  </div>
+                </div>
+                {memberStats.votedProvince === memberStats.total ? (
+                  <Check className="w-8 h-8 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-8 h-8 text-amber-600" />
+                )}
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-lg border-2 ${
+              memberStats.votedDate === memberStats.total
+                ? 'border-green-500 bg-green-50'
+                : 'border-amber-500 bg-amber-50'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">โหวตวันที่</div>
+                  <div className="text-2xl font-bold">
+                    {memberStats.votedDate}/{memberStats.total}
+                  </div>
+                </div>
+                {memberStats.votedDate === memberStats.total ? (
+                  <Check className="w-8 h-8 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-8 h-8 text-amber-600" />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* คำเตือน */}
+          {!allDataComplete && (
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded">
+              <p className="font-semibold text-amber-900 mb-2">⚠️ ข้อมูลยังไม่ครบ!</p>
+              <p className="text-amber-800 text-sm">
+                กรุณาให้สมาชิกที่ยังไม่ได้กรอกข้อมูลเข้ามากรอกให้ครบก่อนปิดการโหวต
+              </p>
+            </div>
+          )}
+
+          {allDataComplete && (
+            <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
+              <p className="font-semibold text-green-900 mb-2">✓ ข้อมูลครบแล้ว!</p>
+              <p className="text-green-800 text-sm">
+                สมาชิกทุกคนกรอกข้อมูลครบถ้วนแล้ว สามารถปิดการโหวตและดูผลสรุปได้
+              </p>
+            </div>
+          )}
+
+          {/* ปุ่ม Preview */}
+          <button
+            onClick={() => setShowPreview(!showPreview)}
+            className="w-full mb-4 px-6 py-3 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded-lg transition flex items-center justify-center gap-2"
+          >
+            {showPreview ? "ซ่อน" : "แสดง"} Preview ผลสรุป
+            {showPreview ? "↑" : "↓"}
+          </button>
+
+          {/* ปุ่มปิดการโหวต */}
+          <button
+            onClick={handleCloseVoting}
+            disabled={!allDataComplete}
+            className={`w-full px-6 py-4 rounded-lg font-bold text-white transition shadow-lg flex items-center justify-center gap-2 ${
+              allDataComplete
+                ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
+                : 'bg-gray-400 cursor-not-allowed'
+            }`}
+          >
+            <span className="text-xl">✓</span>
+            ปิดการโหวตและดูผลสรุป
+          </button>
+
+          {!allDataComplete && (
+            <p className="text-center text-gray-500 text-sm mt-2">
+              ต้องให้สมาชิกทุกคนกรอกข้อมูลครบก่อนถึงจะปิดการโหวตได้
+            </p>
+          )}
         </div>
 
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded">
-          <p className="font-semibold text-amber-900 mb-2">⚠️ คำเตือน:</p>
-          <p className="text-amber-800 text-sm">
-            เมื่อปิดการโหวตแล้ว สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก 
-            และระบบจะสร้างหน้าสรุปผลให้อัตโนมัติ
-          </p>
-        </div>
+        {/* Preview Section */}
+        {showPreview && (
+          <div className="space-y-6">
+            {/* Top 3 วันที่ */}
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">
+                📅 Top 3 วันที่ที่ทุกคนว่าง
+              </h3>
+              {topDates.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {topDates.map((date, idx) => (
+                    <div
+                      key={date.id}
+                      className={`p-4 rounded-lg border-2 ${
+                        idx === 0 ? 'border-yellow-400 bg-yellow-50' :
+                        idx === 1 ? 'border-gray-400 bg-gray-50' :
+                        'border-orange-400 bg-orange-50'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">
+                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                        </div>
+                        <div className="text-sm text-gray-600 mb-1">
+                          {new Date(date.startDate).toLocaleDateString('th-TH')}
+                          {' - '}
+                          {new Date(date.endDate).toLocaleDateString('th-TH')}
+                        </div>
+                        <div className="text-xl font-bold text-gray-800">
+                          {date.votes}/{memberStats.total} คน
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-gray-400 py-4">ยังไม่มีข้อมูลวันที่</p>
+              )}
+            </div>
 
-        <button
-          onClick={handleCloseVoting}
-          className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 rounded-lg transition shadow-lg flex items-center justify-center gap-2"
-        >
-          <span className="text-xl">✓</span>
-          ปิดการโหวตและดูผลสรุป
-        </button>
+            {/* Top 3 จังหวัด */}
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">
+                🗺️ Top 3 จังหวัดยอดนิยม
+              </h3>
+              {topProvinces.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {topProvinces.map((province, idx) => (
+                    <div
+                      key={province.name}
+                      className={`p-4 rounded-lg border-2 ${
+                        idx === 0 ? 'border-yellow-400 bg-yellow-50' :
+                        idx === 1 ? 'border-gray-400 bg-gray-50' :
+                        'border-orange-400 bg-orange-50'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">
+                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                        </div>
+                        <div className="text-lg font-bold text-gray-800 mb-1">
+                          {province.name}
+                        </div>
+                        <div className="text-xl font-bold text-blue-600">
+                          {province.score} คะแนน
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-gray-400 py-4">ยังไม่มีข้อมูลจังหวัด</p>
+              )}
+            </div>
 
-        <p className="text-center text-gray-500 text-sm mt-4">
-          หรือกลับไปแก้ไขข้อมูลในขั้นตอนก่อนหน้า
-        </p>
+            {/* งบประมาณเฉลี่ย */}
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">
+                💰 งบประมาณเฉลี่ยต่อคน
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-gray-700">ค่าที่พัก</span>
+                  <span className="font-bold text-blue-600">
+                    ฿{formatCurrency(Math.round(avgBudget.accommodation))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-gray-700">ค่าเดินทาง</span>
+                  <span className="font-bold text-purple-600">
+                    ฿{formatCurrency(Math.round(avgBudget.transport))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-gray-700">ค่าอาหาร</span>
+                  <span className="font-bold text-green-600">
+                    ฿{formatCurrency(Math.round(avgBudget.food))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-gray-700">เงินสำรอง</span>
+                  <span className="font-bold text-amber-600">
+                    ฿{formatCurrency(Math.round(avgBudget.other))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg">
+                  <span className="font-bold">รวมทั้งหมด</span>
+                  <span className="text-2xl font-bold">
+                    ฿{formatCurrency(Math.round(avgBudget.total))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
+
+  // ============ OWNER CONTROLS ============
+const OwnerControls = () => {
+  const isOwner = memberBudget?.role === 'owner';
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showMemberList, setShowMemberList] = useState(false);
+
+  if (!isOwner) return null;
+
+  const handleDeleteTrip = async () => {
+    if (!confirm("⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบทริปนี้?\n\nการลบจะไม่สามารถกู้คืนได้")) {
+      return;
+    }
+
+    try {
+      if (CONFIG.USE_MOCK_DATA) {
+        await new Promise(r => setTimeout(r, 500));
+      } else {
+        await tripAPI.deleteTrip(tripCode);
+      }
+
+      alert("✓ ลบทริปเรียบร้อยแล้ว");
+      navigate("/homepage");
+    } catch (error) {
+      alert("เกิดข้อผิดพลาดในการลบทริป");
+    }
+  };
+
+  const handleDeleteMember = async (memberId: string, memberName: string) => {
+    if (!confirm(`ต้องการลบ "${memberName}" ออกจากทริป?`)) {
+      return;
+    }
+
+    try {
+      if (CONFIG.USE_MOCK_DATA) {
+        await new Promise(r => setTimeout(r, 300));
+      } else {
+        await tripAPI.deleteMember(tripCode, memberId);
+      }
+
+      setTrip(prev => ({
+        ...prev,
+        members: prev.members?.filter(m => m.id !== memberId) || []
+      }));
+
+      alert(`✓ ลบ "${memberName}" ออกจากทริปแล้ว`);
+    } catch (error) {
+      alert("เกิดข้อผิดพลาดในการลบสมาชิก");
+    }
+  };
+
+  return (
+    <div className="mb-6 bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-6 border-2 border-purple-300">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className="bg-purple-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+            👑 เจ้าของทริป
+          </div>
+          <h3 className="text-lg font-bold text-gray-800">
+            ตัวเลือกสำหรับเจ้าของ
+          </h3>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <button
+          onClick={() => setShowMemberList(!showMemberList)}
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition"
+        >
+          <Users className="w-5 h-5" />
+          จัดการสมาชิก ({trip.members?.length || 0})
+        </button>
+
+        <button
+          onClick={handleDeleteTrip}
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition"
+        >
+          <X className="w-5 h-5" />
+          ลบทริปนี้
+        </button>
+      </div>
+
+      {/* Member List Modal */}
+      {showMemberList && (
+        <div className="mt-4 bg-white rounded-lg p-4 border-2 border-gray-200">
+          <h4 className="font-bold text-gray-800 mb-3">รายชื่อสมาชิก</h4>
+          <div className="space-y-2">
+            {trip.members?.map((member) => (
+              <div
+                key={member.id}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold">
+                    {member.name.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800">{member.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {member.role === 'owner' ? '👑 เจ้าของ' : 'สมาชิก'}
+                    </p>
+                  </div>
+                </div>
+
+                {member.role !== 'owner' && (
+                  <button
+                    onClick={() => handleDeleteMember(member.id, member.name)}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
   const stepLabels = ["สร้างทริป", "เลือกวันที่", "งบประมาณ", "สถานที่", "สรุปผล"];
 
@@ -1090,6 +2029,8 @@ const VotePage: React.FC = () => {
       </div>
       
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <OwnerControls />
+        
         <div className="mb-12">
           <div className="relative">
             <div className="absolute top-6 left-0 right-0 h-1 bg-gray-200 rounded-full" />
