@@ -86,20 +86,21 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   const notiRef = React.useRef<HTMLDivElement>(null);
   const profileRef = React.useRef<HTMLDivElement>(null);
 
+  const handleClickOutside = React.useCallback((event: MouseEvent) => {
+    if (notiRef.current && !notiRef.current.contains(event.target as Node)) {
+      setNotiOpen(false);
+    }
+    if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+      setProfileMenuOpen(false);
+    }
+  }, []);
+
   React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (notiRef.current && !notiRef.current.contains(event.target as Node)) {
-        setNotiOpen(false);
-      }
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
-        setProfileMenuOpen(false);
-      }
-    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [handleClickOutside]);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -165,6 +166,8 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
     setNotifications((prev) => [newNotif, ...prev]);
   };
+  
+  const MAX_BADGE_COUNT = 9;
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50 w-full">
@@ -209,7 +212,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
               <Bell className="w-5 h-5 text-gray-700" />
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold shadow-md animate-pulse">
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                  {unreadCount > MAX_BADGE_COUNT ? `${MAX_BADGE_COUNT}+` : unreadCount}
                 </span>
               )}
             </button>

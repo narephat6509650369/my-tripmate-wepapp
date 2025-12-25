@@ -12,6 +12,13 @@ export interface DateRange {
   createdAt: number;
 }
 
+export interface MemberAvailability {
+  memberId: string;
+  memberName: string;
+  availableDates: string[]; // ["2025-01-15", "2025-01-16", ...]
+  timestamp: number;
+}
+
 export interface ProvinceVote {
   memberId: string;
   memberName: string;
@@ -22,6 +29,7 @@ export interface ProvinceVote {
 export interface Member {
   id: string;
   name: string;
+  email?: string;
   gender: "ชาย" | "หญิง";
   role: MemberRole;
   availability: boolean[];
@@ -56,6 +64,7 @@ export interface TripData {
   dateRanges?: DateRange[];
   provinceVotes?: ProvinceVote[];
   dateVotes?: DateVote[];
+  memberAvailability?: MemberAvailability[];
   voteResults?: {
     provinces: Array<{ name: string; score: number }>;
     dates: Array<{ date: string; votes: number }>;
@@ -175,6 +184,37 @@ const mockMembers: Member[] = [
   }
 ];
 
+export const MOCK_MEMBER_AVAILABILITY: MemberAvailability[] = [
+  {
+    memberId: "member-001",
+    memberName: "สมชาย",
+    availableDates: [
+      "2024-11-05", "2024-11-06", "2024-11-07", "2024-11-08",
+      "2024-11-15", "2024-11-16", "2024-11-22", "2024-11-23"
+    ],
+    timestamp: Date.now() - 86400000
+  },
+  {
+    memberId: "member-002",
+    memberName: "สมหญิง",
+    availableDates: [
+      "2024-11-06", "2024-11-07", "2024-11-08", "2024-11-09",
+      "2024-11-10", "2024-11-16", "2024-11-17"
+    ],
+    timestamp: Date.now() - 7200000
+  },
+  {
+    memberId: "member-003",
+    memberName: "สมศรี",
+    availableDates: [
+      "2024-11-01", "2024-11-02", "2024-11-05", "2024-11-06",
+      "2024-11-07", "2024-11-08", "2024-11-12", "2024-11-15",
+      "2024-11-16", "2024-11-20", "2024-11-22"
+    ],
+    timestamp: Date.now() - 3600000
+  }
+];
+
 // ============== MOCK DATE RANGES ==============
 export const MOCK_DATE_RANGES: DateRange[] = [
   {
@@ -243,70 +283,138 @@ export const MOCK_DATE_VOTES: DateVote[] = [
 ];
 
 // ============== MOCK TRIP DATA ==============
-export const MOCK_TRIP_DATA: ApiResponse<TripData> = {
-  success: true,
-  data: {
-    _id: "trip-test-001",
-    tripCode: "A3K7-P9M2-X5Q8-R4W6",
-    inviteCode: "A3K7-P9M2-X5Q8-R4W6",
-    name: "ทริปทดสอบ - เที่ยวทะเล 3 วัน 2 คืน",
-    days: 3,
-    detail: "ทริปทดสอบระบบ เที่ยวทะเลภาคใต้",
-    createdBy: "user123",
-    createdAt: Date.now() - 7 * 86400000,
-    members: mockMembers,
-    voteOptions: ["5/11/2568", "6/11/2568", "10/11/2568", "18/11/2568"],
-    selectedDate: null,
-    isCompleted: false,
-    dateRanges: MOCK_DATE_RANGES,
-    provinceVotes: MOCK_PROVINCE_VOTES,
-    dateVotes: MOCK_DATE_VOTES,
-    voteResults: {
-      provinces: [
-        { name: "ภูเก็ต", score: 12 },
-        { name: "กระบี่", score: 9 },
-        { name: "เชียงใหม่", score: 7 }
-      ],
-      dates: [
-        { date: "5/11/2568", votes: 4 },
-        { date: "6/11/2568", votes: 5 }
-      ]
-    }
+export const getMockTripData = (): ApiResponse<TripData> => {
+  const { userId, userEmail } = validateAuth();
+  
+  if (!userId || !userEmail) {
+    throw new Error('User not authenticated - missing userId or userEmail in localStorage');
   }
+  
+  return {
+    success: true,
+    data: {
+      _id: "trip001",
+      tripCode: "TEST-1234-5678-9012",
+      inviteCode: "TEST-1234-5678-9012",
+      name: "ทริปทดสอบ",
+      days: 3,
+      detail: "ทริปทดสอบระบบ",
+      createdBy: userId, // ✅ ใช้ userId จริง
+      createdAt: Date.now(),
+      isCompleted: false,
+      members: [
+        {
+          id: userId, // ✅ ใช้ userId จริง
+          name: "You",
+          email: userEmail, // ✅ ใช้ email จริง
+          gender: "หญิง",
+          role: "owner",
+          availability: [],
+          budget: {
+            accommodation: 0,
+            transport: 0,
+            food: 0,
+            other: 0,
+            lastUpdated: 0
+          }
+        },
+        {
+          id: "member-002",
+          name: "สมหญิง",
+          email: "somying@example.com",
+          gender: "หญิง",
+          role: "member",
+          availability: [],
+          budget: {
+            accommodation: 2000,
+            transport: 1000,
+            food: 1500,
+            other: 300,
+            lastUpdated: Date.now()
+          }
+        }
+      ],
+      voteOptions: [],
+      selectedDate: null,
+      voteResults: { provinces: [], dates: [] },
+      dateRanges: [],
+      dateVotes: [],
+      provinceVotes: [],
+      memberAvailability: []
+    }
+  };
 };
 
-// ============== MOCK SUMMARY DATA ==============
-export const MOCK_SUMMARY_DATA: ApiResponse<TripData> = {
-  success: true,
-  data: {
-    _id: "trip-test-001",
-    tripCode: "A3K7-P9M2-X5Q8-R4W6",
-    inviteCode: "A3K7-P9M2-X5Q8-R4W6",
-    name: "ทริปทดสอบ - เที่ยวทะเล 3 วัน 2 คืน",
-    days: 3,
-    detail: "ทริปทดสอบระบบ เที่ยวทะเลภาคใต้",
-    createdBy: "user123",
-    createdAt: Date.now() - 7 * 86400000,
-    members: mockMembers,
-    voteOptions: ["5/11/2568", "6/11/2568", "10/11/2568", "18/11/2568"],
-    selectedDate: "6/11/2568",
-    isCompleted: true,
-    closedAt: Date.now() - 86400000,
-    dateRanges: MOCK_DATE_RANGES,
-    provinceVotes: MOCK_PROVINCE_VOTES,
-    voteResults: {
-      provinces: [
-        { name: "ภูเก็ต", score: 15 },
-        { name: "กระบี่", score: 11 },
-        { name: "เชียงใหม่", score: 8 }
-      ],
-      dates: [
-        { date: "5/11/2568", votes: 4 },
-        { date: "6/11/2568", votes: 5 }
-      ]
-    }
+// ============== AUTH VALIDATION ==============
+const validateAuth = (): { userId: string; userEmail: string } => {
+  let userId = localStorage.getItem('userId');
+  let userEmail = localStorage.getItem('userEmail');
+  
+  // ✅ ถ้าไม่มี userId ให้ตั้งค่า mock แทนที่จะ throw error
+  if (!userId || !userEmail) {
+    console.warn('⚠️ No userId/userEmail in localStorage, setting up mock user...');
+    
+    // ตั้งค่า mock user
+    userId = 'user123';
+    userEmail = 'user@example.com';
+    
+    localStorage.setItem('userId', userId);
+    localStorage.setItem('userEmail', userEmail);
+    localStorage.setItem('userName', 'Test User');
+    localStorage.setItem('jwtToken', 'mock-jwt-token-' + Date.now());
+    
+    console.log('✅ Mock user created:', { userId, userEmail });
   }
+  
+  return { userId, userEmail };
 };
+
+// ✅ Export ทั้ง 2 แบบ
+export const MOCK_TRIP_DATA = getMockTripData();
+// ✅ ฟังก์ชันสำหรับ Summary Page
+export const getMockSummaryData = (): ApiResponse<TripData> => {
+  const { userId, userEmail } = validateAuth();
+  
+  if (!userId || !userEmail) {
+    throw new Error('User not authenticated - missing userId or userEmail in localStorage');
+  }
+
+  return {
+    success: true,
+    data: {
+      _id: "trip-test-001",
+      tripCode: "A3K7-P9M2-X5Q8-R4W6",
+      inviteCode: "A3K7-P9M2-X5Q8-R4W6",
+      name: "ทริปทดสอบ - เที่ยวทะเล 3 วัน 2 คืน",
+      days: 3,
+      detail: "ทริปทดสอบระบบ เที่ยวทะเลภาคใต้",
+      createdBy: userId,
+      createdAt: Date.now() - 7 * 86400000,
+      members: mockMembers, // ใช้ mockMembers ที่มีอยู่แล้ว
+      voteOptions: ["5/11/2568", "6/11/2568", "10/11/2568", "18/11/2568"],
+      selectedDate: "6/11/2568",
+      isCompleted: true,
+      closedAt: Date.now() - 86400000,
+      dateRanges: MOCK_DATE_RANGES,
+      provinceVotes: MOCK_PROVINCE_VOTES,
+      memberAvailability: MOCK_MEMBER_AVAILABILITY,
+      voteResults: {
+        provinces: [
+          { name: "ภูเก็ต", score: 15 },
+          { name: "กระบี่", score: 11 },
+          { name: "เชียงใหม่", score: 8 }
+        ],
+        dates: [
+          { date: "5/11/2568", votes: 4 },
+          { date: "6/11/2568", votes: 5 }
+        ]
+      }
+    }
+  };
+};
+
+// ✅ Export constant ด้วย (สำหรับ backward compatibility)
+export const MOCK_SUMMARY_DATA = getMockSummaryData();
 
 // ============== HELPER FUNCTIONS ==============
 
@@ -768,10 +876,31 @@ export const mockDeleteTrip = async (
   };
 };
 
+// 🆕 Mock: Update Member Availability
+export const mockUpdateMemberAvailability = async (
+  tripId: string,
+  data: {
+    memberId: string;
+    availableDates: string[];
+  }
+): Promise<ApiResponse> => {
+  await mockDelay(300);
+  
+  return {
+    success: true,
+    data: {
+      memberId: data.memberId,
+      availableDates: data.availableDates,
+      timestamp: Date.now()
+    },
+    message: "บันทึกวันที่ว่างสำเร็จ"
+  };
+};
+
 // ============== DEFAULT EXPORT ==============
 export default {
   MOCK_TRIP_DATA,
-  MOCK_SUMMARY_DATA,
+  // MOCK_SUMMARY_DATA,
   MOCK_MY_TRIPS,
   MOCK_CREATE_TRIP_RESPONSE,
   MOCK_INVITE_CODE_RESPONSE,
@@ -786,6 +915,7 @@ export default {
   MOCK_ERROR_TRIP_CLOSED,
   MOCK_DATE_RANGES,
   MOCK_PROVINCE_VOTES,
+  MOCK_MEMBER_AVAILABILITY,
   generateMockMember,
   generateMockTripCode,
   mockDelay,
@@ -795,5 +925,6 @@ export default {
   mockRemoveDateRange,
   mockUpdateBudgetPriority,
   mockDeleteMember,
-  mockDeleteTrip
+  mockDeleteTrip,
+  mockUpdateMemberAvailability
 };

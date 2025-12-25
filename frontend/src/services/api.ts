@@ -4,9 +4,35 @@ import {
   mockRemoveDateRange,
   mockUpdateBudgetPriority,
   mockDeleteMember,
-  mockDeleteTrip
+  mockDeleteTrip,
+  mockUpdateMemberAvailability 
 } from '../data/mockData';
 import { CONFIG } from '../config/app.config';
+
+// ============== HELPER: FETCH WITH TIMEOUT ==============
+const fetchWithTimeout = async (
+  url: string, 
+  options: RequestInit = {}, 
+  timeout: number = 10000
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - เซิร์ฟเวอร์ตอบสนองช้าเกินไป');
+    }
+    throw error;
+  }
+};
 
 // ============== API CONFIGURATION ==============
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -63,8 +89,10 @@ export interface TripResponse {
   selectedDate: string | null;
   isCompleted: boolean;
   closedAt?: number;
-  dateRanges?: DateRange[]; // ✅ เพิ่ม
-  provinceVotes?: any[]; // ✅ เพิ่ม
+  dateRanges?: DateRange[];
+  provinceVotes?: any[];
+  dateVotes?: any[]; 
+  memberAvailability?: any[];
   voteResults?: {
     provinces: { name: string; score: number }[];
     dates: { date: string; votes: number }[];
@@ -103,10 +131,10 @@ export const tripAPI = {
         };
       }
       
-      const response = await fetch(`${API_URL}/trips/AddTrip`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetchWithTimeout(`${API_URL}/trips/AddTrip`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
         },
         body: JSON.stringify(tripData)
@@ -131,7 +159,7 @@ export const tripAPI = {
     }
 
     try {
-      const response = await fetch(`${API_URL}/trips/my-trips`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/my-trips`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
         }
@@ -156,7 +184,7 @@ export const tripAPI = {
     }
 
     try {
-      const response = await fetch(`${API_URL}/trips/DeleteTrip`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/DeleteTrip`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +206,7 @@ export const tripAPI = {
   // ✅ 4. สร้างรหัสเชิญ
   generateInviteCode: async (tripId: string): Promise<ApiResponse> => {
     try {
-      const response = await fetch(`${API_URL}/trips/${tripId}/invite`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}/invite`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
@@ -198,7 +226,7 @@ export const tripAPI = {
   // ✅ 5. เข้าร่วมทริปด้วยรหัสเชิญ
   joinTrip: async (inviteCode: string): Promise<ApiResponse> => {
     try {
-      const response = await fetch(`${API_URL}/trips/join`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -225,7 +253,7 @@ export const tripAPI = {
     }
 
     try {
-      const response = await fetch(`${API_URL}/trips/${tripCode}/members/${memberId}`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/members/${memberId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
@@ -245,7 +273,7 @@ export const tripAPI = {
   // ✅ 7. ดึงรายละเอียดทริป
   getTripDetail: async (tripCode: string): Promise<ApiResponse<TripResponse>> => {
     try {
-      const response = await fetch(`${API_URL}/trips/${tripCode}`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
         }
@@ -272,7 +300,7 @@ export const tripAPI = {
     }
 
     try {
-      const response = await fetch(`${API_URL}/trips/${tripCode}/votes/date`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/votes/date`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -297,7 +325,7 @@ export const tripAPI = {
     voteData: { votes: string[]; scores: Record<string, number> }
   ): Promise<ApiResponse> => {
     try {
-      const response = await fetch(`${API_URL}/trips/${tripCode}/votes/province`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/votes/province`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -319,7 +347,7 @@ export const tripAPI = {
   // ✅ 9. ปิดการโหวต
   closeTrip: async (tripCode: string): Promise<ApiResponse> => {
     try {
-      const response = await fetch(`${API_URL}/trips/${tripCode}/close`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/close`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
@@ -343,10 +371,10 @@ export const tripAPI = {
     budget: Partial<Member['budget']>
   ): Promise<ApiResponse> => {
     try {
-      const response = await fetch(
-        `${API_URL}/trips/${tripCode}/members/${memberId}/budget`,
-        {
-          method: 'PATCH',
+      const response = await fetchWithTimeout(
+      `${API_URL}/trips/${tripCode}/members/${memberId}/budget`,
+      {
+        method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
@@ -373,7 +401,7 @@ export const tripAPI = {
     }
 
     try {
-      const response = await fetch(`${API_URL}/trips/${tripCode}/date-ranges`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/date-ranges`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -400,7 +428,7 @@ export const tripAPI = {
     }
 
     try {
-      const response = await fetch(`${API_URL}/trips/${tripCode}/date-ranges/${rangeId}`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/date-ranges/${rangeId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
@@ -429,7 +457,7 @@ export const tripAPI = {
     }
 
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `${API_URL}/trips/${tripCode}/members/${memberId}/budget-priority`,
         {
           method: 'PATCH',
@@ -449,7 +477,41 @@ export const tripAPI = {
     } catch (error) {
       return handleApiError(error);
     }
-  }
+  },
 
-  
+  // 🆕 14. อัปเดตวันที่ว่างของสมาชิก
+  updateMemberAvailability: async (
+    tripCode: string, 
+    data: {
+      memberId: string;
+      availableDates: string[];
+    }
+  ): Promise<ApiResponse> => {
+    if (CONFIG.USE_MOCK_DATA) {
+      console.log('🎭 Mock Mode: updateMemberAvailability');
+      return await mockUpdateMemberAvailability(tripCode, data);
+    }
+
+    try {
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/${tripCode}/availability`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
+          },
+          body: JSON.stringify(data)
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  }
 };

@@ -77,6 +77,12 @@ export const formatInviteCode = (input: string): string => {
  * จัดรูปแบบตัวเลขเงิน (1,000,000)
  */
 export const formatCurrency = (amount: number): string => {
+  // Validate input
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+    console.warn('formatCurrency: Invalid input', amount);
+    return '0';
+  }
+  
   return amount.toLocaleString('th-TH', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2
@@ -87,8 +93,18 @@ export const formatCurrency = (amount: number): string => {
  * จัดรูปแบบวันที่เป็นภาษาไทย
  */
 export const formatThaiDate = (date: Date | string | number): string => {
+  // Validate input
+  if (date === null || date === undefined) {
+    console.warn('formatThaiDate: null or undefined input');
+    return 'วันที่ไม่ถูกต้อง';
+  }
+  
   const d = new Date(date);
-  if (isNaN(d.getTime())) return 'วันที่ไม่ถูกต้อง';
+  
+  if (isNaN(d.getTime()) || !isFinite(d.getTime())) {
+    console.warn('formatThaiDate: Invalid date', date);
+    return 'วันที่ไม่ถูกต้อง';
+  }
   
   return d.toLocaleDateString('th-TH', {
     year: 'numeric',
@@ -101,8 +117,19 @@ export const formatThaiDate = (date: Date | string | number): string => {
  * แสดงเวลาแบบสั้น (5 นาทีที่แล้ว)
  */
 export const formatRelativeTime = (timestamp: number): string => {
+  // Validate input
+  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp) || timestamp < 0) {
+    console.warn('formatRelativeTime: Invalid timestamp', timestamp);
+    return 'เวลาไม่ถูกต้อง';
+  }
+  
   const now = Date.now();
   const diff = now - timestamp;
+  
+  // Check for future dates
+  if (diff < 0) {
+    return 'ในอนาคต';
+  }
   
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -149,10 +176,20 @@ export const calculateAverageBudget = (
   );
   
   const count = members.length;
-  const accommodation = Math.round(sum.accommodation / count);
-  const transport = Math.round(sum.transport / count);
-  const food = Math.round(sum.food / count);
-  const other = Math.round(sum.other / count);
+  
+  // Validate calculations
+  const accommodation = Number.isFinite(sum.accommodation / count) 
+    ? Math.round(sum.accommodation / count) 
+    : 0;
+  const transport = Number.isFinite(sum.transport / count)
+    ? Math.round(sum.transport / count)
+    : 0;
+  const food = Number.isFinite(sum.food / count)
+    ? Math.round(sum.food / count)
+    : 0;
+  const other = Number.isFinite(sum.other / count)
+    ? Math.round(sum.other / count)
+    : 0;
   
   return {
     accommodation,

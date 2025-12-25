@@ -4,7 +4,7 @@ import { Copy, Calendar, Users, DollarSign, MapPin, Sparkles, Check, X, Loader2 
 import Header from "../components/Header";
 import { tripAPI } from "../services/api";
 import { CONFIG, log } from '../config/app.config';
-import { MOCK_SUMMARY_DATA, Member, TripData } from "../data/mockData";
+import { getMockSummaryData, Member, TripData } from "../data/mockData";
 import {
   ResponsiveContainer,
   BarChart,
@@ -65,13 +65,13 @@ const SummaryPage: React.FC = () => {
         
         if (CONFIG.USE_MOCK_DATA) {
           log.mock('Loading trip summary from mock');
-          response = MOCK_SUMMARY_DATA;
+          response = getMockSummaryData(); 
           await new Promise(resolve => setTimeout(resolve, 500));
         } else {
           log.api('Loading trip summary from API');
           response = await tripAPI.getTripDetail(tripCode);
         }
-        
+
         if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
@@ -125,7 +125,7 @@ const SummaryPage: React.FC = () => {
         <div className="text-center">
           <p className="text-xl text-gray-700 mb-4">ทริปนี้ยังไม่ได้ปิดการโหวต</p>
           <button
-            onClick={() => navigate(`/vote/${tripCode}`)}
+            onClick={() => navigate(`/votepage/${tripCode}`)}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg"
           >
             ไปหน้าโหวต

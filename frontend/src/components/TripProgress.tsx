@@ -1,19 +1,19 @@
 import React from 'react';
-import { Check, Loader2, Users } from 'lucide-react';
-
-// ✅ Import types จาก mockData
+import { Users, Check, Loader2 } from 'lucide-react';
 import type { TripData } from '../data/mockData';
 
+// ============== TYPES ==============
 interface TripProgressProps {
   trip: TripData;
   currentMemberId: string;
 }
 
-const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) => {
+// ============== COMPONENT ==============
+export const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) => {
   const members = trip.members || [];
   const totalMembers = members.length;
 
-  // คำนวณความคืบหน้า
+  // คำนวณความคืบหน้าแต่ละหมวด
   const progress = {
     budget: {
       completed: members.filter(m => 
@@ -40,18 +40,20 @@ const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) =>
   // คำนวณ percentage
   Object.keys(progress).forEach(key => {
     const item = progress[key as keyof typeof progress];
-    item.percentage = totalMembers > 0 ? Math.round((item.completed / totalMembers) * 100) : 0;
+    item.percentage = totalMembers > 0 
+      ? Math.min(100, Math.max(0, Math.round((item.completed / totalMembers) * 100)))
+      : 0;
   });
 
-  // คำนวณ overall progress
-  const overallProgress = Math.round(
+  // คำนวณความคืบหน้ารวม
+  const overallProgress = Math.min(100, Math.max(0, Math.round(
     (progress.budget.percentage + 
      progress.dateVote.percentage + 
      progress.provinceVote.percentage + 
      progress.priority.percentage) / 4
-  );
+  )));
 
-  // ตรวจสอบว่าตัวเองทำครบหรือยัง
+  // ความคืบหน้าของตัวเอง
   const currentMember = members.find(m => m.id === currentMemberId);
   const myProgress = {
     budget: currentMember && 
@@ -80,7 +82,7 @@ const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) =>
         </div>
       </div>
 
-      {/* Overall Progress Bar */}
+      {/* Progress Bar */}
       <div className="mb-6">
         <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
           <div 
@@ -90,7 +92,7 @@ const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) =>
         </div>
       </div>
 
-      {/* My Tasks */}
+      {/* My Progress */}
       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg mb-6">
         <div className="flex items-center justify-between mb-2">
           <h4 className="font-semibold text-blue-900">✏️ งานของคุณ</h4>
@@ -100,29 +102,29 @@ const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) =>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className={`flex items-center gap-2 ${myProgress.budget ? 'text-green-700' : 'text-gray-600'}`}>
-            {myProgress.budget ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4 animate-spin" />}
+            {myProgress.budget ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
             <span>กรอกงบประมาณ</span>
           </div>
           <div className={`flex items-center gap-2 ${myProgress.priority ? 'text-green-700' : 'text-gray-600'}`}>
-            {myProgress.priority ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4 animate-spin" />}
+            {myProgress.priority ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
             <span>เลือก Priority</span>
           </div>
           <div className={`flex items-center gap-2 ${myProgress.dateVote ? 'text-green-700' : 'text-gray-600'}`}>
-            {myProgress.dateVote ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4 animate-spin" />}
+            {myProgress.dateVote ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
             <span>โหวตวันที่</span>
           </div>
           <div className={`flex items-center gap-2 ${myProgress.provinceVote ? 'text-green-700' : 'text-gray-600'}`}>
-            {myProgress.provinceVote ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4 animate-spin" />}
+            {myProgress.provinceVote ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
             <span>โหวตจังหวัด</span>
           </div>
         </div>
       </div>
 
-      {/* Detailed Progress */}
+      {/* Category Progress */}
       <div className="space-y-4">
         <h4 className="font-semibold text-gray-800 mb-2">📊 ความคืบหน้ารายหมวด</h4>
 
-        {/* งบประมาณ */}
+        {/* Budget */}
         <div>
           <div className="flex justify-between items-center mb-1">
             <span className="text-sm text-gray-700">💰 งบประมาณ</span>
@@ -154,7 +156,7 @@ const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) =>
           </div>
         </div>
 
-        {/* วันที่ */}
+        {/* Date Vote */}
         <div>
           <div className="flex justify-between items-center mb-1">
             <span className="text-sm text-gray-700">📅 โหวตวันที่</span>
@@ -170,7 +172,7 @@ const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) =>
           </div>
         </div>
 
-        {/* จังหวัด */}
+        {/* Province Vote */}
         <div>
           <div className="flex justify-between items-center mb-1">
             <span className="text-sm text-gray-700">🗺️ โหวตจังหวัด</span>
@@ -187,7 +189,7 @@ const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) =>
         </div>
       </div>
 
-      {/* All Complete Message */}
+      {/* Complete Message */}
       {overallProgress === 100 && (
         <div className="mt-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
           <p className="text-green-800 font-semibold flex items-center gap-2">
@@ -199,5 +201,3 @@ const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) =>
     </div>
   );
 };
-
-export default TripProgress;

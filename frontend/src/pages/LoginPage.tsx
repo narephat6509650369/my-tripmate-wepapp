@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 import bgImage from '../assets/login-bg.jpg';
 import { CONFIG, log } from '../config/app.config';
+import { safeLocalStorage } from '../utils/safeStorage';
 
 interface GoogleLoginResult {
   token: string;
@@ -18,7 +20,6 @@ function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ✅ ใช้ CONFIG แทนการ hardcode
   const API_BASE_URL = CONFIG.API_BASE_URL;
 
   const handleGoogleLogin = useGoogleLogin({
@@ -37,17 +38,23 @@ function LoginPage() {
         
         const { token, user } = res.data;
         
-        // ตรวจสอบว่ามีข้อมูลครบหรือไม่
         if (!token || !user?.user_id || !user?.email) {
           throw new Error('Invalid response from server');
         }
         
-        // บันทึกข้อมูลลง localStorage
-        localStorage.setItem('jwtToken', token);
-        localStorage.setItem('userId', user.user_id);
-        localStorage.setItem('userEmail', user.email);
+        // Sanitize email before storing
+        const sanitizedEmail = DOMPurify.sanitize(user.email.trim());
         
-        log.success('Login successful', { email: user.email });
+        const tokenSaved = safeLocalStorage.setItem('jwtToken', token);
+        const userIdSaved = safeLocalStorage.setItem('userId', user.user_id);
+        const emailSaved = safeLocalStorage.setItem('userEmail', sanitizedEmail);
+
+        if (!tokenSaved || !userIdSaved || !emailSaved) {
+          alert('ไม่สามารถบันทึกข้อมูลได้ กรุณาล้างข้อมูลในเบราว์เซอร์');
+          return;
+        }
+        
+        log.success('Login successful', { email: sanitizedEmail });
         navigate('/homepage');
         
       } catch (err) {
