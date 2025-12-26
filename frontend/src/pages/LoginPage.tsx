@@ -22,6 +22,9 @@ function LoginPage() {
 
   const API_BASE_URL = CONFIG.API_BASE_URL;
 
+  // ✅ Debug: ดู path ของรูป
+  console.log('Background image path:', bgImage);
+
   const handleGoogleLogin = useGoogleLogin({
     flow: 'implicit',
     onSuccess: async (tokenResponse) => {
@@ -78,10 +81,30 @@ function LoginPage() {
 
   return (
     <div className="wrap-login100">
+      {/* ✅ Background Image Section - แก้ไขให้แสดงรูปชัดเจน */}
       <div 
         className="login100-more" 
-        style={{ backgroundImage: `url(${bgImage})` }}
-      />
+        style={{ 
+          backgroundImage: `url(${bgImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          position: 'relative',
+          minHeight: '100vh'
+        }}
+      >
+        {/* ✅ Overlay แบบเบาๆ - ปรับ opacity ได้ตามใจชอบ */}
+        {/* ค่า 0.15 = เบามาก, 0.3 = ปานกลาง, 0 = ไม่มี overlay */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(102, 126, 234, 0.15)',
+          zIndex: 1
+        }} />
+      </div>
 
       <div className="login100-form-container">
         <form className="login100-form validate-form">
