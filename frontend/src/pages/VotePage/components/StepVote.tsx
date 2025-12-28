@@ -22,6 +22,7 @@ export const StepVote: React.FC<StepVoteProps> = ({
   // ============== STATE ==============
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ============== EFFECTS ==============
   
@@ -58,6 +59,12 @@ export const StepVote: React.FC<StepVoteProps> = ({
       alert("กรุณาเลือกอย่างน้อย 1 วัน");
       return;
     }
+    if (isSubmitting) {
+      console.log('⏳ Already submitting...');
+      return;
+    }
+
+    setIsSubmitting(true); // ✅ เพิ่ม
 
     try {
       if (CONFIG.USE_MOCK_DATA) {
@@ -97,6 +104,8 @@ export const StepVote: React.FC<StepVoteProps> = ({
     } catch (error) {
       log.error('Error saving availability:', error);
       alert("เกิดข้อผิดพลาดในการบันทึก");
+    }finally {
+      setIsSubmitting(false); 
     }
   };
 
@@ -283,9 +292,16 @@ export const StepVote: React.FC<StepVoteProps> = ({
         {/* ปุ่มบันทึก */}
         <button
           onClick={saveAvailability}
-          className="w-full mt-6 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition shadow-lg"
+          disabled={isSubmitting}
+          className={`
+            w-full mt-6 px-6 py-3 font-bold rounded-lg transition shadow-lg
+            ${isSubmitting 
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+              : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
+            }
+          `}
         >
-          บันทึกวันที่ว่าง
+          {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกวันที่ว่าง'}
         </button>
       </div>
 

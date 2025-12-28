@@ -26,6 +26,7 @@ interface BudgetStats {
   avg: number;
   count: number;
   values: number[];
+  outliers?: number;
 }
 
 // ============== CONSTANTS ==============
@@ -126,6 +127,13 @@ const RangeBar: React.FC<RangeBarProps> = ({
           <span>Q1-Q3: ฿{formatCurrency(Math.round(stats.q1))} - ฿{formatCurrency(Math.round(stats.q3))}</span>
           <span>เฉลี่ย: ฿{formatCurrency(Math.round(stats.avg))}</span>
         </div>
+        {stats.outliers && stats.outliers > 0 && (
+          <div className="pt-2 border-t border-gray-200">
+            <p className="text-amber-600 font-medium">
+              ⚠️ กรองค่าผิดปกติ {stats.outliers} ค่าออก
+            </p>
+          </div>
+           )}
       </div>
     </div>
   );
@@ -186,7 +194,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
     return () => {
       debouncedUpdateRef.current?.cancel();
     };
-  }, [memberBudget, tripCode]);
+  }, [tripCode]);
 
   // ============== UPDATE BUDGET FUNCTION ==============
   const updateBudget = async (
@@ -537,3 +545,4 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
     </div>
   );
 };
+

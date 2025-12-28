@@ -91,6 +91,7 @@ const mockMembers: Member[] = [
     id: "member-001",
     name: "สมชาย",
     gender: "ชาย",
+    email: "somchai@example.com",
     role: "owner",
     availability: [true, true, false, true, false, true, true, false],
     budget: {
@@ -109,6 +110,7 @@ const mockMembers: Member[] = [
   {
     id: "member-002",
     name: "สมหญิง",
+    email: "somying@example.com", 
     gender: "หญิง",
     role: "member",
     availability: [false, true, true, false, true, true, false, true],
@@ -128,6 +130,7 @@ const mockMembers: Member[] = [
   {
     id: "member-003",
     name: "สมศรี",
+    email: "somsri@example.com",
     gender: "หญิง",
     role: "member",
     availability: [true, true, true, true, true, true, true, true],
@@ -148,6 +151,7 @@ const mockMembers: Member[] = [
     id: "member-004",
     name: "สมพงษ์",
     gender: "ชาย",
+    email: "sompong@example.com",
     role: "member",
     availability: [true, false, true, true, false, true, true, false],
     budget: {
@@ -166,6 +170,7 @@ const mockMembers: Member[] = [
   {
     id: "member-005",
     name: "สมใจ",
+    email: "somjai@example.com",
     gender: "หญิง",
     role: "member",
     availability: [false, true, true, true, true, false, true, true],

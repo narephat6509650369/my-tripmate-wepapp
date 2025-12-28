@@ -10,6 +10,7 @@ import { StepVote } from "./VotePage/components/StepVote";
 import { StepBudget } from "./VotePage/components/StepBudget";
 import { StepPlace } from "./VotePage/components/StepPlace";
 import { StepSummary } from "./VotePage/components/StepSummary";
+import { MemberControls } from "./VotePage/components/MemberControls";
 
 // Services & Utils
 import { tripAPI } from "../services/api";
@@ -29,6 +30,32 @@ interface BudgetStats {
   avg: number;
   count: number;
   values: number[];
+  outliers?: number;
+}
+
+interface DateRange {
+  id: string;
+  memberId: string;
+  memberName: string;
+  startDate: string;
+  endDate: string;
+  createdAt: number;
+}
+
+interface MemberAvailability {
+  memberId: string;
+  memberName: string;
+  availableDates: string[];
+  timestamp: number;
+}
+
+interface DateRangeScore {
+  startDate: string;
+  endDate: string;
+  consecutiveDays: number;
+  availableCount: number;  
+  score: number;        
+  members: string[];       
 }
 
 // ============== CONSTANTS ==============
@@ -40,12 +67,51 @@ const BUDGET_CATEGORIES = [
 ];
 
 // ============== HELPER FUNCTIONS ==============
-const getSummary = (values: number[]): BudgetStats => {
+/**
+ * กรอง Outliers ออกโดยใช้ IQR Method
+ */
+const removeOutliers = (values: number[]): { 
+  filtered: number[]; 
+  outlierCount: number;
+} => {
+  if (values.length < 4) {
+    return { filtered: values, outlierCount: 0 };
+  }
+  
   const sorted = [...values].sort((a, b) => a - b);
+  const q1Index = Math.floor(sorted.length / 4);
+  const q3Index = Math.floor(3 * sorted.length / 4);
+  
+  const q1 = sorted[q1Index];
+  const q3 = sorted[q3Index];
+  const iqr = q3 - q1;
+  
+  const lowerBound = q1 - 1.5 * iqr;
+  const upperBound = q3 + 1.5 * iqr;
+  
+  const filtered = sorted.filter(v => v >= lowerBound && v <= upperBound);
+  const outlierCount = sorted.length - filtered.length;
+  
+  return { filtered, outlierCount };
+};
+
+const getSummary = (values: number[]): BudgetStats => {
+  const nonZeroValues = values.filter(v => v > 0);
+  
+  if (nonZeroValues.length === 0) {
+    return { 
+      min: 0, max: 0, median: 0, q1: 0, q3: 0, avg: 0, count: 0, values: [], outliers: 0 
+    };
+  }
+  
+  const { filtered, outlierCount } = removeOutliers(nonZeroValues);
+  const sorted = [...filtered].sort((a, b) => a - b);
   const count = sorted.length;
   
   if (count === 0) {
-    return { min: 0, max: 0, median: 0, q1: 0, q3: 0, avg: 0, count: 0, values: [] };
+    return { 
+      min: 0, max: 0, median: 0, q1: 0, q3: 0, avg: 0, count: 0, values: [], outliers: outlierCount 
+    };
   }
   
   const min = sorted[0];
@@ -57,7 +123,7 @@ const getSummary = (values: number[]): BudgetStats => {
   const q3 = sorted[Math.floor(3 * count / 4)];
   const avg = sorted.reduce((a, b) => a + b, 0) / count;
   
-  return { min, max, median, q1, q3, avg, count, values: sorted };
+  return { min, max, median, q1, q3, avg, count, values: sorted, outliers: outlierCount };
 };
 
 // ============== MAIN COMPONENT ==============
@@ -172,6 +238,25 @@ const VotePage: React.FC = () => {
         setMemberBudget(currentMember);
         setLoading(false);
 
+        console.log('========================================');
+        console.log('🔍 MEMBER ROLE DEBUG');
+        console.log('========================================');
+        console.log('Current User ID:', userId);
+        console.log('Trip Created By:', tripData.createdBy);
+        console.log('Current Member:', {
+          id: currentMember.id,
+          name: currentMember.name,
+          role: currentMember.role,
+          email: currentMember.email || 'N/A'
+        });
+        console.log('Is Owner?', currentMember.role === 'owner' && currentMember.id === tripData.createdBy);
+        console.log('All Members:', tripData.members.map(m => ({
+          id: m.id,
+          name: m.name,
+          role: m.role
+        })));
+        console.log('========================================');
+
         console.log('✅ Trip loaded:', {
           tripCode: tripData.tripCode,
           members: tripData.members?.length,
@@ -229,7 +314,71 @@ const VotePage: React.FC = () => {
     navigate("/");
   };
 
-  const next = () => { if (step < 5) setStep(step + 1); };
+  const canProceedToNextStep = (): boolean => {
+    switch (step) {
+      case 2: // Step Vote - ต้องเลือกวันที่แล้ว
+        const myAvailability = trip.memberAvailability?.find(
+          m => m.memberId === memberBudget?.id
+        );
+        if (!myAvailability || myAvailability.availableDates.length === 0) {
+          alert('⚠️ กรุณาเลือกวันที่ว่างก่อนไปหน้าถัดไป');
+          return false;
+        }
+        return true;
+
+      case 3: // Step Budget - ต้องกรอกงบประมาณแล้ว
+        if (!memberBudget) return false;
+        
+        const hasFilledBudget = 
+          memberBudget.budget.accommodation > 0 &&
+          memberBudget.budget.transport > 0 &&
+          memberBudget.budget.food > 0;
+        
+        if (!hasFilledBudget) {
+          alert('⚠️ กรุณากรอกงบประมาณให้ครบทุกหมวดก่อนไปหน้าถัดไป\n(ค่าที่พัก, ค่าเดินทาง, ค่าอาหาร)');
+          return false;
+        }
+        return true;
+
+      case 4: // Step Place - ต้องโหวตจังหวัดแล้ว
+        const myVote = trip.provinceVotes?.find(
+          v => v.memberId === memberBudget?.id
+        );
+        if (!myVote || myVote.votes.length < 3) {
+          alert('⚠️ กรุณาโหวต Top 3 จังหวัดก่อนไปหน้าถัดไป');
+          return false;
+        }
+        return true;
+
+      default:
+        return true;
+    }
+  };
+
+  const next = () => {
+    if (step >= 5) return;
+    
+    // ✅ เช็คก่อนไปหน้าถัดไป
+    if (!canProceedToNextStep()) {
+      return;
+    }
+    
+    setStep(step + 1);
+  };
+
+  <button 
+    onClick={next}
+    disabled={step === 5}
+    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-4 px-6 rounded-xl text-white font-semibold transition-all shadow-lg hover:shadow-xl"
+  >
+    {/* ✅ แสดงสถานะ */}
+    {canProceedToNextStep() ? (
+      <>หน้าถัดไป →</>
+    ) : (
+      <>กรุณากรอกข้อมูลให้ครบ</>
+    )}
+  </button>
+
   const back = () => { if (step > 2) setStep(step - 1); };
 
   // ============== LOADING & ERROR STATES ==============
@@ -331,6 +480,13 @@ const VotePage: React.FC = () => {
         <OwnerControls
           trip={trip}
           setTrip={setTrip}
+          memberBudget={memberBudget}
+          tripCode={tripCode}
+        />
+
+        {/* Member Controls */}
+        <MemberControls
+          trip={trip}
           memberBudget={memberBudget}
           tripCode={tripCode}
         />

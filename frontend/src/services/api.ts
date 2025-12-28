@@ -7,7 +7,7 @@ import {
   mockDeleteTrip,
   mockUpdateMemberAvailability 
 } from '../data/mockData';
-import { CONFIG } from '../config/app.config';
+import { CONFIG, log } from '../config/app.config';
 
 // ============== HELPER: FETCH WITH TIMEOUT ==============
 const fetchWithTimeout = async (
@@ -270,6 +270,41 @@ export const tripAPI = {
     }
   },
 
+  /**
+   * Leave trip - สมาชิกออกจากทริป
+   */
+  leaveTrip: async (tripCode: string): Promise<ApiResponse> => {
+    if (CONFIG.USE_MOCK_DATA) {
+      log.mock('Leaving trip (mock):', tripCode);
+      return {
+        success: true,
+        message: 'ออกจากทริปสำเร็จ'
+      };
+    }
+
+    try {
+      // ✅ ใช้ fetchWithTimeout แทน apiClient
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/${tripCode}/leave`, 
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      log.success('Left trip successfully');
+      return await response.json();
+    } catch (error) {
+      log.error('Failed to leave trip:', error);
+      return handleApiError(error);
+    }
+  },
   // ✅ 7. ดึงรายละเอียดทริป
   getTripDetail: async (tripCode: string): Promise<ApiResponse<TripResponse>> => {
     try {
