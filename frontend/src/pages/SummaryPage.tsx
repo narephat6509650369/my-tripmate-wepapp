@@ -160,7 +160,7 @@ const SummaryPage: React.FC = () => {
   // คำนวณวันที่ที่ตรงกันมากที่สุด
   const dateAvailability = dateHeaders.map((date: string, idx: number) => ({
     date,
-    available: members.filter((m: Member) => m.availability?.[idx]).length,
+    available: members.filter((m: Member) => m.availability?.[idx] === true).length, 
     total: members.length
   })).sort((a, b) => b.available - a.available);
 
@@ -291,7 +291,7 @@ ${topProvinces.length > 0
                     <th key={idx} className="py-3 px-2 border text-center">
                       <div>{date}</div>
                       <div className="text-xs opacity-90">
-                        {members.filter(m => m.availability[idx]).length}/{members.length}
+                        {members.filter(m => m.availability?.[idx] === true).length}/{members.length}
                       </div>
                     </th>
                   ))}
@@ -307,7 +307,7 @@ ${topProvinces.length > 0
                         {member.name}
                       </span>
                     </td>
-                    {member.availability.map((available, i) => (
+                    {(member.availability || []).map((available, i) => (
                       <td key={i} className="py-3 border text-center">
                         <div className="flex justify-center">
                           {available ? (

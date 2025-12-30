@@ -47,6 +47,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   const [hasVoted, setHasVoted] = useState(false);
   const [voteHistory, setVoteHistory] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [followMajority, setFollowMajority] = useState(false);
   
 
   // ============== LOAD USER VOTE ==============
@@ -220,6 +221,49 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
             </select>
           </div>
         ))}
+
+        {/* ✅ เพิ่มส่วนนี้ */}
+        {/* Follow Majority Option */}
+        <div className="mb-4 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={followMajority}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setFollowMajority(checked);
+                
+                if (checked) {
+                  // Auto-select top 3 provinces
+                  const topProvinces = (trip.voteResults?.provinces || [])
+                    .slice(0, 3)
+                    .map(p => p.name);
+                  
+                  if (topProvinces.length >= 3) {
+                    setMyVote([topProvinces[0], topProvinces[1], topProvinces[2]]);
+                  } else {
+                    alert("ยังไม่มีเพื่อนคนไหนโหวต กรุณาเลือกเอง");
+                    setFollowMajority(false);
+                  }
+                }
+              }}
+              className="mt-1 w-5 h-5 text-purple-600"
+            />
+            <div>
+              <p className="font-semibold text-purple-900">
+                ✨ โหวตตามเพื่อนส่วนใหญ่
+              </p>
+              <p className="text-sm text-purple-700 mt-1">
+                ระบบจะเลือก Top 3 จังหวัดที่ได้รับความนิยมให้อัตโนมัติ
+              </p>
+              {followMajority && (
+                <div className="mt-2 p-2 bg-white rounded text-xs text-purple-600">
+                  💡 ระบบเลือก: {myVote[0]}, {myVote[1]}, {myVote[2]}
+                </div>
+              )}
+            </div>
+          </label>
+        </div>
 
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded">

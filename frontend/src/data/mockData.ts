@@ -29,10 +29,10 @@ export interface ProvinceVote {
 export interface Member {
   id: string;
   name: string;
+  gender?: string;
   email?: string;
-  gender: "ชาย" | "หญิง";
-  role: MemberRole;
-  availability: boolean[];
+  role: 'owner' | 'member';
+  availability?: boolean[]; 
   budget: {
     accommodation: number;
     transport: number;
@@ -44,6 +44,12 @@ export interface Member {
     accommodation: BudgetPriority;
     transport: BudgetPriority;
     food: BudgetPriority;
+  };
+
+  followMajority?: {
+    dates: boolean;
+    budget: boolean;
+    province: boolean;
   };
 }
 
@@ -105,6 +111,11 @@ const mockMembers: Member[] = [
       accommodation: 1,
       transport: 2,
       food: 3
+    },
+    followMajority: {
+      dates: false,
+      budget: false,
+      province: false
     }
   },
   {
@@ -125,6 +136,11 @@ const mockMembers: Member[] = [
       accommodation: 2,
       transport: 1,
       food: 2
+    },
+    followMajority: {
+      dates: false,
+      budget: false,
+      province: false
     }
   },
   {
@@ -145,6 +161,11 @@ const mockMembers: Member[] = [
       accommodation: 2,
       transport: 2,
       food: 1
+    },
+    followMajority: {
+      dates: false,
+      budget: false,
+      province: false
     }
   },
   {
@@ -165,6 +186,11 @@ const mockMembers: Member[] = [
       accommodation: 3,
       transport: 1,
       food: 2
+    },
+    followMajority: {
+      dates: false,
+      budget: false,
+      province: false
     }
   },
   {
@@ -185,6 +211,11 @@ const mockMembers: Member[] = [
       accommodation: 1,
       transport: 3,
       food: 2
+    },
+    followMajority: {
+      dates: false,
+      budget: false,
+      province: false
     }
   }
 ];
@@ -304,14 +335,14 @@ export const getMockTripData = (): ApiResponse<TripData> => {
       name: "ทริปทดสอบ",
       days: 3,
       detail: "ทริปทดสอบระบบ",
-      createdBy: userId, // ✅ ใช้ userId จริง
+      createdBy: userId, 
       createdAt: Date.now(),
       isCompleted: false,
       members: [
         {
-          id: userId, // ✅ ใช้ userId จริง
+          id: userId,
           name: "You",
-          email: userEmail, // ✅ ใช้ email จริง
+          email: userEmail,
           gender: "หญิง",
           role: "owner",
           availability: [],
@@ -321,6 +352,11 @@ export const getMockTripData = (): ApiResponse<TripData> => {
             food: 0,
             other: 0,
             lastUpdated: 0
+          },
+          followMajority: {
+            dates: false,
+            budget: false,
+            province: false
           }
         },
         {
@@ -336,6 +372,11 @@ export const getMockTripData = (): ApiResponse<TripData> => {
             food: 1500,
             other: 300,
             lastUpdated: Date.now()
+          },
+          followMajority: {
+            dates: false,
+            budget: false,
+            province: false
           }
         }
       ],
@@ -462,6 +503,10 @@ export const generateMockMember = (
     accommodation: [1, 2, 3][Math.floor(Math.random() * 3)] as BudgetPriority,
     transport: [1, 2, 3][Math.floor(Math.random() * 3)] as BudgetPriority,
     food: [1, 2, 3][Math.floor(Math.random() * 3)] as BudgetPriority
+  },followMajority: {
+    dates: false,
+    budget: false,
+    province: false
   }
 });
 
@@ -492,16 +537,16 @@ export const MOCK_MY_TRIPS: ApiResponse<TripData[]> = {
           role: "owner",
           availability: [true, true, false, true, false, true, true, false],
           budget: {
-            accommodation: 1500,
-            transport: 800,
-            food: 1200,
-            other: 500,
-            lastUpdated: Date.now()
+            accommodation: 0,
+            transport: 0,
+            food: 0,
+            other: 0,
+            lastUpdated: 0
           },
-          budgetPriorities: {
-            accommodation: 1,
-            transport: 2,
-            food: 3
+          followMajority: {
+            dates: false,
+            budget: false,
+            province: false
           }
         },
         {
@@ -521,6 +566,11 @@ export const MOCK_MY_TRIPS: ApiResponse<TripData[]> = {
             accommodation: 2,
             transport: 1,
             food: 2
+          },
+          followMajority: {
+            dates: false,
+            budget: false,
+            province: false
           }
         },
         {
@@ -540,6 +590,11 @@ export const MOCK_MY_TRIPS: ApiResponse<TripData[]> = {
             accommodation: 2,
             transport: 2,
             food: 1
+          },
+          followMajority: {
+            dates: false,
+            budget: false,
+            province: false
           }
         }
       ]
@@ -573,6 +628,11 @@ export const MOCK_MY_TRIPS: ApiResponse<TripData[]> = {
             accommodation: 1,
             transport: 2,
             food: 3
+          },
+          followMajority: {
+            dates: false,
+            budget: false,
+            province: false
           }
         },
         {
@@ -592,6 +652,11 @@ export const MOCK_MY_TRIPS: ApiResponse<TripData[]> = {
             accommodation: 2,
             transport: 1,
             food: 2
+          },
+          followMajority: {
+            dates: false,
+            budget: false,
+            province: false
           }
         }
       ],
@@ -640,6 +705,11 @@ export const MOCK_MY_TRIPS: ApiResponse<TripData[]> = {
             accommodation: 2,
             transport: 1,
             food: 2
+          },
+          followMajority: {
+            dates: false,
+            budget: false,
+            province: false
           }
         },
         {
@@ -654,6 +724,11 @@ export const MOCK_MY_TRIPS: ApiResponse<TripData[]> = {
             food: 0,
             other: 0,
             lastUpdated: 0
+          },
+          followMajority: {
+            dates: false,
+            budget: false,
+            province: false
           }
         }
       ]

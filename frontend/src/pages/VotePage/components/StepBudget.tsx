@@ -173,6 +173,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
     }
   );
   const [history, setHistory] = useState<string[]>([]);
+  const [followMajority, setFollowMajority] = useState(false);
 
   // ============== REFS ==============
   const debouncedUpdateRef = useRef<ReturnType<typeof debounce>>();
@@ -180,7 +181,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
   // ============== SYNC LOCAL BUDGET ==============
   useEffect(() => {
     setLocalBudget(memberBudget.budget);
-  }, [memberBudget.budget]);
+  }, []);
 
   // ============== SETUP DEBOUNCE ==============
   useEffect(() => {
@@ -194,13 +195,21 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
     return () => {
       debouncedUpdateRef.current?.cancel();
     };
-  }, [tripCode]);
+  }, []);
 
   // ============== UPDATE BUDGET FUNCTION ==============
   const updateBudget = async (
     key: keyof Member["budget"], 
     value: number
   ): Promise<void> => {
+    // ✅ ป้องกัน concurrent updates
+    if (isSaving) {
+      console.log('⏳ Already saving, skipping update');
+      return;
+    }
+    
+    console.log(`💾 Starting save: ${key} = ${value}`);
+    
     // Validation: ตัวเลขต้องถูกต้อง
     if (isNaN(value) || value < 0) {
       alert("กรุณากรอกตัวเลขที่ถูกต้องและไม่ติดลบ");
@@ -319,10 +328,12 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
 
   // ============== HANDLE INPUT CHANGE ==============
   const handleBudgetChange = (key: keyof Member["budget"], value: number) => {
+    console.log(`📝 Input changed: ${key} = ${value}`);
+    
     // อัปเดต local state ทันที (responsive UI)
     setLocalBudget(prev => ({ ...prev, [key]: value }));
     
-    // เรียก API หลังจากหยุดพิมพ์ 1 วินาที
+    // เรียก API หลังจากหยุดพิมพ์ 1.5 วินาที
     debouncedUpdateRef.current?.(key, value);
   };
 
@@ -438,6 +449,88 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
             <span className="text-sm">กำลังบันทึก...</span>
           </div>
         )}
+      </div>
+
+      {/* ✅ เพิ่มส่วนนี้ */}
+      {/* Follow Majority Option */}
+      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mb-6">
+        <div className="p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={followMajority}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setFollowMajority(checked);
+                
+                if (checked) {
+                  // Calculate average budget from other members
+                  const otherMembers = trip.members?.filter(m => 
+                    m.id !== memberBudget.id &&
+                    m.budget.accommodation > 0 && 
+                    m.budget.transport > 0 && 
+                    m.budget.food > 0
+                  ) || [];
+                  
+                  if (otherMembers.length > 0) {
+                    const avgBudget = {
+                      accommodation: 0,
+                      transport: 0,
+                      food: 0,
+                      other: 0
+                    };
+                    
+                    otherMembers.forEach(m => {
+                      avgBudget.accommodation += m.budget.accommodation;
+                      avgBudget.transport += m.budget.transport;
+                      avgBudget.food += m.budget.food;
+                      avgBudget.other += m.budget.other;
+                    });
+                    
+                    avgBudget.accommodation = Math.round(avgBudget.accommodation / otherMembers.length);
+                    avgBudget.transport = Math.round(avgBudget.transport / otherMembers.length);
+                    avgBudget.food = Math.round(avgBudget.food / otherMembers.length);
+                    avgBudget.other = Math.round(avgBudget.other / otherMembers.length);
+                    
+                    setLocalBudget(avgBudget);
+                    
+                    // Auto-update each field
+                    Object.keys(avgBudget).forEach(key => {
+                      Object.keys(avgBudget).forEach((key, index) => {
+                      if (key !== 'lastUpdated') {
+                        setTimeout(() => {
+                          debouncedUpdateRef.current?.(
+                            key as keyof Member["budget"], 
+                            avgBudget[key as keyof typeof avgBudget]
+                          );
+                        }, index * 100); // แต่ละ field ห่างกัน 100ms
+                      }
+                    });
+                  });
+                  } else {
+                    alert("ยังไม่มีเพื่อนคนไหนกรอกงบประมาณ กรุณากรอกเอง");
+                    setFollowMajority(false);
+                  }
+                }
+              }}
+              className="mt-1 w-5 h-5 text-purple-600"
+            />
+            <div>
+              <p className="font-semibold text-purple-900">
+                ✨ ใช้งบเฉลี่ยของกลุ่ม
+              </p>
+              <p className="text-sm text-purple-700 mt-1">
+                ระบบจะคำนวณงบเฉลี่ยจากเพื่อนที่กรอกไปแล้วให้อัตโนมัติ 
+                (คุณยังสามารถแก้ไขได้ทีหลัง)
+              </p>
+              {followMajority && (
+                <div className="mt-2 p-2 bg-white rounded text-xs text-purple-600">
+                  💡 ระบบกำลังใช้งบเฉลี่ยของกลุ่ม แต่คุณยังแก้ไขได้ตลอดเวลา
+                </div>
+              )}
+            </div>
+          </label>
+        </div>
       </div>
 
       {/* ============ Priority Voting ============ */}

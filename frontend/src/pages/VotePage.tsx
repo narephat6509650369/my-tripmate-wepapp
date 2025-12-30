@@ -6,6 +6,8 @@ import { Loader2, AlertCircle, Copy, Users } from "lucide-react";
 import Header from "../components/Header";
 import { TripProgress } from "../components/TripProgress";
 import { OwnerControls } from "./VotePage/components/OwnerControls";
+import { TripAnalytics } from "../components/TripAnalytics";
+import { MemberProgressList } from "../components/MemberProgressList";
 import { StepVote } from "./VotePage/components/StepVote";
 import { StepBudget } from "./VotePage/components/StepBudget";
 import { StepPlace } from "./VotePage/components/StepPlace";
@@ -366,19 +368,6 @@ const VotePage: React.FC = () => {
     setStep(step + 1);
   };
 
-  <button 
-    onClick={next}
-    disabled={step === 5}
-    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-4 px-6 rounded-xl text-white font-semibold transition-all shadow-lg hover:shadow-xl"
-  >
-    {/* ✅ แสดงสถานะ */}
-    {canProceedToNextStep() ? (
-      <>หน้าถัดไป →</>
-    ) : (
-      <>กรุณากรอกข้อมูลให้ครบ</>
-    )}
-  </button>
-
   const back = () => { if (step > 2) setStep(step - 1); };
 
   // ============== LOADING & ERROR STATES ==============
@@ -495,6 +484,15 @@ const VotePage: React.FC = () => {
         <TripProgress 
           trip={trip}
           currentMemberId={memberBudget.id}
+        />
+
+        {/* Trip Analytics */}
+        <TripAnalytics trip={trip} />
+        
+        {/* Member Progress List */}
+        <MemberProgressList 
+          trip={trip}
+          currentUserId={memberBudget.id}
         />
         
         {/* Progress Steps */}

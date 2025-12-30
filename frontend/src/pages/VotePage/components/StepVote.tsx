@@ -23,6 +23,7 @@ export const StepVote: React.FC<StepVoteProps> = ({
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [followMajority, setFollowMajority] = useState(false);
 
   // ============== EFFECTS ==============
   
@@ -55,16 +56,31 @@ export const StepVote: React.FC<StepVoteProps> = ({
    * บันทึกวันที่ว่างของตัวเอง
    */
   const saveAvailability = async () => {
-    if (selectedDates.length === 0) {
-      alert("กรุณาเลือกอย่างน้อย 1 วัน");
+    // ✅ เพิ่มการ handle follow majority
+    let datesToSave = selectedDates;
+    
+    if (followMajority && selectedDates.length === 0) {
+      // Auto-select dates based on majority
+      const allDates = trip.memberAvailability?.flatMap(m => m.availableDates) || [];
+      const dateFrequency: Record<string, number> = {};
+      
+      allDates.forEach(date => {
+        dateFrequency[date] = (dateFrequency[date] || 0) + 1;
+      });
+      
+      datesToSave = Object.entries(dateFrequency)
+        .sort((a, b) => b[1] - a[1])
+        .map(([date]) => date)
+        .slice(0, trip.days || 3);
+      
+      if (datesToSave.length === 0) {
+        alert("ยังไม่มีเพื่อนคนไหนเลือกวันที่ กรุณาเลือกเอง");
+        return;
+      }
+    } else if (!followMajority && selectedDates.length === 0) {
+      alert("กรุณาเลือกอย่างน้อย 1 วัน หรือเลือก 'ตามใจเพื่อน'");
       return;
     }
-    if (isSubmitting) {
-      console.log('⏳ Already submitting...');
-      return;
-    }
-
-    setIsSubmitting(true); // ✅ เพิ่ม
 
     try {
       if (CONFIG.USE_MOCK_DATA) {
@@ -72,7 +88,7 @@ export const StepVote: React.FC<StepVoteProps> = ({
       } else {
         await tripAPI.updateMemberAvailability(tripCode, {
           memberId: memberBudget?.id || "",
-          availableDates: selectedDates
+          availableDates: datesToSave
         });
       }
 
@@ -84,7 +100,7 @@ export const StepVote: React.FC<StepVoteProps> = ({
         const newEntry = {
           memberId: memberBudget?.id || "",
           memberName: memberBudget?.name || "",
-          availableDates: selectedDates,
+          availableDates: datesToSave,
           timestamp: Date.now()
         };
 
@@ -100,12 +116,13 @@ export const StepVote: React.FC<StepVoteProps> = ({
         }
       });
 
-      alert("✓ บันทึกวันที่ว่างเรียบร้อย");
+      alert(followMajority 
+        ? "✓ ระบบเลือกวันที่ตามเพื่อนส่วนใหญ่ให้แล้ว!" 
+        : "✓ บันทึกวันที่ว่างเรียบร้อย"
+      );
     } catch (error) {
       log.error('Error saving availability:', error);
       alert("เกิดข้อผิดพลาดในการบันทึก");
-    }finally {
-      setIsSubmitting(false); 
     }
   };
 
@@ -289,6 +306,33 @@ export const StepVote: React.FC<StepVoteProps> = ({
           </div>
         </div>
 
+        {/* ✅ เพิ่มส่วนนี้ */}
+        {/* Follow Majority Option */}
+        <div className="mt-4 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={followMajority}
+              onChange={(e) => setFollowMajority(e.target.checked)}
+              className="mt-1 w-5 h-5 text-purple-600"
+            />
+            <div>
+              <p className="font-semibold text-purple-900">
+                ✨ ตามใจเพื่อนส่วนใหญ่
+              </p>
+              <p className="text-sm text-purple-700 mt-1">
+                ระบบจะเลือกวันที่ที่เพื่อนส่วนใหญ่เลือกให้อัตโนมัติ 
+                (คุณยังสามารถแก้ไขได้ทีหลัง)
+              </p>
+              {followMajority && (
+                <div className="mt-2 p-2 bg-white rounded text-xs text-purple-600">
+                  💡 เมื่อคุณกด "บันทึก" ระบบจะเลือกวันที่ให้โดยอัตโนมัติ
+                </div>
+              )}
+            </div>
+          </label>
+        </div>
+        
         {/* ปุ่มบันทึก */}
         <button
           onClick={saveAvailability}
