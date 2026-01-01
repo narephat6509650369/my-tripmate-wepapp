@@ -1,127 +1,178 @@
+// backend/src/services/tripService.ts
 import { v4 as uuidv4 } from 'uuid';
-import { createTripWithMember, generateInviteCode, generateInviteLink,getTripDetail,getMyTrips, findTripByInviteCode, addMemberIfNotExists, findTripById, findMemberInTrip, removeMemberById, deleteTrip, findAllTripsByUserId, getTripStatus} from "../models/tripModel.js";
-import type { Trip, MyTrip, TripDetail,  } from '../models/tripModel.js';
+import * as tripModel from '../models/tripModel.js';
+import type { Trip } from '../models/tripModel.js';
 
-interface RemoveMemberParams {
+/**
+ * สร้างทริปใหม่ พร้อมเพิ่มผู้สร้างเป็นสมาชิกคนแรก (Owner)
+ */
+export const addTrip = async (
+  owner_id: string,
+  trip_name: string,
+  description: string | null,
+  num_days: number
+) => {
+  // 1. สร้าง IDs
+  const trip_id = uuidv4();
+  const member_id = uuidv4();
+  
+  // 2. สร้างรหัสเชิญ
+  const invite_code = await tripModel.generateInviteCode();
+  const invite_link = await tripModel.generateInviteLink(trip_id);
+  
+  // 3. สร้าง Trip Object
+  const tripData: Trip = {
+    trip_id,
+    owner_id,
+    trip_name,
+    description,
+    num_days,
+    invite_code,
+    invite_link,
+    status: 'planning',
+    is_active: true
+  };
+  
+  // 4. บันทึกลง Database (Trip + Member ใน Transaction)
+  await tripModel.createTripWithMember(tripData, member_id);
+  
+  return {
+    trip_id,
+    trip_name,
+    invite_code,
+    invite_link,
+    status: 'planning'
+  };
+};
+
+/**
+ * ดึงทริปทั้งหมดของ User (เจ้าของ + เข้าร่วม)
+ */
+export const getUserTrips = async (user_id: string) => {
+  // ดึงทริปทั้งหมด
+  const allTrips = await tripModel.findAllTripsByUserId(user_id);
+  
+  // แยกตาม role
+  const owned = allTrips.filter(t => t.role === 'owner');
+  const joined = allTrips.filter(t => t.role === 'member');
+  
+  return {
+    all: allTrips,
+    owned,
+    joined
+  };
+};
+
+/**
+ * ลบทริป (เฉพาะ Owner + สถานะต้องเป็น 'planning')
+ */
+export const deleteTripService = async (trip_id: string) => {
+  // 1. เช็คสถานะก่อน
+  const status = await tripModel.getTripStatus(trip_id);
+  
+  if (!status) {
+    throw new Error("ไม่พบทริป");
+  }
+  
+  if (status !== 'planning') {
+    throw new Error(`ไม่สามารถลบทริปที่มีสถานะ '${status}' ได้`);
+  }
+  
+  // 2. ลบทริป
+  await tripModel.deleteTrip(trip_id);
+  
+  return { success: true, message: "ลบทริปสำเร็จ" };
+};
+
+/**
+ * เข้าร่วมทริปด้วยรหัสเชิญ
+ */
+export const joinTripByCode = async (invite_code: string, user_id: string) => {
+  // 1. หาทริปจากโค้ด
+  const trip = await tripModel.getTripByInviteCode(invite_code);
+  
+  if (!trip) {
+    throw new Error("Invalid invite code");
+  }
+  
+  // 2. เช็คว่าทริปปิดไปแล้วหรือยัง
+  if (trip.status === 'archived' || trip.status === 'completed') {
+    throw new Error("This trip is closed");
+  }
+  
+  // 3. เช็คว่าเป็นสมาชิกอยู่แล้วหรือไม่
+  const members = await tripModel.getTripMembers(trip.trip_id);
+  const existingMember = members.find(m => m.user_id === user_id);
+  
+  if (existingMember && existingMember.is_active) {
+    throw new Error("You are already a member of this trip");
+  }
+  
+  // 4. ถ้าเคยเป็นสมาชิกแต่ออกไป -> Reactivate
+  if (existingMember && !existingMember.is_active) {
+    await tripModel.reactivateTripMember(trip.trip_id, user_id);
+    return {
+      success: true,
+      message: "กลับเข้าร่วมทริปสำเร็จ",
+      trip_id: trip.trip_id,
+      trip_name: trip.trip_name
+    };
+  }
+  
+  // 5. เพิ่มสมาชิกใหม่
+  await tripModel.addMemberIfNotExists(trip.trip_id, user_id);
+  
+  return {
+    success: true,
+    message: "เข้าร่วมทริปสำเร็จ",
+    trip_id: trip.trip_id,
+    trip_name: trip.trip_name
+  };
+};
+
+/**
+ * ลบสมาชิกออกจากทริป (เฉพาะ Owner)
+ */
+export const removeMemberService = async (params: {
   trip_id: string;
   member_id: string;
   owner_id: string;
-}
-//ผู้ใช้ fetch ข้อมูลหลังจากทำการ login ครั้งแรก
-
+}) => {
+  const { trip_id, member_id, owner_id } = params;
   
-export const getUserTrips = async (user_id: string) => {
-    // เรียก Database โดยตรง (ไม่ต้อง fetch)
-    const allTrips = await findAllTripsByUserId(user_id);
-
-    // ถ้าต้องการแยกข้อมูลให้ Frontend ใช้ง่ายๆ สามารถทำ Data Transformation ตรงนี้ได้
-    const myTrips = allTrips.filter(t => t.role === 'owner');
-    const joinedTrips = allTrips.filter(t => t.role === 'member');
-
-    return {
-        all: allTrips,     // ส่งไปทั้งหมด
-        owned: myTrips,    // หรือจะแยกอาเรย์ให้เลยก็ได้
-        joined: joinedTrips
-    };
-}
-
-export const addTrip = async( user_id: string, trip_name: string, description: string | null, num_days: number): Promise<Trip> => {
-    const trip_id = uuidv4();
-    const member_id = uuidv4();
-    const invite_code = await generateInviteCode();
-    const invite_link = await generateInviteLink(trip_id);
-
-    const newTrip: Trip = {
-        trip_id: trip_id,
-        owner_id: user_id,
-        trip_name: trip_name,
-        description: description ,
-        num_days: num_days,
-        invite_code: invite_code,
-        invite_link: invite_link,
-        status: 'planning',
-    };
-    await createTripWithMember(newTrip, member_id);
-    return newTrip;
-}
-
-export async function getTripsByUserId(user_id: string): Promise<Trip[]> {
-    return await getTripsByUserId(user_id);
-}
-
-export async function fetchMyTrips(userId: string): Promise<MyTrip[]> {
-    return await getMyTrips(userId);
-}
-
-export async function fetchTripDetail(tripId: string): Promise<TripDetail | null> {
-    return await getTripDetail(tripId);
-}
-
-export const joinTripServiceByCode = async (inviteCode: string, userId: string) => {
-
-  const trip = await findTripByInviteCode(inviteCode);
-  if (!trip) throw new Error("Invalid invite code");
-
-  await addMemberIfNotExists(trip.trip_id, userId);
-
-  return trip;
-};
-
-export const joinTripServiceByLink = async (tripId: string, userId: string) => {
-
-  const trip = await findTripById(tripId);
-  if (!trip) throw new Error("Invalid invite link");
-
-  await addMemberIfNotExists(tripId, userId);
-
-  return trip;
-};
-
-export const removeMemberService = async ({trip_id, member_id, owner_id}: RemoveMemberParams) => {
-  // 1. ตรวจสอบ Trip
-  const trip = await findTripById(trip_id);
-
+  // 1. เช็คว่าผู้เรียกเป็น owner หรือไม่
+  const trip = await tripModel.getTripDetail(trip_id);
+  
   if (!trip) {
-    return { success: false, error: "Trip not found" };
+    return { success: false, error: "ไม่พบทริป" };
   }
-
+  
   if (trip.owner_id !== owner_id) {
-    return { success: false, error: "Only owner can remove members" };
+    return { success: false, error: "เฉพาะเจ้าของทริปเท่านั้นที่ลบสมาชิกได้" };
   }
-
-  // 2. ตรวจสอบ Member ใน trip
-  const member = await findMemberInTrip(trip_id, member_id);
-
+  
+  // 2. เช็คว่าสมาชิกอยู่ในทริปหรือไม่
+  const member = await tripModel.findMemberInTrip(trip_id, member_id);
+  
   if (!member) {
-    return { success: false, error: "Member not found in this trip" };
+    return { success: false, error: "ไม่พบสมาชิกในทริป" };
   }
-
-  if (member.role === "owner") {
-    return { success: false, error: "Owner cannot remove themselves" };
+  
+  // 3. ห้ามลบตัวเอง (Owner)
+  if (member.user_id === owner_id) {
+    return { success: false, error: "เจ้าของทริปไม่สามารถลบตัวเองได้" };
   }
-
-  // 3. ดึงสถานะปัจจุบันมาก่อน
-  const currentStatus = await getTripStatus(trip_id);
-
-  // 4. ถ้าไม่เจอทริป (อาจจะถูกลบไปแล้ว หรือ id มั่ว)
-  if (!currentStatus) {
-    throw new Error("Trip not found");
-  }
-
-  // 6. เช็คเงื่อนไข FR2.5: ห้ามลบถ้า Confirmed หรือ Completed
-  if (currentStatus === 'confirmed' || currentStatus === 'completed') {
-    // โยน Error ออกไปพร้อมข้อความเฉพาะเจาะจง
-    throw new Error("Cannot delete trip that is already confirmed or completed.");
-  }
-  // 7. ลบสมาชิก
-  await removeMemberById(trip_id, member_id);
-
-  return { success: true };
+  
+  // 4. ลบสมาชิก (Soft Delete + ลบ Availability)
+  await tripModel.removeMemberById(trip_id, member_id);
+  
+  return { success: true, message: "ลบสมาชิกสำเร็จ" };
 };
 
-export const deleteTripService = async (tripId: string) => {
-   await deleteTrip(tripId);
-}
-
-
-export default { findAllTripsByUserId, getTripsByUserId, joinTripServiceByLink,joinTripServiceByCode,removeMemberService,deleteTripService};
+export default {
+  addTrip,
+  getUserTrips,
+  deleteTripService,
+  joinTripByCode,
+  removeMemberService
+};

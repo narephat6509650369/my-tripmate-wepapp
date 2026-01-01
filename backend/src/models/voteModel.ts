@@ -1,33 +1,35 @@
 import { pool } from "../config/db.js";
 import type { RowDataPacket } from "mysql2";
+import { v4 as uuidv4 } from 'uuid';
 
-// 1) INSERT USER AVAILABILITY (บันทึกช่วงเวลาที่ user ว่าง)
-// User คนนึงอาจจะส่งมาหลายช่วงก็ได้ เช่น ว่าง 20-22 และ 25-27
-export const addAvailability = async (trip_id: string, user_id: string, start_date: string, end_date: string) => {
+// ================= DATE VOTING SECTION =================
+
+export const addAvailability = async (
+  trip_id: string, 
+  user_id: string, 
+  start_date: string, 
+  end_date: string
+) => {
   const [result] = await pool.query(
-    `INSERT INTO trip_user_availabilities (availability_id, trip_id, user_id, start_date, end_date)
+    `INSERT INTO trip_user_availabilities 
+     (availability_id, trip_id, user_id, start_date, end_date)
      VALUES (UUID(), ?, ?, ?, ?)`,
     [trip_id, user_id, start_date, end_date]
   );
   return result;
 };
 
-// 2) DELETE USER AVAILABILITY (ลบวันว่างของตัวเอง เผื่อเปลี่ยนใจ)
 export const clearUserAvailability = async (trip_id: string, user_id: string) => {
-    await pool.query(
-        `DELETE FROM trip_user_availabilities WHERE trip_id = ? AND user_id = ?`,
-        [trip_id, user_id]
-    );
-}
+  await pool.query(
+    `DELETE FROM trip_user_availabilities 
+     WHERE trip_id = ? AND user_id = ?`,
+    [trip_id, user_id]
+  );
+};
 
-// 3) GET HEATMAP DATA (ดึงข้อมูลเพื่อมาคำนวณว่าวันไหนคนว่างเยอะสุด)
-// อันนี้จะดึงช่วงเวลาทั้งหมดของทุกคนในทริปออกมา แล้วให้ Frontend หรือ Service ไปคำนวณกราฟ
 export const getTripAvailabilities = async (trip_id: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT 
-        user_id,
-        start_date, 
-        end_date 
+    `SELECT user_id, start_date, end_date 
      FROM trip_user_availabilities 
      WHERE trip_id = ?`,
     [trip_id]
@@ -35,21 +37,6 @@ export const getTripAvailabilities = async (trip_id: string) => {
   return rows;
 };
 
-// 4) (Optional) ถ้าอยากให้ SQL คำนวณเบื้องต้นว่าวันไหนมีคนทับซ้อนกันบ้าง
-// หมายเหตุ: การคำนวณ overlaps ละเอียดๆ มักทำใน Javascript ง่ายกว่า SQL
-// แต่อันนี้เป็นตัวอย่าง SQL ดึง User ที่ว่างในแต่ละช่วง
-export const getUsersInDateRange = async (trip_id: string, target_start: string, target_end: string) => {
-    const [rows] = await pool.query<RowDataPacket[]>(
-        `SELECT DISTINCT user_id 
-         FROM trip_user_availabilities
-         WHERE trip_id = ? 
-         AND (start_date <= ? AND end_date >= ?)`, 
-        [trip_id, target_end, target_start]
-    );
-    return rows;
-}
-
-// ... ส่วน insertDateVoting (สร้างห้อง) ใช้เหมือนเดิมได้ครับ ...
 export const insertDateVoting = async (date_voting_id: string, trip_id: string) => {
   const [result] = await pool.query(
     `INSERT INTO date_votings (date_voting_id, trip_id, status)
@@ -59,8 +46,6 @@ export const insertDateVoting = async (date_voting_id: string, trip_id: string) 
   return result;
 };
 
-// 6) GET ACTIVE DATE VOTING BY TRIP (ดึงห้องโหวตวันที่ที่กำลัง active ของทริป)
-// เอาไว้เช็คว่าทริปนี้มีการเปิดโหวตค้างไว้หรือยัง หรือเอาไว้ดึง voting_id ไปใช้งาน
 export const getActiveDateVotingByTrip = async (trip_id: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT * FROM date_votings 
@@ -68,9 +53,258 @@ export const getActiveDateVotingByTrip = async (trip_id: string) => {
      LIMIT 1`,
     [trip_id]
   );
+  return rows[0];
+};
+
+// ================= BUDGET SECTION =================
+
+export const getTripBudgets = async (trip_id: string) => {
+  const sql = `
+    SELECT 
+      bo.category_name, 
+      bo.estimated_amount, 
+      bo.proposed_by as user_id, 
+      bo.proposed_at as last_updated
+    FROM budget_options bo
+    JOIN budget_votings bv ON bo.budget_voting_id = bv.budget_voting_id
+    WHERE bv.trip_id = ?
+    ORDER BY bo.proposed_at DESC
+  `;
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [trip_id]);
+  return rows;
+};
+
+export const getBudgetLogs = async (trip_id: string) => {
+  const sql = `
+    SELECT 
+      bl.log_id,
+      bl.user_id,
+      bl.category_name,
+      bl.old_amount,
+      bl.new_amount,
+      bl.created_at,
+      u.full_name,
+      u.avatar_url
+    FROM budget_logs bl
+    LEFT JOIN users u ON bl.user_id = u.user_id
+    WHERE bl.trip_id = ?
+    ORDER BY bl.created_at DESC 
+    LIMIT 50
+  `;
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [trip_id]);
+  return rows;
+};
+
+export const upsertBudget = async (
+  trip_id: string, 
+  user_id: string, 
+  category: string, 
+  amount: number
+) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. หา/สร้าง Budget Voting ID
+    let [voting] = await connection.query<RowDataPacket[]>(
+      'SELECT budget_voting_id FROM budget_votings WHERE trip_id = ?', 
+      [trip_id]
+    );
+    let voting_id = voting[0]?.budget_voting_id;
+    
+    if (!voting_id) {
+      voting_id = uuidv4();
+      await connection.query(
+        'INSERT INTO budget_votings (budget_voting_id, trip_id) VALUES (?, ?)', 
+        [voting_id, trip_id]
+      );
+    }
+
+    // 2. หาค่าเดิม (เพื่อทำ Log)
+    const [oldRow] = await connection.query<RowDataPacket[]>(
+      `SELECT estimated_amount 
+       FROM budget_options 
+       WHERE budget_voting_id = ? 
+         AND category_name = ? 
+         AND proposed_by = ?`,
+      [voting_id, category, user_id]
+    );
+    const old_amount = oldRow[0]?.estimated_amount || 0;
+
+    // 3. บันทึกค่าใหม่ (Upsert)
+    await connection.query(
+      `INSERT INTO budget_options 
+       (budget_option_id, budget_voting_id, category_name, estimated_amount, proposed_by, priority)
+       VALUES (UUID(), ?, ?, ?, ?, 1)
+       ON DUPLICATE KEY UPDATE 
+         estimated_amount = VALUES(estimated_amount), 
+         proposed_at = NOW()`,
+      [voting_id, category, amount, user_id]
+    );
+
+    // 4. บันทึก Log
+    await connection.query(
+      `INSERT INTO budget_logs 
+       (log_id, trip_id, user_id, category_name, old_amount, new_amount)
+       VALUES (UUID(), ?, ?, ?, ?, ?)`,
+      [trip_id, user_id, category, old_amount, amount]
+    );
+
+    await connection.commit();
+    return { old_amount, new_amount: amount };
+    
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+};
+
+// ================= LOCATION SECTION =================
+
+export const submitLocationVotes = async (
+  trip_id: string, 
+  user_id: string, 
+  votes: string[]
+) => {
+  const scores = [3, 2, 1]; // คะแนนตามอันดับ
   
-  // คืนค่า object แรกที่เจอ หรือถ้าไม่มีจะคืนค่า undefined
-  return rows[0]; 
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. หา/สร้าง Location Voting ID
+    let [voting] = await connection.query<RowDataPacket[]>(
+      'SELECT location_voting_id FROM location_votings WHERE trip_id = ?', 
+      [trip_id]
+    );
+    let voting_id = voting[0]?.location_voting_id;
+    
+    if (!voting_id) {
+      voting_id = uuidv4();
+      await connection.query(
+        'INSERT INTO location_votings (location_voting_id, trip_id) VALUES (?, ?)', 
+        [voting_id, trip_id]
+      );
+    }
+
+    // 2. ลบโหวตเก่าของ User คนนี้
+    await connection.query(
+      `DELETE lv FROM location_votes lv
+       JOIN location_options lo ON lv.location_option_id = lo.location_option_id
+       WHERE lo.location_voting_id = ? AND lv.user_id = ?`,
+      [voting_id, user_id]
+    );
+
+    // 3. บันทึกโหวตใหม่ 3 อันดับ
+    for (let i = 0; i < votes.length; i++) {
+      const province = votes[i];
+      const score = scores[i];
+
+      if (!province) continue;
+
+      // หา/สร้าง Option
+      let [opt] = await connection.query<RowDataPacket[]>(
+        `SELECT location_option_id 
+         FROM location_options 
+         WHERE location_voting_id = ? AND province_name = ?`,
+        [voting_id, province]
+      );
+      
+      let option_id = opt[0]?.location_option_id;
+      if (!option_id) {
+        option_id = uuidv4();
+        await connection.query(
+          `INSERT INTO location_options 
+           (location_option_id, location_voting_id, province_name, proposed_by) 
+           VALUES (?, ?, ?, ?)`,
+          [option_id, voting_id, province, user_id]
+        );
+      }
+
+      // บันทึกคะแนน - ✅ แก้ไข: เพิ่ม score column
+      await connection.query(
+        `INSERT INTO location_votes 
+         (location_vote_id, location_option_id, user_id, score) 
+         VALUES (UUID(), ?, ?, ?)`,
+        [option_id, user_id, score]
+      );
+    }
+
+    await connection.commit();
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+};
+
+export const getLocationScores = async (trip_id: string) => {
+  const sql = `
+    SELECT 
+      lo.province_name, 
+      COALESCE(SUM(lv.score), 0) as total_score
+    FROM location_options lo
+    LEFT JOIN location_votes lv ON lo.location_option_id = lv.location_option_id
+    JOIN location_votings lvs ON lo.location_voting_id = lvs.location_voting_id
+    WHERE lvs.trip_id = ?
+    GROUP BY lo.province_name
+    ORDER BY total_score DESC
+  `;
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [trip_id]);
+  return rows;
+};
+
+// ================= TRIP STATUS =================
+
+export const updateTripStatus = async (
+  trip_id: string, 
+  status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived'
+) => {
+  await pool.query(
+    'UPDATE trips SET status = ?, updated_at = NOW() WHERE trip_id = ?',
+    [status, trip_id]
+  );
+};
+
+export const closeAllVotings = async (trip_id: string) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    
+    // ปิด Date Voting
+    await connection.query(
+      `UPDATE date_votings 
+       SET status = 'closed', closed_at = NOW() 
+       WHERE trip_id = ? AND status = 'active'`,
+      [trip_id]
+    );
+    
+    // ปิด Budget Voting
+    await connection.query(
+      `UPDATE budget_votings 
+       SET status = 'closed', closed_at = NOW() 
+       WHERE trip_id = ? AND status = 'active'`,
+      [trip_id]
+    );
+    
+    // ปิด Location Voting
+    await connection.query(
+      `UPDATE location_votings 
+       SET status = 'closed', closed_at = NOW() 
+       WHERE trip_id = ? AND status = 'active'`,
+      [trip_id]
+    );
+    
+    await connection.commit();
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 };
 
 export default {
@@ -79,5 +313,11 @@ export default {
   getTripAvailabilities,
   insertDateVoting,
   getActiveDateVotingByTrip,
-  
+  getTripBudgets,
+  getBudgetLogs,
+  upsertBudget,
+  submitLocationVotes,
+  getLocationScores,
+  updateTripStatus,
+  closeAllVotings
 };

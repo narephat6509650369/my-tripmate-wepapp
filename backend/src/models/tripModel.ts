@@ -1,5 +1,7 @@
 import { pool } from "../config/db.js";
 import type { RowDataPacket } from "mysql2";
+import crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface Trip {
     trip_id: string;
@@ -124,31 +126,6 @@ export async function findAllTripsByUserId(user_id: string): Promise<TripSummary
     return rows;
 }
 
-export async function getDashboardTrips(user_id: string): Promise<TripDashboardItem[]> {
-    const sql = `
-        SELECT 
-            t.trip_id,
-            t.trip_name,
-            t.status,
-            t.start_date,
-            tm_user.role, -- Role ของเรา (Owner/Member)
-            
-            (SELECT COUNT(*) FROM trip_members WHERE trip_id = t.trip_id AND is_active = 1) as num_members,
-            
-            DATEDIFF(t.start_date, CURDATE()) as days_left
-
-        FROM trips t
-        JOIN trip_members tm_user ON t.trip_id = tm_user.trip_id
-        
-        WHERE tm_user.user_id = ? 
-          AND tm_user.is_active = 1
-        ORDER BY t.created_at DESC
-    `;
-
-    const [rows] = await pool.query<TripDashboardItem[] & RowDataPacket[]>(sql, [user_id]);
-    return rows;
-}
-
 // ฟังก์ชันดึงเฉพาะสถานะของทริป (ใช้เช็คก่อนลบ)
 export const getTripStatus = async (trip_id: string): Promise<string | null> => {
   const [rows] = await pool.query<RowDataPacket[]>(
@@ -164,7 +141,28 @@ export async function deleteTrip(tripId: string): Promise<void> {
 }   
 
 export async function generateInviteCode(): Promise<string> {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    let code = '';
+    let isUnique = false;
+
+    // วนลูปจนกว่าจะได้รหัสที่ไม่ซ้ำใน Database
+    while (!isUnique) {
+        // 1. สร้างรหัส 16 ตัวอักษร (8 bytes แปลงเป็น hex จะได้ 16 ตัว)
+        code = crypto.randomBytes(8).toString('hex').toUpperCase(); 
+        
+        // หรือถ้าอยากได้ตัวอักษรผสมตัวเลขแบบสุ่มเอง (Custom Set) ให้ใช้ฟังก์ชันแถมด้านล่าง *
+
+        // 2. เช็คใน Database ว่าซ้ำไหม
+        const [rows] = await pool.query<RowDataPacket[]>(
+            'SELECT trip_id FROM trips WHERE invite_code = ?', 
+            [code]
+        );
+
+        // ถ้าไม่เจอ (rows.length === 0) แสดงว่าไม่ซ้ำ -> จบลูป
+        if (rows.length === 0) {
+            isUnique = true;
+        }
+    }
+
     return code;
 }
 
@@ -173,79 +171,7 @@ export async function generateInviteLink(tripId: string): Promise<string> {
     return `${baseUrl}/join/${tripId}`;
 }
 
-/*
-export async function deactivateTrip(tripId: string): Promise<void> {
-    await pool.query(
-        'UPDATE trips SET is_active = ? WHERE trip_id = ?',
-        [false, tripId]
-    );
-}
-*/
-/*
-export async function activateTrip(tripId: string): Promise<void> {
-    await pool.query(
-        'UPDATE trips SET is_active = ? WHERE trip_id = ?',
-        [true, tripId]
-    );
-}
-*/
-/*
-export async function addMemberToTrip(tripId: string, userId: string, role: 'owner' | 'member'): Promise<void> {
-    const member_id = crypto.randomUUID();
-    await pool.query(
-        'INSERT INTO trip_members (member_id, trip_id, user_id, role) VALUES (?, ?, ?, ?)',
-        [member_id, tripId, userId, role]
-    );
-}
-*/
-/*
-export async function removeMemberFromTrip(tripId: string, userId: string): Promise<void> {
-    await pool.query(
-        'DELETE FROM trip_members WHERE trip_id = ? AND user_id = ?',
-        [tripId, userId]
-    );
-}  */ 
-/*
-export async function getTripMembers(tripId: string): Promise<TripMember[]> {
-    const [rows] = await pool.query('SELECT * FROM trip_members WHERE trip_id = ?', [tripId]);
-    return rows as TripMember[];
-}
-*/
-/*
-export async function getTripsByUserId(userId: string): Promise<Trip[]> {
-    const [rows] = await pool.query(
-        `SELECT t.* FROM trips t
-         JOIN trip_members tm ON t.trip_id = tm.trip_id
-         WHERE tm.user_id = ? AND t.is_active = ?`,
-        [userId, true]
-    );
-    return rows as Trip[];
-}   
-*/
-/*
-export async function confirmTrip(tripId: string): Promise<void> {
-    await pool.query(
-        'UPDATE trips SET status = ?, confirmed_at = ? WHERE trip_id = ?',
-        ['confirmed', new Date(), tripId]
-    );
-}
-*/
-/*
-export async function completeTrip(tripId: string): Promise<void> {
-    await pool.query(
-        'UPDATE trips SET status = ? WHERE trip_id = ?',
-        ['completed', tripId]
-    );
-}
-*/
-/*
-export async function archiveTrip(tripId: string): Promise<void> {
-    await pool.query(
-        'UPDATE trips SET status = ? WHERE trip_id = ?',
-        ['archived', tripId]
-    );
-}
-*/
+
 export const findTripById = async (tripId: string) => {
   const [rows] = await pool.execute("SELECT * FROM trips WHERE trip_id = ?", [tripId]);
   return (rows as any[])[0];
@@ -336,6 +262,7 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
     return rows[0] || null;  // ✔ ไม่ต้อง || null
 }
 
+// หาสมาชิกในทริป
 export const findMemberInTrip = async (trip_id: string, member_id: string) => {
   const [rows] = await pool.query<TripMember[]>(
     `SELECT * FROM trip_members WHERE trip_id = ? AND member_id = ? AND is_active = 1`,
@@ -344,11 +271,72 @@ export const findMemberInTrip = async (trip_id: string, member_id: string) => {
   return rows.length > 0 ? rows[0] : null;
 };
 
-export const removeMemberById = async (trip_id: string, member_id: string) => {
-  return pool.query(
-    `UPDATE trip_members SET is_active = 0 WHERE trip_id = ? AND member_id = ?`,
-    [trip_id, member_id]
+export const getTripMembers = async (trip_id: string) => {
+  const [rows] = await pool.query<TripMember[]>(
+    `SELECT * FROM trip_members WHERE trip_id = ? AND is_active = 1`,
+    [trip_id]
   );
+  return rows;
+}
+// สมาชิกที่ออกจากทริปต้องไม่สามารถเข้าถึงข้อมูลโหวต/งบ/สถานที่ได้อีก
+export const removeMemberById = async (trip_id: string, member_id: string) => {
+  const connection = await pool.getConnection(); // ขอ Connection แยกเพื่อทำ Transaction
+  
+  try {
+    await connection.beginTransaction(); // เริ่มต้น Transaction
+
+    // 1. หา user_id จาก member_id ก่อน (เพราะตาราง availability ใช้ user_id)
+    const [rows] = await connection.query<RowDataPacket[]>(
+      `SELECT user_id FROM trip_members WHERE member_id = ? AND trip_id = ?`,
+      [member_id, trip_id]
+    );
+
+    if (rows.length === 0) {
+       throw new Error("Member not found");
+    }
+    const user_id = rows[0]?.user_id;
+
+    // 2. Soft Delete สมาชิก (Active = 0)
+    await connection.query(
+      `UPDATE trip_members SET is_active = 0 WHERE trip_id = ? AND member_id = ?`,
+      [trip_id, member_id]
+    );
+
+    // 3. ลบ Availability (ใช้ user_id ที่หามาได้จากข้อ 1)
+    await connection.query(
+       `DELETE FROM trip_user_availabilities WHERE trip_id = ? AND user_id = ?`,
+       [trip_id, user_id]
+    );
+
+    await connection.commit(); // บันทึกทุกอย่าง
+    return { success: true, message: "Member removed and availability cleared" };
+
+  } catch (error) {
+    await connection.rollback(); // ถ้าพัง ให้ยกเลิกทั้งหมด (Data จะไม่แหว่ง)
+    throw error;
+  } finally {
+    connection.release(); // คืน Connection
+  }
+};
+
+// หาข้อมูลทริปจาก Invite Code (สำหรับ FR2.10)
+export const getTripByInviteCode = async (invite_code: string) => {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        `SELECT trip_id, trip_name, status FROM trips WHERE invite_code = ?`,
+        [invite_code]
+    );
+    return rows[0]; // คืนค่า undefined ถ้าหาไม่เจอ
+};
+
+
+
+// ดึงสมาชิกเก่ากลับเข้าทริป (กรณีเคยออกไปแล้ว is_active = 0)
+export const reactivateTripMember = async (trip_id: string, user_id: string) => {
+    await pool.query(
+        `UPDATE trip_members SET is_active = 1, role = 'member' 
+         WHERE trip_id = ? AND user_id = ?`,
+        [trip_id, user_id]
+    );
 };
 
 export default {
@@ -358,19 +346,20 @@ export default {
     getMyTrips,
     findTripByInviteCode,
     addMemberIfNotExists,
-    findTripById,
     findMemberInTrip,
     removeMemberById,
     deleteTrip,
     createTripWithMember,
     getTripStatus,
-   
+    getTripByInviteCode,
+    reactivateTripMember,
+    findAllTripsByUserId,
+    getTripMembers
         
 };
 /*
- getTripById,
+    getTripById,
     updateTrip,
-    
     deactivateTrip,
     activateTrip,
     addMemberToTrip,

@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { getUserTrips,joinTripServiceByCode, joinTripServiceByLink, removeMemberService, deleteTripService,addTrip} from "../services/tripService.js";
+import { getUserTrips, joinTripByCode, removeMemberService, deleteTripService, addTrip, } from "../services/tripService.js";
 import type { JwtPayload } from "../express.d.js"
 
 //เพิ่มสมาชิก
@@ -69,56 +69,44 @@ export const deleteTripController = async (req: Request, res: Response) => {
   }
 }
 
-export const joinTripByCode = async (req: Request, res: Response) => {
-  try {
-    const { invite_code } = req.body;
-    const {user_id} = req.body;
+//เข้าร่วมทริปด้วยโค้ด
+export const joinTripController = async (req: Request, res: Response) => {
+    try {
+        const { invite_code } = req.body; // รับ code จาก body
+        const user_id = (req.user as JwtPayload).user_id;
 
-    if (!invite_code) {
-      return res.status(400).json({ error: "invite code is required" });
+        if (!invite_code) {
+            return res.status(400).json({ message: "Invite code is required" });
+        }
+
+        // เรียก Service
+        const result = await joinTripByCode(invite_code, user_id);
+
+        res.status(200).json({
+            success: true,
+            data: result
+        });
+
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        
+        // จัดการ Error ตามกรณี
+        if (message === "Invalid invite code") {
+            return res.status(404).json({ message: "ไม่พบทริปที่ระบุ (รหัสไม่ถูกต้อง)" });
+        }
+        if (message.includes("already a member")) {
+            return res.status(409).json({ message: "คุณเป็นสมาชิกของทริปนี้อยู่แล้ว" });
+        }
+        if (message.includes("closed")) {
+             return res.status(403).json({ message: "ทริปนี้ปิดไปแล้ว ไม่สามารถเข้าร่วมได้" });
+        }
+
+        console.error("Join trip error:", error);
+        res.status(500).json({ message: "Failed to join trip" });
     }
-    if (!user_id) {
-      return res.status(400).json({ error: "user id is required" });
-    }
-
-    const result = await joinTripServiceByCode(invite_code, user_id!);
-
-    return res.status(200).json({
-      success: true,
-      message: "Joined trip successfully",
-      data: result,
-    });
-
-  } catch (err: any) {
-    return res.status(400).json({ error: err.message });
-  }
 };
 
-export const joinTripByLink = async (req: Request, res: Response) => {
-  try {
-    const { trip_id } = req.params;
-    const user_id = req.body;
-
-     if (!trip_id) {
-      return res.status(400).json({ error: "trip id is required" });
-    }
-    if (!user_id) {
-      return res.status(400).json({ error: "user id is required" });
-    }
-    
-    const result = await joinTripServiceByLink(trip_id, user_id!);
-
-    return res.status(200).json({
-      success: true,
-      message: "Joined trip successfully",
-      data: result,
-    });
-
-  } catch (err: any) {
-    return res.status(400).json({ error: err.message });
-  }
-};
-
+//ลบสมาชิกทริป
 export const removeMemberController = async (req: Request, res: Response) => {
   try {
     const { trip_id, member_id } = req.params;
@@ -146,4 +134,6 @@ export const removeMemberController = async (req: Request, res: Response) => {
 };
 
 
-export default {addTripController, deleteTripController, getMyTripsController, joinTripByCode, joinTripByLink};
+
+
+export default {addTripController, deleteTripController, getMyTripsController, joinTripController, removeMemberController, };

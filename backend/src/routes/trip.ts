@@ -1,5 +1,5 @@
 import express from 'express';
-import { addTripController, getMyTripsController, deleteTripController,joinTripByCode, removeMemberController} from "../controllers/TripController.js";
+import { addTripController, getMyTripsController, deleteTripController,joinTripController, removeMemberController} from "../controllers/TripController.js";
 import { auth } from "../middleware/auth.js"
 import { requireTripOwner } from "../middleware/role.js"
 import { generateInviteCode } from '../models/tripModel.js';
@@ -18,7 +18,8 @@ router.get("/all-my-trips", auth, getMyTripsController);
 router.post("/:tripId/invite", auth, generateInviteCode);
 
 // ผู้ใช้ที่มีบัญชี join โดยใช้โค้ด
-router.post("/join", auth, joinTripByCode);
+router.post("/join", auth, joinTripController);
+
 
 // Owner ลบสมาชิกออกจากทริป  
 router.delete("/:tripId/members/:memberId", auth, requireTripOwner, removeMemberController);
