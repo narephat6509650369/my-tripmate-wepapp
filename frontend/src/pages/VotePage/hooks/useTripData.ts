@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tripAPI } from '../../services/api';
-import { CONFIG, log } from '../../config/app.config';
-import { getMockTripData, TripData, Member } from '../../data/mockData';
+import { tripAPI } from '../../../services/api';
+import { CONFIG, log } from '../../../config/app.config';
+import { getMockTripData, TripData, Member } from '../../../data/mockData';
 
 export const useTripData = (tripCode: string) => {
   const navigate = useNavigate();

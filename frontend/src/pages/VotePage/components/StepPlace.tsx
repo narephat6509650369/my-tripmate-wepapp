@@ -50,14 +50,21 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   const [followMajority, setFollowMajority] = useState(false);
   
 
-  // ============== LOAD USER VOTE ==============
+  // ============== AUTO-SAVE LISTENER ==============
   useEffect(() => {
-    const myVoteData = trip.provinceVotes?.find(v => v.memberId === memberBudget?.id);
-    if (myVoteData && myVoteData.votes) {
-      setMyVote(myVoteData.votes);
-      setHasVoted(true);
-    }
-  }, [trip.provinceVotes, memberBudget]);
+    const handleAutoSave = () => {
+      console.log('📥 Received auto-save event for provinces');
+      if (myVote[0] && myVote[1] && myVote[2]) {
+        submitVotes();
+      }
+    };
+    
+    window.addEventListener('auto-save-provinces', handleAutoSave);
+    
+    return () => {
+      window.removeEventListener('auto-save-provinces', handleAutoSave);
+    };
+  }, [myVote]);
 
   // ============== HANDLERS ==============
   
@@ -93,6 +100,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     }
 
     const oldScores = { ...globalScores };
+    const oldProvinceVotes = trip.provinceVotes || [];
     const wasVoted = hasVoted;
 
     const newScores = { ...globalScores };
@@ -136,31 +144,54 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
       }
       
       if (response.success) {
+        // ✅ อัปเดตทั้ง provinceVotes และ voteResults
         setTrip(prev => ({
           ...prev,
-          voteResults: {
-            ...(prev.voteResults || {}),
-            provinces: Object.entries(newScores)
-              .map(([name, score]) => ({ name, score: score as number }))
-              .sort((a, b) => b.score - a.score),
-            dates: prev.voteResults?.dates || []
+          // ✅ อัปเดต provinceVotes (สำคัญมาก!)
+          provinceVotes: [
+            ...(prev.provinceVotes || []).filter(v => v.memberId !== memberBudget?.id),
+          {
+            memberId: memberBudget?.id || '',
+            memberName: memberBudget?.name || '',
+            votes: myVote as string[],
+            timestamp: Date.now()
           }
-        }));
-        
-        log.success("บันทึกผลโหวตสำเร็จ");
-      }
-    } catch (error: any) {
-      log.error("Error saving votes:", error);
-      alert("เกิดข้อผิดพลาด: " + (error.message || "ไม่สามารถบันทึกผลโหวต"));
+        ],
+        // อัปเดต voteResults
+        voteResults: {
+          ...(prev.voteResults || {}),
+          provinces: Object.entries(newScores)
+            .map(([name, score]) => ({ name, score: score as number }))
+            .sort((a, b) => b.score - a.score),
+          dates: prev.voteResults?.dates || []
+        }
+      }));
       
-      // Rollback
-      setGlobalScores(oldScores);
-      setHasVoted(wasVoted);
-      setVoteHistory(prev => prev.slice(1));
-    }finally {  
-      setIsSubmitting(false);
+      console.log('✅ Province votes saved:', {
+        memberId: memberBudget?.id,
+        votes: myVote,
+        provinceVotes: trip.provinceVotes
+      });
+      
+      log.success("บันทึกผลโหวตสำเร็จ");
     }
-  };
+  } catch (error: any) {
+    log.error("Error saving votes:", error);
+    
+    // Rollback
+    setGlobalScores(oldScores);
+    setHasVoted(wasVoted);
+    setVoteHistory(prev => prev.slice(1));
+    
+    // Rollback provinceVotes
+    setTrip(prev => ({
+      ...prev,
+      provinceVotes: oldProvinceVotes
+    }));
+  } finally {  
+    setIsSubmitting(false);
+  }
+};
 
   // ============== COMPUTED VALUES ==============
   const sortedProvinces = Object.entries(globalScores)
@@ -271,7 +302,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
           </div>
         )}
 
-        <button
+        {/* <button
           onClick={submitVotes}
           disabled={isSubmitting}
           className={`
@@ -293,7 +324,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
           ) : (
             hasVoted ? "แก้ไขโหวต" : "ยืนยันโหวต"
           )}
-        </button>
+        </button> */}
       </div>
 
       {/* ============== แสดงผลโหวต Real-time ============== */}

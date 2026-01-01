@@ -15,6 +15,7 @@ interface StepBudgetProps {
   tripCode: string;
   budgetStats: Record<string, BudgetStats>;
   totalBudget: number;
+  onBudgetChange?: (budget: Member['budget']) => void;
 }
 
 interface BudgetStats {
@@ -39,7 +40,7 @@ const BUDGET_CATEGORIES = [
 
 const MAX_TOTAL_BUDGET = 1000000;
 const MAX_PER_CATEGORY = 100000;
-const EDIT_COOLDOWN_MS = 2 * 60 * 1000;
+const EDIT_COOLDOWN_MS = 0;
 
 // ============== RANGE BAR COMPONENT ==============
 interface RangeBarProps {
@@ -147,7 +148,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
   setMemberBudget,
   tripCode,
   budgetStats,
-  totalBudget
+  totalBudget,
+  onBudgetChange
 }) => {
   // ============== GUARD CLAUSE ==============
   if (!memberBudget) {
@@ -180,91 +182,51 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
 
   // ============== SYNC LOCAL BUDGET ==============
   useEffect(() => {
-    setLocalBudget(memberBudget.budget);
-  }, []);
-
-  // ============== SETUP DEBOUNCE ==============
-  useEffect(() => {
-    debouncedUpdateRef.current = debounce(
-      (key: keyof Member["budget"], value: number) => {
-        updateBudget(key, value);
-      }, 
-      1000
-    );
+    const handleAutoSave = () => {
+      console.log('📥 Received auto-save event for budget');
+      saveBudget();
+    };
+    
+    window.addEventListener('auto-save-budget', handleAutoSave);
     
     return () => {
-      debouncedUpdateRef.current?.cancel();
+      window.removeEventListener('auto-save-budget', handleAutoSave);
     };
-  }, []);
+  }, [localBudget]);
 
   // ============== UPDATE BUDGET FUNCTION ==============
-  const updateBudget = async (
-    key: keyof Member["budget"], 
-    value: number
-  ): Promise<void> => {
-    // ✅ ป้องกัน concurrent updates
+  const saveBudget = async (): Promise<void> => {
     if (isSaving) {
       console.log('⏳ Already saving, skipping update');
       return;
     }
     
-    console.log(`💾 Starting save: ${key} = ${value}`);
+    console.log('💾 Starting save all budget:', localBudget);
     
     // Validation: ตัวเลขต้องถูกต้อง
-    if (isNaN(value) || value < 0) {
-      alert("กรุณากรอกตัวเลขที่ถูกต้องและไม่ติดลบ");
+    const hasValidBudget = 
+      localBudget.accommodation > 0 &&
+      localBudget.transport > 0 &&
+      localBudget.food > 0;
+    
+    if (!hasValidBudget) {
+      console.log('❌ Please fill all required fields');
       return;
     }
 
-    // Validation: หมวดบังคับต้องมากกว่า 0
-    const requiredCategories = ["accommodation", "transport", "food"];
-    if (requiredCategories.includes(key) && value <= 0) {
-      alert(`${BUDGET_CATEGORIES.find(c => c.key === key)?.label} ต้องมากกว่า 0 บาท`);
-      return;
-    }
-
-    // Validation: ไม่เกินวงเงินต่อหมวด
-    if (value > MAX_PER_CATEGORY) {
-      alert(`จำนวนเงินต่อหมวดไม่ควรเกิน ฿${formatCurrency(MAX_PER_CATEGORY)}`);
-      return;
-    }
-
-    // คำนวณงบประมาณรวมใหม่
-    const currentBudget = { ...memberBudget.budget };
-    const newTotal = Object.keys(currentBudget).reduce((sum, k) => {
-      if (k === 'lastUpdated') return sum;
-      return sum + (k === key ? value : currentBudget[k as keyof typeof currentBudget] as number);
-    }, 0);
-
-    // Validation: ไม่เกินวงเงินรวม
-    if (newTotal > MAX_TOTAL_BUDGET) {
-      alert(`งบประมาณรวมต้องไม่เกิน ฿${formatCurrency(MAX_TOTAL_BUDGET)}`);
-      return;
-    }
-
-    // Cooldown check
     const nowTs = Date.now();
-    const lastUpdated = memberBudget.budget.lastUpdated ?? 0;
-    const timeSinceLastUpdate = nowTs - lastUpdated;
 
-    if (lastUpdated > 0 && timeSinceLastUpdate < EDIT_COOLDOWN_MS) {
-      const minutesLeft = Math.ceil((EDIT_COOLDOWN_MS - timeSinceLastUpdate) / 60000);
-      alert(`กรุณารออีก ${minutesLeft} นาทีก่อนแก้ไขอีกครั้ง`);
-      return;
-    }
+    const newBudget = {
+      ...localBudget,
+      lastUpdated: nowTs
+    };
 
-    // เก็บค่าเดิมสำหรับ rollback
-    const oldValue = memberBudget.budget[key];
-    const oldLastUpdated = memberBudget.budget.lastUpdated;
+    console.log('🔄 Budget to save:', JSON.stringify(newBudget, null, 2));
 
     // Optimistic update
     const updatedMember = {
       ...memberBudget,
-      budget: {
-        ...memberBudget.budget,
-        [key]: value,
-        lastUpdated: nowTs
-      }
+      budget: newBudget
     };
 
     setMemberBudget(updatedMember);
@@ -285,40 +247,29 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
         await new Promise(r => setTimeout(r, 300));
         response = { success: true };
       } else {
-        response = await tripAPI.updateMemberBudget(tripCode, memberBudget.id, {
-          [key]: value
-        });
+        response = await tripAPI.updateMemberBudget(tripCode, memberBudget.id, newBudget);
       }
 
       if (response.success) {
-        const categoryLabel = BUDGET_CATEGORIES.find(c => c.key === key)?.label || key;
         setHistory(prev => [
-          `${memberBudget.name} แก้ไข${categoryLabel}เป็น ฿${formatCurrency(value)} เวลา ${new Date().toLocaleTimeString("th-TH")}`,
+          `${memberBudget.name} บันทึกงบประมาณ: ที่พัก ฿${formatCurrency(newBudget.accommodation)}, เดินทาง ฿${formatCurrency(newBudget.transport)}, อาหาร ฿${formatCurrency(newBudget.food)}, สำรอง ฿${formatCurrency(newBudget.other)} เวลา ${new Date().toLocaleTimeString("th-TH")}`,
           ...prev
         ]);
+        console.log('✅ Budget saved successfully:', newBudget);
       } else {
         throw new Error(response.message || 'ไม่สามารถบันทึกได้');
       }
 
     } catch (err) {
-      alert("เกิดข้อผิดพลาดในการบันทึกงบประมาณ กลับไปใช้ค่าเดิม");
+      console.error("❌ Error saving budget:", err);
       
       // Rollback
-      const rolledBackMember = {
-        ...memberBudget,
-        budget: {
-          ...memberBudget.budget,
-          [key]: oldValue,
-          lastUpdated: oldLastUpdated
-        }
-      };
-
-      setMemberBudget(rolledBackMember);
+      setMemberBudget(memberBudget);
 
       setTrip(prev => ({
         ...prev,
         members: prev.members?.map(m =>
-          m.id === memberBudget.id ? rolledBackMember : m
+          m.id === memberBudget.id ? memberBudget : m
         ) || []
       }));
     } finally {
@@ -331,10 +282,13 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
     console.log(`📝 Input changed: ${key} = ${value}`);
     
     // อัปเดต local state ทันที (responsive UI)
-    setLocalBudget(prev => ({ ...prev, [key]: value }));
+    const newBudget = { ...localBudget, [key]: value };
+    setLocalBudget(newBudget);
     
-    // เรียก API หลังจากหยุดพิมพ์ 1.5 วินาที
-    debouncedUpdateRef.current?.(key, value);
+    // ✅ ส่งกลับไปที่ parent ทันที
+    if (onBudgetChange) {
+      onBudgetChange(newBudget);
+    }
   };
 
   // ============== UPDATE PRIORITY ==============
@@ -364,7 +318,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
         ) || []
       }));
     } catch (error) {
-      alert("เกิดข้อผิดพลาดในการบันทึก Priority");
+      // alert("เกิดข้อผิดพลาดในการบันทึก Priority");
       setPriorities(memberBudget.budgetPriorities || priorities);
     }
   };
@@ -436,20 +390,56 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
               <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 font-bold">
                 <td className="px-4 py-3 text-gray-800">รวมทั้งหมด</td>
                 <td className="px-4 py-3 text-right text-blue-700 text-lg">
-                  ฿{formatCurrency(totalBudget)}
+                  {/* ✅ คำนวณจาก localBudget แทน */}
+                  ฿{formatCurrency(
+                    localBudget.accommodation + 
+                    localBudget.transport + 
+                    localBudget.food + 
+                    localBudget.other
+                  )}
                 </td>
               </tr>
             </tbody>
           </table>
-        </div>
-        
-        {isSaving && (
-          <div className="mt-4 flex items-center justify-center gap-2 text-blue-600">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-sm">กำลังบันทึก...</span>
-          </div>
-        )}
       </div>
+      
+      {/* ✅ เพิ่มปุ่มบันทึก */}
+      {/* <button
+        onClick={saveBudget}
+        disabled={isSaving || (
+          localBudget.accommodation <= 0 ||
+          localBudget.transport <= 0 ||
+          localBudget.food <= 0
+        )}
+        className={`
+          w-full mt-4 px-6 py-3 font-bold rounded-lg transition shadow-lg
+          ${isSaving || (
+            localBudget.accommodation <= 0 ||
+            localBudget.transport <= 0 ||
+            localBudget.food <= 0
+          )
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+            : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700'
+          }
+        `}
+      >
+        {isSaving ? (
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            กำลังบันทึก...
+          </span>
+        ) : (
+          '💾 บันทึกงบประมาณ'
+        )}
+      </button> */}
+      
+      {isSaving && (
+        <div className="mt-2 flex items-center justify-center gap-2 text-blue-600">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span className="text-sm">กำลังบันทึก...</span>
+        </div>
+      )}
+    </div>
 
       {/* ✅ เพิ่มส่วนนี้ */}
       {/* Follow Majority Option */}
@@ -494,21 +484,12 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
                     
                     setLocalBudget(avgBudget);
                     
-                    // Auto-update each field
-                    Object.keys(avgBudget).forEach(key => {
-                      Object.keys(avgBudget).forEach((key, index) => {
-                      if (key !== 'lastUpdated') {
-                        setTimeout(() => {
-                          debouncedUpdateRef.current?.(
-                            key as keyof Member["budget"], 
-                            avgBudget[key as keyof typeof avgBudget]
-                          );
-                        }, index * 100); // แต่ละ field ห่างกัน 100ms
-                      }
-                    });
-                  });
+                    // ✅ ส่งไปที่ parent
+                    if (onBudgetChange) {
+                      onBudgetChange(avgBudget);
+                    }
                   } else {
-                    alert("ยังไม่มีเพื่อนคนไหนกรอกงบประมาณ กรุณากรอกเอง");
+                    console.log('ยังไม่มีเพื่อนคนไหนกรอกงบประมาณ');
                     setFollowMajority(false);
                   }
                 }

@@ -30,14 +30,21 @@ export const StepVote: React.FC<StepVoteProps> = ({
   /**
    * โหลดวันที่ว่างของตัวเองจาก trip.memberAvailability
    */
+  // ============== AUTO-SAVE LISTENER ==============
   useEffect(() => {
-    const myAvailability = trip.memberAvailability?.find(
-      m => m.memberId === memberBudget?.id
-    );
-    if (myAvailability) {
-      setSelectedDates(myAvailability.availableDates);
-    }
-  }, [trip.memberAvailability, memberBudget]);
+    const handleAutoSave = () => {
+      console.log('📥 Received auto-save event for dates');
+      if (selectedDates.length > 0) {
+        saveAvailability();
+      }
+    };
+    
+    window.addEventListener('auto-save-dates', handleAutoSave);
+    
+    return () => {
+      window.removeEventListener('auto-save-dates', handleAutoSave);
+    };
+  }, [selectedDates]);
 
   // ============== HANDLERS ==============
   
@@ -116,10 +123,6 @@ export const StepVote: React.FC<StepVoteProps> = ({
         }
       });
 
-      alert(followMajority 
-        ? "✓ ระบบเลือกวันที่ตามเพื่อนส่วนใหญ่ให้แล้ว!" 
-        : "✓ บันทึกวันที่ว่างเรียบร้อย"
-      );
     } catch (error) {
       log.error('Error saving availability:', error);
       alert("เกิดข้อผิดพลาดในการบันทึก");
@@ -334,7 +337,7 @@ export const StepVote: React.FC<StepVoteProps> = ({
         </div>
         
         {/* ปุ่มบันทึก */}
-        <button
+        {/* <button
           onClick={saveAvailability}
           disabled={isSubmitting}
           className={`
@@ -346,7 +349,7 @@ export const StepVote: React.FC<StepVoteProps> = ({
           `}
         >
           {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกวันที่ว่าง'}
-        </button>
+        </button> */}
       </div>
 
       {/* ============== สรุปช่วงวันที่ที่เหมาะสม ============== */}

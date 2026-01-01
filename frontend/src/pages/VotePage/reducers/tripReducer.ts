@@ -1,4 +1,4 @@
-import { TripData, Member } from '../../data/mockData';
+import { TripData, Member } from '../../../data/mockData';
 
 // ============== TYPES ==============
 export interface TripState {

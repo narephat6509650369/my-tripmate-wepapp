@@ -318,18 +318,14 @@ const VotePage: React.FC = () => {
 
   const canProceedToNextStep = (): boolean => {
     switch (step) {
-      case 2: // Step Vote - ต้องเลือกวันที่แล้ว
-        const myAvailability = trip.memberAvailability?.find(
-          m => m.memberId === memberBudget?.id
-        );
-        if (!myAvailability || myAvailability.availableDates.length === 0) {
-          alert('⚠️ กรุณาเลือกวันที่ว่างก่อนไปหน้าถัดไป');
+      case 2: // Step Vote - ไม่ต้องเช็คว่าบันทึกแล้ว
+        return true; // ✅ ให้ไปต่อได้เลย จะบันทึกตอนกด "หน้าถัดไป"
+
+      case 3: // Step Budget - เช็คแค่ว่ากรอกครบหรือยัง
+        if (!memberBudget) {
+          console.log('❌ No memberBudget');
           return false;
         }
-        return true;
-
-      case 3: // Step Budget - ต้องกรอกงบประมาณแล้ว
-        if (!memberBudget) return false;
         
         const hasFilledBudget = 
           memberBudget.budget.accommodation > 0 &&
@@ -337,30 +333,49 @@ const VotePage: React.FC = () => {
           memberBudget.budget.food > 0;
         
         if (!hasFilledBudget) {
-          alert('⚠️ กรุณากรอกงบประมาณให้ครบทุกหมวดก่อนไปหน้าถัดไป\n(ค่าที่พัก, ค่าเดินทาง, ค่าอาหาร)');
+          console.log('❌ กรุณากรอกงบประมาณให้ครบทุกหมวด (ที่พัก, เดินทาง, อาหาร)');
           return false;
         }
+        
         return true;
 
-      case 4: // Step Place - ต้องโหวตจังหวัดแล้ว
-        const myVote = trip.provinceVotes?.find(
-          v => v.memberId === memberBudget?.id
-        );
-        if (!myVote || myVote.votes.length < 3) {
-          alert('⚠️ กรุณาโหวต Top 3 จังหวัดก่อนไปหน้าถัดไป');
-          return false;
-        }
-        return true;
+      case 4: // Step Place - ไม่ต้องเช็คว่าบันทึกแล้ว
+        return true; // ✅ ให้ไปต่อได้เลย จะบันทึกตอนกด "หน้าถัดไป"
 
       default:
         return true;
     }
   };
 
-  const next = () => {
+  const next = async () => {
     if (step >= 5) return;
     
-    // ✅ เช็คก่อนไปหน้าถัดไป
+    // ✅ Auto-save ก่อนไปหน้าถัดไป
+    if (step === 2) {
+      // บันทึกวันที่ว่าง (เรียกจาก StepVote)
+      console.log('💾 Auto-saving date availability...');
+      const saveEvent = new CustomEvent('auto-save-dates');
+      window.dispatchEvent(saveEvent);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    if (step === 3) {
+      // บันทึกงบประมาณ (เรียกจาก StepBudget)
+      console.log('💾 Auto-saving budget...');
+      const saveEvent = new CustomEvent('auto-save-budget');
+      window.dispatchEvent(saveEvent);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    if (step === 4) {
+      // บันทึกโหวตจังหวัด (เรียกจาก StepPlace)
+      console.log('💾 Auto-saving province votes...');
+      const saveEvent = new CustomEvent('auto-save-provinces');
+      window.dispatchEvent(saveEvent);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    // เช็คก่อนไปหน้าถัดไป
     if (!canProceedToNextStep()) {
       return;
     }
@@ -556,6 +571,16 @@ const VotePage: React.FC = () => {
               tripCode={tripCode}
               budgetStats={budgetStats}
               totalBudget={totalBudget}
+              onBudgetChange={(newBudget) => {
+                console.log('📥 Received budget change from StepBudget:', newBudget);
+                // Update memberBudget immediately
+                if (memberBudget) {
+                  setMemberBudget({
+                    ...memberBudget,
+                    budget: newBudget
+                  });
+                }
+              }}
             />
           )}
           
