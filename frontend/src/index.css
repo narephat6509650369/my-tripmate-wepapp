@@ -49,18 +49,6 @@ code {
   min-height: 100vh;
 }
 
-/* .login100-more::before {
-  content: "";
-  display: block;
-  position: absolute;
-  z-index: -1;  
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  background: rgba(102, 126, 234, 0.15); 
-} */
-
 .login100-more::before {
   display: none;
 }
@@ -207,4 +195,20 @@ code {
     height: 45px;
     font-size: 14px;
   }
+}
+
+/* ใน index.css หรือ tailwind.config.js */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
 }

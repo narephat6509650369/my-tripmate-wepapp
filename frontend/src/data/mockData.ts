@@ -1,7 +1,23 @@
 // ============== TYPE DEFINITIONS ==============
 
 export type MemberRole = 'owner' | 'member';
+// ============== TYPES ==============
 export type BudgetPriority = 1 | 2 | 3;
+
+export interface HistoryEntry {
+  step: number;
+  stepName: string;
+  action: string;
+  timestamp: number;
+}
+
+export interface Budget {
+  accommodation: number;
+  transport: number;
+  food: number;
+  other: number;
+  lastUpdated?: number;
+}
 
 export interface DateRange {
   id: string;
