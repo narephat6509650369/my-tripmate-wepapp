@@ -13,9 +13,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  PieChart,
-  Pie,
-  Cell,
   Legend
 } from "recharts";
 
@@ -44,6 +41,7 @@ const SummaryPage: React.FC = () => {
   const [tripData, setTripData] = useState<TripData | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showTable, setShowTable] = useState(false); // ✅ เพิ่ม state สำหรับ toggle
 
   const handleLogout = () => {
     localStorage.removeItem("jwtToken");
@@ -118,7 +116,6 @@ const SummaryPage: React.FC = () => {
     );
   }
 
-  // ✅ เพิ่มการตรวจสอบว่า trip ถูกปิดแล้วหรือยัง
   if (!tripData.isCompleted || !tripData.closedAt) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -138,7 +135,6 @@ const SummaryPage: React.FC = () => {
   const members = tripData.members || [];
   const voteResults = tripData.voteResults || { provinces: [], dates: [] };
 
-  // ✅ เพิ่มการตรวจสอบว่ามีสมาชิกหรือไม่
   if (members.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -157,14 +153,12 @@ const SummaryPage: React.FC = () => {
 
   const dateHeaders = ["1 พย", "2 พย", "5 พย", "6 พย", "10 พย", "11 พย", "17 พย", "18 พย"];
   
-  // คำนวณวันที่ที่ตรงกันมากที่สุด
   const dateAvailability = dateHeaders.map((date: string, idx: number) => ({
     date,
     available: members.filter((m: Member) => m.availability?.[idx] === true).length, 
     total: members.length
   })).sort((a, b) => b.available - a.available);
 
-  // คำนวณสถิติงบประมาณ
   const budgetStats = BUDGET_CATEGORIES.map(({ key, label, color }) => {
     const values = members.map((m: Member) => m.budget[key]);
     const median = getMedian(values);
@@ -173,70 +167,122 @@ const SummaryPage: React.FC = () => {
   });
 
   const totalMedian = budgetStats.reduce((sum, stat) => sum + stat.median, 0);
-  const totalBudget = budgetStats.reduce((sum, stat) => sum + stat.total, 0);
-
-  // ข้อมูลสำหรับกราฟวงกลม
-  const pieData = budgetStats.map(({ label, total, color }) => ({
-    name: label,
-    value: total,
-    color
-  }));
-
-  // Top 3 จังหวัด
   const topProvinces = voteResults?.provinces?.slice(0, 3) || [];
 
-  // ✅ ปรับปรุง AI Prompt Generation
   const generateAIPrompt = () => {
     const maleCount = members.filter(m => m.gender === "ชาย").length;
     const femaleCount = members.filter(m => m.gender === "หญิง").length;
     const topDate = dateAvailability[0];
     const duration = `${tripData.days} วัน`;
 
+    // ✅ คำนวณ Priority เฉลี่ย
+    const calculateAvgPriority = () => {
+      const membersWithPriorities = members.filter(m => m.budgetPriorities);
+      
+      if (membersWithPriorities.length === 0) {
+        return null;
+      }
+      
+      const sum = {
+        accommodation: 0,
+        transport: 0,
+        food: 0
+      };
+      
+      membersWithPriorities.forEach(m => {
+        sum.accommodation += m.budgetPriorities?.accommodation || 2;
+        sum.transport += m.budgetPriorities?.transport || 2;
+        sum.food += m.budgetPriorities?.food || 2;
+      });
+      
+      return {
+        accommodation: sum.accommodation / membersWithPriorities.length,
+        transport: sum.transport / membersWithPriorities.length,
+        food: sum.food / membersWithPriorities.length,
+        count: membersWithPriorities.length
+      };
+    };
+
+    const avgPriorities = calculateAvgPriority();
+
+    // ✅ ฟังก์ชันแปลง Priority เป็น Text
+    const getPriorityText = (priority: number): string => {
+      if (priority <= 1.5) return "⭐⭐⭐ สำคัญมาก";
+      if (priority <= 2.5) return "⭐⭐ ปานกลาง";
+      return "⭐ สำคัญน้อย";
+    };
+
+    // ✅ หา Priority สูงสุด
+    const getTopPriority = () => {
+      if (!avgPriorities) return null;
+      
+      const priorities = [
+        { name: 'ที่พัก', value: avgPriorities.accommodation },
+        { name: 'เดินทาง', value: avgPriorities.transport },
+        { name: 'อาหาร', value: avgPriorities.food }
+      ];
+      
+      priorities.sort((a, b) => a.value - b.value);
+      
+      return priorities;
+    };
+
+    const topPriorities = getTopPriority();
+
     const prompt = `สวัสดีค่ะ! ฉันกำลังวางแผนทริปท่องเที่ยวกับเพื่อน ๆ และต้องการคำแนะนำจากคุณ
 
-📊 **ข้อมูลสรุปทริปของเรา:**
+  📊 **ข้อมูลสรุปทริปของเรา:**
 
-🎯 **ชื่อทริป:** ${tripData.name}
-📝 **รายละเอียด:** ${tripData.detail || 'ไม่มีรายละเอียด'}
+  🎯 **ชื่อทริป:** ${tripData.name}
+  📝 **รายละเอียด:** ${tripData.detail || 'ไม่มีรายละเอียด'}
 
-👥 **สมาชิก:** ${members.length} คน${maleCount > 0 ? ` (ชาย ${maleCount} คน` : ''}${femaleCount > 0 ? `, หญิง ${femaleCount} คน)` : ')'}
+  👥 **สมาชิก:** ${members.length} คน${maleCount > 0 ? ` (ชาย ${maleCount} คน` : ''}${femaleCount > 0 ? `, หญิง ${femaleCount} คน)` : ')'}
 
-📅 **วันที่ที่เหมาะสมที่สุด:**
-- ${topDate.date} (${topDate.available}/${topDate.total} คน ว่าง - ${Math.round((topDate.available / topDate.total) * 100)}%)
-${dateAvailability.slice(1, 3).map((d, i) => `- อันดับ ${i + 2}: ${d.date} (${d.available}/${d.total} คน)`).join('\n')}
+  📅 **วันที่ที่เหมาะสมที่สุด:**
+  - ${topDate.date} (${topDate.available}/${topDate.total} คน ว่าง - ${Math.round((topDate.available / topDate.total) * 100)}%)
+  ${dateAvailability.slice(1, 3).map((d, i) => `- อันดับ ${i + 2}: ${d.date} (${d.available}/${d.total} คน)`).join('\n')}
 
-⏱️ **ระยะเวลา:** ${duration}
+  ⏱️ **ระยะเวลา:** ${duration}
 
-💰 **งบประมาณ (ค่ากลางต่อคน):**
-- ค่าที่พัก: ฿${formatCurrency(Math.round(budgetStats[0].median))}
-- ค่าเดินทาง: ฿${formatCurrency(Math.round(budgetStats[1].median))}
-- ค่าอาหาร: ฿${formatCurrency(Math.round(budgetStats[2].median))}
-- เงินสำรอง: ฿${formatCurrency(Math.round(budgetStats[3].median))}
-- **รวมต่อคน: ฿${formatCurrency(Math.round(totalMedian))}**
-- **งบรวมทั้งกลุ่ม: ฿${formatCurrency(Math.round(totalMedian * members.length))}**
+  💰 **งบประมาณ (ค่ากลางต่อคน):**
+  - ค่าที่พัก: ฿${formatCurrency(Math.round(budgetStats[0].median))}${avgPriorities ? ` (${getPriorityText(avgPriorities.accommodation)})` : ''}
+  - ค่าเดินทาง: ฿${formatCurrency(Math.round(budgetStats[1].median))}${avgPriorities ? ` (${getPriorityText(avgPriorities.transport)})` : ''}
+  - ค่าอาหาร: ฿${formatCurrency(Math.round(budgetStats[2].median))}${avgPriorities ? ` (${getPriorityText(avgPriorities.food)})` : ''}
+  - เงินสำรอง: ฿${formatCurrency(Math.round(budgetStats[3].median))}
+  - **รวมต่อคน: ฿${formatCurrency(Math.round(totalMedian))}**
+  - **งบรวมทั้งกลุ่ม: ฿${formatCurrency(Math.round(totalMedian * members.length))}**
+  ${avgPriorities && topPriorities ? `
+  🎯 **ความสำคัญของกลุ่ม (จากการโหวต ${avgPriorities.count}/${members.length} คน):**
+  ${topPriorities.map((p, i) => `${i + 1}. ${p.name}: ${getPriorityText(p.value)}`).join('\n')}
 
-📍 **จังหวัดที่สนใจ (จากการโหวต):**
-${topProvinces.length > 0 
-  ? topProvinces.map((p, i) => `${i + 1}. ${p.name} (${p.score} คะแนน)`).join('\n')
-  : 'ยังไม่มีการโหวตจังหวัด'
-}
+  💡 **คำแนะนำจากความสำคัญ:**
+  - กลุ่มเน้น${topPriorities[0].name}มากที่สุด → ควรเลือก${topPriorities[0].name}คุณภาพดี
+  - ${topPriorities[2].name}สำคัญน้อยที่สุด → สามารถประหยัดได้
+  ` : ''}
+  📍 **จังหวัดที่สนใจ (จากการโหวต Borda Count):**
+  ${topProvinces.length > 0 
+    ? topProvinces.map((p, i) => `${i + 1}. ${p.name} (${p.score} คะแนน)`).join('\n')
+    : 'ยังไม่มีการโหวตจังหวัด'
+  }
 
-❓ **คำถาม:**
-1. จากข้อมูลด้านบน จังหวัดไหนที่เหมาะสมที่สุดสำหรับกลุ่มเรา? (พิจารณาจากงบประมาณ, จำนวนคน, และความนิยม)
-2. มีกิจกรรมหรือสถานที่ท่องเที่ยวไหนที่แนะนำสำหรับกลุ่ม ${members.length} คนบ้าง?
-3. ช่วยแนะนำที่พักที่เหมาะสมในช่วงงบ ฿${formatCurrency(Math.round(budgetStats[0].median))}/คน/คืน
-4. แนะนำวิธีการเดินทางและประมาณค่าใช้จ่ายที่เหมาะสม
-5. งบประมาณรวม ฿${formatCurrency(Math.round(totalMedian * members.length))} เหมาะสมกับการท่องเที่ยวไหม? ควรปรับเพิ่ม/ลดไหม?
-6. ช่วยแนะนำแผนการเดินทาง ${duration} แบบละเอียดได้ไหม? (รวมถึงเวลา, สถานที่, และร้านอาหารแนะนำ)
+  ❓ **คำถาม:**
+  1. จากข้อมูลด้านบน ${topProvinces[0]?.name || 'จังหวัดไหน'}เหมาะสมที่สุดสำหรับกลุ่มเรา?${avgPriorities && topPriorities ? ` (พิจารณาจากความสำคัญ: ${topPriorities[0].name} > ${topPriorities[1].name} > ${topPriorities[2].name})` : ''}
+  2. มีกิจกรรมหรือสถานที่ท่องเที่ยวไหนที่แนะนำสำหรับกลุ่ม ${members.length} คนบ้าง?
+  3. ช่วยแนะนำ${topPriorities && topPriorities[0].name === 'ที่พัก' ? '**ที่พักคุณภาพดี**' : 'ที่พัก'}ในช่วงงบ ฿${formatCurrency(Math.round(budgetStats[0].median))}/คน/คืน${avgPriorities && topPriorities && topPriorities[0].name === 'ที่พัก' ? ' (กลุ่มเน้นที่พักมาก)' : ''}
+  4. แนะนำวิธีการเดินทาง${avgPriorities && topPriorities && topPriorities[0].name === 'เดินทาง' ? '**ที่สะดวกสบาย**' : ''}และประมาณค่าใช้จ่าย
+  5. งบประมาณรวม ฿${formatCurrency(Math.round(totalMedian * members.length))} เหมาะสมกับการท่องเที่ยวไหม?${avgPriorities && topPriorities ? ` (พิจารณาว่ากลุ่มเน้น${topPriorities[0].name})` : ''}
+  6. ช่วยแนะนำแผนการเดินทาง ${duration} แบบละเอียดได้ไหม?${avgPriorities && topPriorities && topPriorities[2].name === 'อาหาร' ? ' (อาหารประหยัดได้)' : avgPriorities && topPriorities && topPriorities[0].name === 'อาหาร' ? ' (แนะนำร้านอาหารดีๆ)' : ''}
 
-ขอบคุณมากค่ะ! 🙏
+  ขอบคุณมากค่ะ! 🙏
 
----
-*หมายเหตุ: งบประมาณข้างต้นเป็นค่ากลาง (median) จากการโหวตของสมาชิก*`;
+  ---
+  *หมายเหตุ: 
+  - งบประมาณเป็นค่ากลาง (median) จากการโหวตของสมาชิก${avgPriorities ? `
+  - ความสำคัญคำนวณจากการโหวต ${avgPriorities.count}/${members.length} คน
+  - ⭐⭐⭐ = สำคัญมาก, ⭐⭐ = ปานกลาง, ⭐ = สำคัญน้อย` : ''}*`;
 
     return prompt;
-  };
-
+  }; 
   const handleCopyPrompt = () => {
     const prompt = generateAIPrompt();
     navigator.clipboard.writeText(prompt);
@@ -247,139 +293,165 @@ ${topProvinces.length > 0
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       <Header onLogout={handleLogout} />
-      <div className="py-8 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+      <div className="py-6 px-4 max-w-6xl mx-auto">
+        
+        {/* ✅ Header - Compact */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+            <h1 className="text-2xl font-bold text-gray-800">
               📊 สรุปผลการวางแผนทริป
             </h1>
-          </div>
-          
-          <div className="flex items-center gap-4 text-gray-600 flex-wrap">
-            <span className="font-mono bg-blue-100 px-4 py-2 rounded-lg text-blue-700 font-semibold">
-              รหัสทริป: {tripCode}
-            </span>
-            <span className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              {members.length} สมาชิก
-            </span>
             <button
               onClick={() => navigate("/homepage")}
-              className="ml-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold transition-colors"
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition text-sm"
             >
               ← กลับหน้าหลัก
             </button>
           </div>
+          
+          <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
+            <span className="font-mono bg-blue-100 px-3 py-1.5 rounded-lg text-blue-700 font-semibold">
+              {tripCode}
+            </span>
+            <span className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              {members.length} คน
+            </span>
+          </div>
         </div>
 
-        {/* วันที่ความว่าง */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Calendar className="w-8 h-8 text-blue-600" />
-            <h2 className="text-3xl font-bold text-gray-800">📅 วันที่ที่ทุกคนว่าง</h2>
+        {/* ✅ วันที่ - Compact */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-blue-600" />
+              <h2 className="text-xl font-bold text-gray-800">วันที่แนะนำ</h2>
+            </div>
+            <button
+              onClick={() => setShowTable(!showTable)}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              {showTable ? 'ซ่อนตาราง' : 'ดูตารางเต็ม'} →
+            </button>
           </div>
 
-          {/* ตารางความว่าง */}
-          <div className="overflow-x-auto mb-8">
-            <table className="w-full border-collapse min-w-[800px]">
-              <thead className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
-                <tr>
-                  <th className="py-3 px-4 border text-left">สมาชิก</th>
-                  {dateHeaders.map((date, idx) => (
-                    <th key={idx} className="py-3 px-2 border text-center">
-                      <div>{date}</div>
-                      <div className="text-xs opacity-90">
-                        {members.filter(m => m.availability?.[idx] === true).length}/{members.length}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((member, idx) => (
-                  <tr key={idx} className="hover:bg-blue-50">
-                    <td className="py-3 px-4 border font-medium">
-                      <span className={`inline-block px-3 py-1 rounded-full text-sm ${
-                        member.gender === "ชาย" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"
-                      }`}>
-                        {member.name}
-                      </span>
-                    </td>
-                    {(member.availability || []).map((available, i) => (
-                      <td key={i} className="py-3 border text-center">
-                        <div className="flex justify-center">
-                          {available ? (
-                            <Check className="text-green-600 w-5 h-5" />
-                          ) : (
-                            <X className="text-red-600 w-5 h-5" />
-                          )}
+          {/* Top 3 Dates - Compact */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {dateAvailability.slice(0, 3).map((item, idx) => (
+              <div
+                key={idx}
+                className={`p-4 rounded-lg border-2 text-center ${
+                  idx === 0 ? 'border-yellow-400 bg-yellow-50' :
+                  idx === 1 ? 'border-gray-300 bg-gray-50' :
+                  'border-orange-300 bg-orange-50'
+                }`}
+              >
+                <div className="text-2xl mb-1">
+                  {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                </div>
+                <div className="text-lg font-bold text-gray-800 mb-1">
+                  {item.date}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {item.available}/{item.total} คน
+                </div>
+                <div className="text-xs text-gray-500">
+                  ({Math.round((item.available / item.total) * 100)}%)
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ✅ Collapsible Table */}
+          {showTable && (
+            <div className="overflow-x-auto mt-4 border-t pt-4">
+              <table className="w-full border-collapse min-w-[600px] text-sm">
+                <thead className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+                  <tr>
+                    <th className="py-2 px-3 border text-left">สมาชิก</th>
+                    {dateHeaders.map((date, idx) => (
+                      <th key={idx} className="py-2 px-2 border text-center">
+                        <div className="text-xs">{date}</div>
+                        <div className="text-[10px] opacity-80">
+                          {members.filter(m => m.availability?.[idx] === true).length}/{members.length}
                         </div>
-                      </td>
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Top 3 วันที่ */}
-          <div>
-            <h3 className="text-xl font-bold mb-4 text-gray-700">🏆 Top 3 วันที่ทุกคนว่างมากที่สุด</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {dateAvailability.slice(0, 3).map((item, idx) => (
-                <div
-                  key={idx}
-                  className={`p-6 rounded-xl border-4 ${
-                    idx === 0 ? 'border-yellow-400 bg-yellow-50' :
-                    idx === 1 ? 'border-gray-400 bg-gray-50' :
-                    'border-orange-400 bg-orange-50'
-                  }`}
-                >
-                  <div className="text-center">
-                    <div className="text-4xl mb-2">
-                      {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                    </div>
-                    <div className="text-2xl font-bold text-gray-800 mb-2">
-                      {item.date}
-                    </div>
-                    <div className="text-lg text-gray-600">
-                      {item.available}/{item.total} คน
-                    </div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      ({Math.round((item.available / item.total) * 100)}%)
-                    </div>
-                  </div>
-                </div>
-              ))}
+                </thead>
+                <tbody>
+                  {members.map((member, idx) => (
+                    <tr key={idx} className="hover:bg-blue-50">
+                      <td className="py-2 px-3 border text-sm">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs ${
+                          member.gender === "ชาย" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"
+                        }`}>
+                          {member.name}
+                        </span>
+                      </td>
+                      {(member.availability || []).map((available, i) => (
+                        <td key={i} className="py-2 border text-center">
+                          {available ? (
+                            <Check className="text-green-600 w-4 h-4 mx-auto" />
+                          ) : (
+                            <X className="text-red-600 w-4 h-4 mx-auto" />
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* งบประมาณ */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <DollarSign className="w-8 h-8 text-green-600" />
-            <h2 className="text-3xl font-bold text-gray-800">💰 สรุปงบประมาณ</h2>
+        {/* ✅ งบประมาณ - Compact (ลบ Pie Chart ออก) */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="w-5 h-5 text-green-600" />
+            <h2 className="text-xl font-bold text-gray-800">งบประมาณ</h2>
           </div>
 
-          {/* กราฟแท่งงบประมาณ */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold mb-4 text-gray-700">งบประมาณแต่ละสมาชิก</h3>
-            <ResponsiveContainer width="100%" height={300}>
+          {/* ✅ Budget Stats Only - Compact */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            {budgetStats.map(({ label, median, color }) => (
+              <div key={label} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                  <span className="text-sm font-medium">{label}</span>
+                </div>
+                <span className="text-lg font-bold" style={{ color }}>
+                  ฿{formatCurrency(Math.round(median))}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-lg flex justify-between items-center">
+            <span className="font-bold">รวมต่อคน</span>
+            <span className="text-2xl font-bold">฿{formatCurrency(Math.round(totalMedian))}</span>
+          </div>
+
+          {/* ✅ Bar Chart - Compact */}
+          <div className="mt-4">
+            <h3 className="text-sm font-bold mb-3 text-gray-700">งบแต่ละสมาชิก</h3>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={members.map(m => ({
-                name: m.name,
+                name: m.name.length > 8 ? m.name.slice(0, 8) + '...' : m.name,
                 ค่าที่พัก: m.budget.accommodation,
                 ค่าเดินทาง: m.budget.transport,
                 ค่าอาหาร: m.budget.food,
                 เงินสำรอง: m.budget.other
               }))}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value) => `฿${formatCurrency(Number(value))}`} />
-                <Legend />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip 
+                  formatter={(value) => `฿${formatCurrency(Number(value))}`}
+                  contentStyle={{ fontSize: '12px' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Bar dataKey="ค่าที่พัก" fill="#3b82f6" />
                 <Bar dataKey="ค่าเดินทาง" fill="#8b5cf6" />
                 <Bar dataKey="ค่าอาหาร" fill="#10b981" />
@@ -387,127 +459,61 @@ ${topProvinces.length > 0
               </BarChart>
             </ResponsiveContainer>
           </div>
-
-          {/* กราฟวงกลมสัดส่วนงบประมาณ */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div>
-              <h3 className="text-xl font-bold mb-4 text-gray-700">สัดส่วนงบประมาณรวม</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => `฿${formatCurrency(Number(value))}`} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* การ์ดสรุปค่า Median */}
-            <div>
-              <h3 className="text-xl font-bold mb-4 text-gray-700">ค่ากลาง (Median) แนะนำ</h3>
-              <div className="space-y-3">
-                {budgetStats.map(({ label, median, color }) => (
-                  <div key={label} className="bg-gray-50 p-4 rounded-lg flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: color }}></div>
-                      <span className="font-medium">{label}</span>
-                    </div>
-                    <span className="text-xl font-bold" style={{ color }}>
-                      ฿{formatCurrency(Math.round(median))}
-                    </span>
-                  </div>
-                ))}
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-lg flex justify-between items-center">
-                  <span className="font-bold text-lg">รวมทั้งหมด</span>
-                  <span className="text-2xl font-bold">฿{formatCurrency(Math.round(totalMedian))}</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* จังหวัด */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <MapPin className="w-8 h-8 text-red-600" />
-            <h2 className="text-3xl font-bold text-gray-800">🗺️ จังหวัดที่ได้รับความนิยม</h2>
+        {/* ✅ จังหวัด - Compact (ลบ Bar Chart ออก) */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className="w-5 h-5 text-red-600" />
+            <h2 className="text-xl font-bold text-gray-800">จังหวัดยอดนิยม</h2>
           </div>
 
           {topProvinces.length > 0 ? (
-            <>
-              {/* Top 3 การ์ด */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {topProvinces.map((province, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-8 rounded-xl border-4 ${
-                      idx === 0 ? 'border-yellow-400 bg-gradient-to-br from-yellow-50 to-yellow-100' :
-                      idx === 1 ? 'border-gray-400 bg-gradient-to-br from-gray-50 to-gray-100' :
-                      'border-orange-400 bg-gradient-to-br from-orange-50 to-orange-100'
-                    }`}
-                  >
-                    <div className="text-center">
-                      <div className="text-5xl mb-3">
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                      </div>
-                      <div className="text-sm text-gray-500 mb-2">อันดับ {idx + 1}</div>
-                      <div className="text-3xl font-bold text-gray-800 mb-3">
-                        {province.name}
-                      </div>
-                      <div className="text-4xl font-bold text-blue-600">
-                        {province.score} คะแนน
-                      </div>
-                    </div>
+            <div className="grid grid-cols-3 gap-3">
+              {topProvinces.map((province, idx) => (
+                <div
+                  key={idx}
+                  className={`p-4 rounded-lg border-2 text-center ${
+                    idx === 0 ? 'border-yellow-400 bg-yellow-50' :
+                    idx === 1 ? 'border-gray-300 bg-gray-50' :
+                    'border-orange-300 bg-orange-50'
+                  }`}
+                >
+                  <div className="text-3xl mb-2">
+                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
                   </div>
-                ))}
-              </div>
-
-              {/* กราฟแท่งจังหวัด */}
-              <div>
-                <h3 className="text-xl font-bold mb-4 text-gray-700">กราฟคะแนนโหวต</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={voteResults?.provinces || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="score" fill="#3b82f6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </>
+                  <div className="text-xs text-gray-500 mb-1">อันดับ {idx + 1}</div>
+                  <div className="text-lg font-bold text-gray-800 mb-1">
+                    {province.name}
+                  </div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {province.score}
+                  </div>
+                  <div className="text-xs text-gray-500">คะแนน</div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="text-center py-12 text-gray-400">
+            <div className="text-center py-8 text-gray-400 text-sm">
               <p>ยังไม่มีข้อมูลการโหวตจังหวัด</p>
             </div>
           )}
         </div>
 
-        {/* AI Prompt */}
-        <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl shadow-xl p-8 text-white">
-          <div className="flex items-center gap-3 mb-4">
-            <Sparkles className="w-8 h-8" />
-            <h2 className="text-3xl font-bold">🤖 ถามคำแนะนำจาก AI</h2>
+        {/* ✅ AI Prompt - Compact */}
+        <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg p-6 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-5 h-5" />
+            <h2 className="text-xl font-bold">ถามคำแนะนำจาก AI</h2>
           </div>
           
-          <p className="mb-6 text-purple-100">
-            คลิกปุ่มด้านล่างเพื่อคัดลอกข้อมูลสรุปทริปของคุณ แล้วนำไปถาม ChatGPT, Claude หรือ AI อื่นๆ เพื่อรับคำแนะนำการวางแผนทริป!
+          <p className="mb-4 text-sm text-purple-100">
+            คัดลอกข้อมูลสรุปทริป แล้วนำไปถาม ChatGPT, Claude หรือ AI อื่นๆ!
           </p>
 
           <button
             onClick={handleCopyPrompt}
-            className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-3 ${
+            className={`w-full py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
               copied 
                 ? 'bg-green-500 hover:bg-green-600' 
                 : 'bg-white text-purple-600 hover:bg-purple-50'
@@ -515,32 +521,28 @@ ${topProvinces.length > 0
           >
             {copied ? (
               <>
-                <span>✓</span>
-                <span>คัดลอกแล้ว! นำไปถาม AI ได้เลย</span>
+                <Check className="w-5 h-5" />
+                <span>คัดลอกแล้ว!</span>
               </>
             ) : (
               <>
-                <Copy className="w-6 h-6" />
-                <span>คัดลอกข้อมูลเพื่อถาม AI</span>
+                <Copy className="w-5 h-5" />
+                <span>คัดลอกข้อมูล</span>
               </>
             )}
           </button>
 
-          <div className="mt-4 p-4 bg-white/10 rounded-lg">
-            <p className="text-sm text-purple-100">
-              💡 <strong>เคล็ดลับ:</strong> หลังจากคัดลอก ให้ไปวางในช่องแชทของ AI ที่คุณชอบ 
-              แล้ว AI จะช่วยแนะนำสถานที่ท่องเที่ยว กิจกรรม และแผนการเดินทางที่เหมาะกับกลุ่มของคุณ!
-            </p>
+          <div className="mt-3 p-3 bg-white/10 rounded-lg text-xs text-purple-100">
+            💡 หลังคัดลอก ไปวางในช่องแชทของ AI เพื่อรับคำแนะนำ!
           </div>
         </div>
 
         {/* Footer */}
-        <div className="mt-8 text-center text-gray-500 text-sm">
-          <p>สร้างโดย Trip Planner System | ขอให้มีความสุขกับการท่องเที่ยว! 🎉</p>
+        <div className="mt-6 text-center text-gray-500 text-xs">
+          <p>สร้างโดย TripMate | ขอให้มีความสุขกับการท่องเที่ยว! 🎉</p>
         </div>
       </div>
     </div>
-  </div>
   );
 };
 
