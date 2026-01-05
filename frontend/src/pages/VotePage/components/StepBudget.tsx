@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Loader2 } from 'lucide-react';
-import debounce from 'lodash/debounce';
+import React, { useState, useEffect } from 'react';
+import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { tripAPI } from '../../../services/api';
 import { CONFIG } from '../../../config/app.config';
 import { formatCurrency } from '../../../utils/helpers';
-import { TripData, Member, BudgetPriority } from '../../../data/mockData';
+import { TripData, Member, BudgetPriority, HistoryEntry } from '../../../data/mockData';
 
 // ============== TYPES ==============
 interface StepBudgetProps {
@@ -15,6 +14,8 @@ interface StepBudgetProps {
   tripCode: string;
   budgetStats: Record<string, BudgetStats>;
   totalBudget: number;
+  addHistory: (step: number, stepName: string, action: string) => void;
+  onNavigateToStep: (step: number) => void;
   onBudgetChange?: (budget: Member['budget']) => void;
 }
 
@@ -38,10 +39,6 @@ const BUDGET_CATEGORIES = [
   { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b' }
 ];
 
-const MAX_TOTAL_BUDGET = 1000000;
-const MAX_PER_CATEGORY = 100000;
-const EDIT_COOLDOWN_MS = 0;
-
 // ============== RANGE BAR COMPONENT ==============
 interface RangeBarProps {
   stats: BudgetStats;
@@ -50,21 +47,10 @@ interface RangeBarProps {
   currentValue?: number;
 }
 
-const RangeBar: React.FC<RangeBarProps> = ({ 
-  stats, 
-  label, 
-  color = "#3b82f6",
-  currentValue 
-}) => {
-  if (stats.count === 0) {
-    return (
-      <div className="py-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg">
-        ไม่มีข้อมูลสำหรับ {label}
-      </div>
-    );
-  }
+const RangeBar: React.FC<RangeBarProps> = ({ stats, label, color = "#3b82f6", currentValue }) => {
+  if (stats.count === 0) return null;
 
-  const widthPx = 400;
+  const widthPx = 300;
   const pad = Math.max(0.05 * (stats.max - stats.min || 1), 1);
   const domainMin = stats.min - pad;
   const domainMax = stats.max + pad;
@@ -78,63 +64,29 @@ const RangeBar: React.FC<RangeBarProps> = ({
   const xCurrent = currentValue !== undefined ? scale(currentValue) : null;
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm mb-4 border border-gray-100">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-        <h3 className="text-sm font-semibold text-gray-700">{label}</h3>
+    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-3">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+        <h4 className="text-sm font-semibold text-gray-700">{label}</h4>
       </div>
       
       <div className="overflow-x-auto">
-        <svg width={widthPx} height={60} className="mx-auto">
-          <line 
-            x1={xMin} x2={xMax} y1={30} y2={30} 
-            stroke="#e0e7ff" strokeWidth={8} strokeLinecap="round"
-          />
-          <rect 
-            x={xQ1} y={15} 
-            width={Math.max(1, xQ3 - xQ1)} height={30} 
-            fill={color} fillOpacity={0.2} rx={6}
-          />
-          <line 
-            x1={xMed} x2={xMed} y1={10} y2={50} 
-            stroke={color} strokeWidth={3}
-          />
+        <svg width={widthPx} height={50} className="mx-auto">
+          <line x1={xMin} x2={xMax} y1={25} y2={25} stroke="#e0e7ff" strokeWidth={6} strokeLinecap="round" />
+          <rect x={xQ1} y={12} width={Math.max(1, xQ3 - xQ1)} height={26} fill={color} fillOpacity={0.2} rx={4} />
+          <line x1={xMed} x2={xMed} y1={8} y2={42} stroke={color} strokeWidth={2} />
           {xCurrent !== null && (
-            <circle 
-              cx={xCurrent} cy={30} r={6} 
-              fill="#ef4444" stroke="white" strokeWidth={2}
-            />
+            <circle cx={xCurrent} cy={25} r={5} fill="#ef4444" stroke="white" strokeWidth={2} />
           )}
-          <circle cx={xMin} cy={30} r={4} fill={color} />
-          <circle cx={xMax} cy={30} r={4} fill={color} />
-          <text 
-            x={xMed} 
-            y={8} 
-            textAnchor="middle" 
-            className="text-xs font-semibold"
-            fill={color}
-          >
-            ฿{formatCurrency(Math.round(stats.median))}
-          </text>
+          <circle cx={xMin} cy={25} r={3} fill={color} />
+          <circle cx={xMax} cy={25} r={3} fill={color} />
         </svg>
       </div>
       
-      <div className="mt-3 text-xs text-gray-600 space-y-1">
-        <div className="flex justify-between">
-          <span>ต่ำสุด: ฿{formatCurrency(stats.min)}</span>
-          <span>สูงสุด: ฿{formatCurrency(stats.max)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Q1-Q3: ฿{formatCurrency(Math.round(stats.q1))} - ฿{formatCurrency(Math.round(stats.q3))}</span>
-          <span>เฉลี่ย: ฿{formatCurrency(Math.round(stats.avg))}</span>
-        </div>
-        {stats.outliers && stats.outliers > 0 && (
-          <div className="pt-2 border-t border-gray-200">
-            <p className="text-amber-600 font-medium">
-              ⚠️ กรองค่าผิดปกติ {stats.outliers} ค่าออก
-            </p>
-          </div>
-           )}
+      <div className="mt-2 flex justify-between text-xs text-gray-600">
+        <span>฿{formatCurrency(stats.min)}</span>
+        <span className="font-semibold text-gray-800">฿{formatCurrency(Math.round(stats.median))}</span>
+        <span>฿{formatCurrency(stats.max)}</span>
       </div>
     </div>
   );
@@ -149,9 +101,10 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
   tripCode,
   budgetStats,
   totalBudget,
+  addHistory,
+  onNavigateToStep,
   onBudgetChange
 }) => {
-  // ============== GUARD CLAUSE ==============
   if (!memberBudget) {
     return (
       <div className="bg-white p-6 rounded-xl shadow-lg text-center">
@@ -174,16 +127,57 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
       food: 2
     }
   );
-  const [history, setHistory] = useState<string[]>([]);
   const [followMajority, setFollowMajority] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
-  // ============== REFS ==============
-  const debouncedUpdateRef = useRef<ReturnType<typeof debounce>>();
-
-  // ============== SYNC LOCAL BUDGET ==============
+  // ============== AUTO-SAVE LISTENER ==============
   useEffect(() => {
-    const handleAutoSave = () => {
+    const handleAutoSave = async () => {
       console.log('📥 Received auto-save event for budget');
+      
+      if (followMajority && (
+        localBudget.accommodation === 0 ||
+        localBudget.transport === 0 ||
+        localBudget.food === 0
+      )) {
+        const otherMembers = trip.members?.filter(m => 
+          m.id !== memberBudget?.id &&
+          m.budget.accommodation > 0 && 
+          m.budget.transport > 0 && 
+          m.budget.food > 0
+        ) || [];
+        
+        if (otherMembers.length > 0) {
+          const avgBudget = {
+            accommodation: 0,
+            transport: 0,
+            food: 0,
+            other: 0
+          };
+          
+          otherMembers.forEach(m => {
+            avgBudget.accommodation += m.budget.accommodation;
+            avgBudget.transport += m.budget.transport;
+            avgBudget.food += m.budget.food;
+            avgBudget.other += m.budget.other;
+          });
+          
+          avgBudget.accommodation = Math.round(avgBudget.accommodation / otherMembers.length);
+          avgBudget.transport = Math.round(avgBudget.transport / otherMembers.length);
+          avgBudget.food = Math.round(avgBudget.food / otherMembers.length);
+          avgBudget.other = Math.round(avgBudget.other / otherMembers.length);
+          
+          setLocalBudget(avgBudget);
+          
+          if (onBudgetChange) {
+            onBudgetChange(avgBudget);
+          }
+          
+          setTimeout(() => saveBudget(), 100);
+          return;
+        }
+      }
+      
       saveBudget();
     };
     
@@ -192,18 +186,15 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
     return () => {
       window.removeEventListener('auto-save-budget', handleAutoSave);
     };
-  }, [localBudget]);
+  }, [localBudget, followMajority]);
 
-  // ============== UPDATE BUDGET FUNCTION ==============
+  // ============== SAVE BUDGET ==============
   const saveBudget = async (): Promise<void> => {
     if (isSaving) {
       console.log('⏳ Already saving, skipping update');
       return;
     }
     
-    console.log('💾 Starting save all budget:', localBudget);
-    
-    // Validation: ตัวเลขต้องถูกต้อง
     const hasValidBudget = 
       localBudget.accommodation > 0 &&
       localBudget.transport > 0 &&
@@ -215,15 +206,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
     }
 
     const nowTs = Date.now();
+    const newBudget = { ...localBudget, lastUpdated: nowTs };
 
-    const newBudget = {
-      ...localBudget,
-      lastUpdated: nowTs
-    };
-
-    console.log('🔄 Budget to save:', JSON.stringify(newBudget, null, 2));
-
-    // Optimistic update
     const updatedMember = {
       ...memberBudget,
       budget: newBudget
@@ -251,21 +235,15 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
       }
 
       if (response.success) {
-        setHistory(prev => [
-          `${memberBudget.name} บันทึกงบประมาณ: ที่พัก ฿${formatCurrency(newBudget.accommodation)}, เดินทาง ฿${formatCurrency(newBudget.transport)}, อาหาร ฿${formatCurrency(newBudget.food)}, สำรอง ฿${formatCurrency(newBudget.other)} เวลา ${new Date().toLocaleTimeString("th-TH")}`,
-          ...prev
-        ]);
-        console.log('✅ Budget saved successfully:', newBudget);
+        addHistory(3, 'งบประมาณ', `บันทึกงบประมาณ: ที่พัก ฿${formatCurrency(newBudget.accommodation)}, เดินทาง ฿${formatCurrency(newBudget.transport)}, อาหาร ฿${formatCurrency(newBudget.food)}`);
+        console.log('✅ Budget saved successfully');
       } else {
         throw new Error(response.message || 'ไม่สามารถบันทึกได้');
       }
 
     } catch (err) {
       console.error("❌ Error saving budget:", err);
-      
-      // Rollback
       setMemberBudget(memberBudget);
-
       setTrip(prev => ({
         ...prev,
         members: prev.members?.map(m =>
@@ -279,23 +257,16 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
 
   // ============== HANDLE INPUT CHANGE ==============
   const handleBudgetChange = (key: keyof Member["budget"], value: number) => {
-    console.log(`📝 Input changed: ${key} = ${value}`);
-    
-    // อัปเดต local state ทันที (responsive UI)
     const newBudget = { ...localBudget, [key]: value };
     setLocalBudget(newBudget);
     
-    // ✅ ส่งกลับไปที่ parent ทันที
     if (onBudgetChange) {
       onBudgetChange(newBudget);
     }
   };
 
   // ============== UPDATE PRIORITY ==============
-  const updatePriority = async (
-    category: keyof typeof priorities,
-    value: BudgetPriority
-  ) => {
+  const updatePriority = async (category: keyof typeof priorities, value: BudgetPriority) => {
     const newPriorities = { ...priorities, [category]: value };
     setPriorities(newPriorities);
 
@@ -306,10 +277,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
         await tripAPI.updateBudgetPriority?.(tripCode, memberBudget.id, newPriorities);
       }
 
-      setMemberBudget(prev => prev ? {
-        ...prev,
-        budgetPriorities: newPriorities
-      } : null);
+      setMemberBudget(prev => prev ? { ...prev, budgetPriorities: newPriorities } : null);
 
       setTrip(prev => ({
         ...prev,
@@ -317,8 +285,9 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
           m.id === memberBudget.id ? { ...m, budgetPriorities: newPriorities } : m
         ) || []
       }));
+
+      addHistory(3, 'งบประมาณ', `เปลี่ยนความสำคัญ ${category}`);
     } catch (error) {
-      // alert("เกิดข้อผิดพลาดในการบันทึก Priority");
       setPriorities(memberBudget.budgetPriorities || priorities);
     }
   };
@@ -326,71 +295,93 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
   // ============== HELPER FUNCTIONS ==============
   const getPriorityLabel = (priority: BudgetPriority): string => {
     switch (priority) {
-      case 1: return "⭐⭐⭐ สำคัญมาก";
-      case 2: return "⭐⭐ สำคัญปานกลาง";
-      case 3: return "⭐ สำคัญน้อย";
+      case 1: return "⭐⭐⭐";
+      case 2: return "⭐⭐";
+      case 3: return "⭐";
     }
   };
 
   const getPriorityColor = (priority: BudgetPriority): string => {
     switch (priority) {
-      case 1: return "bg-red-100 text-red-700 border-red-300";
-      case 2: return "bg-yellow-100 text-yellow-700 border-yellow-300";
-      case 3: return "bg-green-100 text-green-700 border-green-300";
+      case 1: return "text-red-600";
+      case 2: return "text-yellow-600";
+      case 3: return "text-green-600";
     }
   };
 
   // ============== RENDER ==============
   return (
     <div className="space-y-6">
-      {/* ============ แก้ไขงบประมาณ ============ */}
-      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">💰 แก้ไขงบประมาณ</h3>
+      {/* ============ แก้ไขงบประมาณ + Priority ในตาราง ============ */}
+      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg border border-gray-200">
+      <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">💰 แก้ไขงบประมาณ</h3>
+      
+      {/* ✅ เพิ่ม horizontal scroll indicator */}
+      <div className="relative">
+        {/* Scroll hint for mobile */}
+        <div className="sm:hidden absolute -top-2 right-0 text-xs text-gray-500 bg-yellow-100 px-2 py-1 rounded">
+          👉 เลื่อนดู →
+        </div>
         
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full border-collapse">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 -mx-4 sm:mx-0">
+          <table className="w-full border-collapse min-w-[600px]">
             <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
               <tr>
-                <th className="py-3 px-4 text-left font-semibold text-gray-700">
-                  หมวดหมู่ (* บังคับ)
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left font-semibold text-gray-700 text-sm sm:text-base">
+                  หมวดหมู่
                 </th>
-                <th className="py-3 px-4 text-right font-semibold text-gray-700">
-                  จำนวนเงิน (บาท)
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-right font-semibold text-gray-700 text-sm sm:text-base">
+                  จำนวนเงิน (฿)
+                </th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-center font-semibold text-gray-700 text-xs sm:text-sm">
+                  ความสำคัญ
                 </th>
               </tr>
             </thead>
             <tbody>
               {BUDGET_CATEGORIES.map(({ key, label, color }) => (
-                <tr 
-                  key={key} 
-                  className="hover:bg-gray-50 transition-colors border-b border-gray-100"
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-3 h-3 rounded-full shadow-sm" 
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="font-medium text-gray-800">{label}</span>
+                <tr key={key} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                  <td className="px-2 sm:px-4 py-2 sm:py-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full shadow-sm" style={{ backgroundColor: color }} />
+                      <span className="font-medium text-gray-800 text-sm sm:text-base">{label}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-2 sm:px-4 py-2 sm:py-3">
                     <input 
                       type="number" 
                       disabled={isSaving}
                       min={0}
                       step={100}
                       value={localBudget[key]}
-                      className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full text-right border-2 border-gray-300 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                       onChange={e => handleBudgetChange(key, Number(e.target.value))}
                     />
+                  </td>
+                  <td className="px-2 sm:px-4 py-2 sm:py-3">
+                    {(key === 'accommodation' || key === 'transport' || key === 'food') && (
+                      <div className="flex gap-0.5 sm:gap-1 justify-center">
+                        {[1, 2, 3].map((priority) => (
+                          <button
+                            key={priority}
+                            onClick={() => updatePriority(key, priority as BudgetPriority)}
+                            className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium transition-all ${
+                              priorities[key] === priority
+                                ? `${getPriorityColor(priority as BudgetPriority)} bg-gray-100 border border-gray-300`
+                                : "text-gray-400 hover:bg-gray-50"
+                            }`}
+                          >
+                            {getPriorityLabel(priority as BudgetPriority)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
               <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 font-bold">
-                <td className="px-4 py-3 text-gray-800">รวมทั้งหมด</td>
-                <td className="px-4 py-3 text-right text-blue-700 text-lg">
-                  {/* ✅ คำนวณจาก localBudget แทน */}
+                <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-800 text-sm sm:text-base">รวมทั้งหมด</td>
+                <td className="px-2 sm:px-4 py-2 sm:py-3 text-right text-blue-700 text-base sm:text-lg">
                   ฿{formatCurrency(
                     localBudget.accommodation + 
                     localBudget.transport + 
@@ -398,41 +389,13 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
                     localBudget.other
                   )}
                 </td>
+                <td></td>
               </tr>
             </tbody>
           </table>
+        </div>
       </div>
-      
-      {/* ✅ เพิ่มปุ่มบันทึก */}
-      {/* <button
-        onClick={saveBudget}
-        disabled={isSaving || (
-          localBudget.accommodation <= 0 ||
-          localBudget.transport <= 0 ||
-          localBudget.food <= 0
-        )}
-        className={`
-          w-full mt-4 px-6 py-3 font-bold rounded-lg transition shadow-lg
-          ${isSaving || (
-            localBudget.accommodation <= 0 ||
-            localBudget.transport <= 0 ||
-            localBudget.food <= 0
-          )
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-            : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700'
-          }
-        `}
-      >
-        {isSaving ? (
-          <span className="flex items-center justify-center gap-2">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            กำลังบันทึก...
-          </span>
-        ) : (
-          '💾 บันทึกงบประมาณ'
-        )}
-      </button> */}
-      
+
       {isSaving && (
         <div className="mt-2 flex items-center justify-center gap-2 text-blue-600">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -441,9 +404,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
       )}
     </div>
 
-      {/* ✅ เพิ่มส่วนนี้ */}
-      {/* Follow Majority Option */}
-      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mb-6">
+      {/* Follow Majority */}
+      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
         <div className="p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
           <label className="flex items-start gap-3 cursor-pointer">
             <input 
@@ -454,7 +416,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
                 setFollowMajority(checked);
                 
                 if (checked) {
-                  // Calculate average budget from other members
                   const otherMembers = trip.members?.filter(m => 
                     m.id !== memberBudget.id &&
                     m.budget.accommodation > 0 && 
@@ -484,12 +445,10 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
                     
                     setLocalBudget(avgBudget);
                     
-                    // ✅ ส่งไปที่ parent
                     if (onBudgetChange) {
                       onBudgetChange(avgBudget);
                     }
                   } else {
-                    console.log('ยังไม่มีเพื่อนคนไหนกรอกงบประมาณ');
                     setFollowMajority(false);
                   }
                 }
@@ -497,126 +456,59 @@ export const StepBudget: React.FC<StepBudgetProps> = ({
               className="mt-1 w-5 h-5 text-purple-600"
             />
             <div>
-              <p className="font-semibold text-purple-900">
-                ✨ ใช้งบเฉลี่ยของกลุ่ม
-              </p>
+              <p className="font-semibold text-purple-900">✨ ใช้งบเฉลี่ยของกลุ่ม</p>
               <p className="text-sm text-purple-700 mt-1">
-                ระบบจะคำนวณงบเฉลี่ยจากเพื่อนที่กรอกไปแล้วให้อัตโนมัติ 
-                (คุณยังสามารถแก้ไขได้ทีหลัง)
+                ระบบจะคำนวณงบเฉลี่ยจากเพื่อนที่กรอกไปแล้วให้อัตโนมัติ
               </p>
-              {followMajority && (
-                <div className="mt-2 p-2 bg-white rounded text-xs text-purple-600">
-                  💡 ระบบกำลังใช้งบเฉลี่ยของกลุ่ม แต่คุณยังแก้ไขได้ตลอดเวลา
-                </div>
-              )}
             </div>
           </label>
         </div>
       </div>
 
-      {/* ============ Priority Voting ============ */}
-      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">
-          ⭐ ระดับความสำคัญของงบประมาณ
-        </h3>
-        
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
-          <p className="text-sm text-blue-800">
-            💡 <strong>คำแนะนำ:</strong> เลือกว่าคุณต้องการให้งบประมาณรวมของกลุ่ม
-            จัดสรรไปที่หมวดไหนมากที่สุด
-          </p>
-        </div>
+      {/* ✅ ปุ่มดูผลลัพธ์ */}
+      {(localBudget.accommodation > 0 || localBudget.transport > 0 || localBudget.food > 0) && (
+        <button
+          onClick={() => setShowResults(!showResults)}
+          className="w-full px-4 sm:px-6 py-3 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-sm sm:text-base rounded-xl transition shadow-lg flex items-center justify-center gap-2 min-h-[48px]"
+          aria-label={showResults ? 'ซ่อนผลลัพธ์' : 'ดูผลลัพธ์'}
+        >
+          <span>📊</span>
+          <span className="hidden sm:inline">{showResults ? 'ซ่อน' : 'ดู'}ผลลัพธ์ล่าสุด</span>
+          <span className="sm:hidden">{showResults ? 'ซ่อน' : 'ดู'}ผล</span>
+          {showResults ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+        </button>
+      )}
 
-        <div className="space-y-4">
-          {(['accommodation', 'transport', 'food'] as const).map((key) => {
-            const category = BUDGET_CATEGORIES.find(c => c.key === key);
-            if (!category) return null;
-
-            return (
-              <div key={key} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: category.color }}
-                    />
-                    <span className="font-semibold text-gray-800">
-                      {category.label}
-                    </span>
-                  </div>
-                  <span className={`px-4 py-2 rounded-full text-sm font-medium border-2 ${getPriorityColor(priorities[key])}`}>
-                    {getPriorityLabel(priorities[key])}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  {[1, 2, 3].map((priority) => (
-                    <button
-                      key={priority}
-                      onClick={() => updatePriority(key, priority as BudgetPriority)}
-                      className={`py-2 px-3 rounded-lg font-medium transition-all ${
-                        priorities[key] === priority
-                          ? getPriorityColor(priority as BudgetPriority) + " border-2"
-                          : "bg-white border-2 border-gray-200 text-gray-600 hover:bg-gray-100"
-                      }`}
-                    >
-                      {getPriorityLabel(priority as BudgetPriority)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ============ การกระจายงบประมาณ ============ */}
-      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">
-          📊 การกระจายงบประมาณของสมาชิกทั้งหมด
-        </h3>
-        
-        <div className="flex flex-wrap gap-4 mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <span className="w-3 h-3 rounded-full bg-red-500"></span>
-            <span>จุดสีแดง = งบของเรา</span>
+      {/* ============ การกระจายงบประมาณ - Compact ============ */}
+      {showResults && (localBudget.accommodation > 0 || localBudget.transport > 0 || localBudget.food > 0) && (
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+          <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <span>📊</span>
+            <span>เปรียบเทียบกับกลุ่ม</span>
+          </h3>
+          
+          <div className="flex gap-3 mb-3 text-xs text-gray-600">
+            <div className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-red-500"></span>
+              <span>คุณ</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-[2px] bg-blue-500"></span>
+              <span>ค่ากลาง</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <span className="w-5 h-[3px] bg-blue-500"></span>
-            <span>เส้นสีน้ำเงิน = ค่ากลาง (Median)</span>
-          </div>
-        </div>  
 
-        {BUDGET_CATEGORIES.map(({ key, label, color }) => (
-          <RangeBar
-            key={key}
-            stats={budgetStats[key]}
-            label={label}
-            color={color}
-            currentValue={memberBudget.budget[key]}
-          />
-        ))}
-      </div>
-
-      {/* ============ ประวัติการแก้ไข ============ */}
-      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-        <h3 className="text-lg font-bold text-gray-800 mb-3">📝 ประวัติการแก้ไข</h3>
-        <div className="bg-gray-50 p-4 rounded-lg h-48 overflow-y-auto border border-gray-200">
-          {history.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">ยังไม่มีประวัติการแก้ไข</p>
-          ) : (
-            <ul className="text-sm space-y-2">
-              {history.map((h, i) => (
-                <li key={i} className="flex items-start gap-2 text-gray-700">
-                  <span className="text-blue-500 mt-1">•</span>
-                  <span>{h}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          {BUDGET_CATEGORIES.map(({ key, label, color }) => (
+            <RangeBar
+              key={key}
+              stats={budgetStats[key]}
+              label={label}
+              color={color}
+              currentValue={memberBudget.budget[key]}
+            />
+          ))}
         </div>
-      </div>
+      )}
     </div>
   );
 };
-

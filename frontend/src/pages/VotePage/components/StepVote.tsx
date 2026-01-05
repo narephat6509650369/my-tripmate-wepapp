@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { tripAPI } from '../../../services/api';
 import { CONFIG, log } from '../../../config/app.config';
-import { TripData, Member } from '../../../data/mockData';
+import { TripData, Member, HistoryEntry } from '../../../data/mockData';
 
 // ============== TYPES ==============
 interface StepVoteProps {
@@ -10,6 +10,8 @@ interface StepVoteProps {
   setTrip: React.Dispatch<React.SetStateAction<TripData>>;
   memberBudget: Member | null;
   tripCode: string;
+  addHistory: (step: number, stepName: string, action: string) => void;
+  onNavigateToStep: (step: number) => void;
 }
 
 // ============== COMPONENT ==============
@@ -17,23 +19,53 @@ export const StepVote: React.FC<StepVoteProps> = ({
   trip,
   setTrip,
   memberBudget,
-  tripCode
+  tripCode,
+  addHistory,
+  onNavigateToStep
 }) => {
   // ============== STATE ==============
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [followMajority, setFollowMajority] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
   // ============== EFFECTS ==============
-  
-  /**
-   * โหลดวันที่ว่างของตัวเองจาก trip.memberAvailability
-   */
+  useEffect(() => {
+    const myAvailability = trip.memberAvailability?.find(
+      m => m.memberId === memberBudget?.id
+    );
+    if (myAvailability) {
+      setSelectedDates(myAvailability.availableDates);
+    }
+  }, [trip.memberAvailability, memberBudget]);
+
   // ============== AUTO-SAVE LISTENER ==============
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleAutoSave = () => {
       console.log('📥 Received auto-save event for dates');
+      
+      if (followMajority && selectedDates.length === 0) {
+        const allDates = trip.memberAvailability?.flatMap(m => m.availableDates) || [];
+        const dateFrequency: Record<string, number> = {};
+        
+        allDates.forEach(date => {
+          dateFrequency[date] = (dateFrequency[date] || 0) + 1;
+        });
+        
+        const topDates = Object.entries(dateFrequency)
+          .sort((a, b) => b[1] - a[1])
+          .map(([date]) => date)
+          .slice(0, trip.days || 3);
+        
+        if (topDates.length > 0) {
+          setSelectedDates(topDates);
+          setTimeout(() => saveAvailability(), 100);
+          return;
+        }
+      }
+      
       if (selectedDates.length > 0) {
         saveAvailability();
       }
@@ -44,13 +76,9 @@ export const StepVote: React.FC<StepVoteProps> = ({
     return () => {
       window.removeEventListener('auto-save-dates', handleAutoSave);
     };
-  }, [selectedDates]);
+  }, [selectedDates, followMajority]);
 
   // ============== HANDLERS ==============
-  
-  /**
-   * Toggle เลือก/ยกเลิกวันที่
-   */
   const toggleDate = (dateStr: string) => {
     setSelectedDates(prev =>
       prev.includes(dateStr)
@@ -59,15 +87,10 @@ export const StepVote: React.FC<StepVoteProps> = ({
     );
   };
 
-  /**
-   * บันทึกวันที่ว่างของตัวเอง
-   */
   const saveAvailability = async () => {
-    // ✅ เพิ่มการ handle follow majority
     let datesToSave = selectedDates;
     
     if (followMajority && selectedDates.length === 0) {
-      // Auto-select dates based on majority
       const allDates = trip.memberAvailability?.flatMap(m => m.availableDates) || [];
       const dateFrequency: Record<string, number> = {};
       
@@ -81,11 +104,11 @@ export const StepVote: React.FC<StepVoteProps> = ({
         .slice(0, trip.days || 3);
       
       if (datesToSave.length === 0) {
-        alert("ยังไม่มีเพื่อนคนไหนเลือกวันที่ กรุณาเลือกเอง");
+        console.log("ยังไม่มีเพื่อนคนไหนเลือกวันที่");
         return;
       }
     } else if (!followMajority && selectedDates.length === 0) {
-      alert("กรุณาเลือกอย่างน้อย 1 วัน หรือเลือก 'ตามใจเพื่อน'");
+      console.log("กรุณาเลือกอย่างน้อย 1 วัน");
       return;
     }
 
@@ -99,7 +122,6 @@ export const StepVote: React.FC<StepVoteProps> = ({
         });
       }
 
-      // อัปเดต trip state
       setTrip(prev => {
         const existing = prev.memberAvailability?.findIndex(
           m => m.memberId === memberBudget?.id
@@ -123,17 +145,14 @@ export const StepVote: React.FC<StepVoteProps> = ({
         }
       });
 
+      addHistory(2, 'เลือกวันที่', `เลือกวันที่ว่าง ${datesToSave.length} วัน`);
+
     } catch (error) {
       log.error('Error saving availability:', error);
-      alert("เกิดข้อผิดพลาดในการบันทึก");
     }
   };
 
   // ============== HELPER FUNCTIONS ==============
-  
-  /**
-   * สร้างปฏิทินแสดงวันในเดือน
-   */
   const renderCalendar = () => {
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
@@ -142,17 +161,12 @@ export const StepVote: React.FC<StepVoteProps> = ({
 
     const days = [];
     
-    // เว้นวันว่าง (วันอาทิตย์ = 0)
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-12" />);
+      days.push(<div key={`empty-${i}`} className="h-10 sm:h-12" />);
     }
 
-    // วันในเดือน
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
-        day
-      ).padStart(2, "0")}`;
-      
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const isSelected = selectedDates.includes(dateStr);
       const isPast = new Date(dateStr) < new Date(new Date().setHours(0, 0, 0, 0));
 
@@ -162,7 +176,11 @@ export const StepVote: React.FC<StepVoteProps> = ({
           onClick={() => !isPast && toggleDate(dateStr)}
           disabled={isPast}
           className={`
-            h-12 rounded-lg font-semibold transition-all
+            h-10 sm:h-12 
+            rounded-lg font-semibold 
+            text-sm sm:text-base
+            transition-all
+            min-w-[40px] min-h-[40px]
             ${isPast ? "bg-gray-100 text-gray-400 cursor-not-allowed" : ""}
             ${isSelected && !isPast
               ? "bg-green-500 text-white shadow-lg scale-105"
@@ -180,9 +198,6 @@ export const StepVote: React.FC<StepVoteProps> = ({
     return days;
   };
 
-  /**
-   * คำนวณช่วงวันที่ติดกันที่คนว่างมากที่สุด
-   */
   const getBestDateRanges = () => {
     if (!trip.memberAvailability || trip.memberAvailability.length === 0) {
       return [];
@@ -205,9 +220,7 @@ export const StepVote: React.FC<StepVoteProps> = ({
     for (let i = 0; i <= sortedDates.length - tripDays; i++) {
       const rangeStart = new Date(sortedDates[i]);
       const rangeEnd = new Date(sortedDates[i + tripDays - 1]);
-      const daysDiff = Math.round(
-        (rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)
-      );
+      const daysDiff = Math.round((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24));
       
       if (daysDiff === tripDays - 1) {
         const datesInRange = sortedDates.slice(i, i + tripDays);
@@ -219,9 +232,7 @@ export const StepVote: React.FC<StepVoteProps> = ({
         ranges.push({
           dates: datesInRange,
           count: membersAvailable.length,
-          percentage: Math.round(
-            (membersAvailable.length / trip.members!.length) * 100
-          )
+          percentage: Math.round((membersAvailable.length / trip.members!.length) * 100)
         });
       }
     }
@@ -229,9 +240,6 @@ export const StepVote: React.FC<StepVoteProps> = ({
     return ranges.sort((a, b) => b.count - a.count).slice(0, 3);
   };
 
-  /**
-   * คำนวณวันเดี่ยวที่คนว่างมาก
-   */
   const getCommonDates = () => {
     if (!trip.memberAvailability || trip.memberAvailability.length === 0) {
       return [];
@@ -256,52 +264,44 @@ export const StepVote: React.FC<StepVoteProps> = ({
   return (
     <div className="space-y-6">
       {/* ============== ปฏิทิน ============== */}
-      <div className="bg-white p-6 rounded-xl shadow-lg">
-        {/* Header - เลือกเดือน */}
+      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
         <div className="flex items-center justify-between mb-4">
           <button
-            onClick={() =>
-              setCalendarMonth(
-                new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1)
-              )
-            }
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-semibold transition"
+            onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))}
+            className="px-3 sm:px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-semibold transition text-lg sm:text-base min-w-[44px] min-h-[44px]"
+            aria-label="เดือนก่อนหน้า"
           >
             ←
           </button>
 
-          <h3 className="text-xl font-bold">
-            {calendarMonth.toLocaleDateString("th-TH", {
-              year: "numeric",
-              month: "long"
+          <h3 className="text-base sm:text-xl font-bold text-center">
+            {calendarMonth.toLocaleDateString("th-TH", { 
+              year: "numeric", 
+              month: window.innerWidth < 640 ? "short" : "long" 
             })}
           </h3>
 
           <button
-            onClick={() =>
-              setCalendarMonth(
-                new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1)
-              )
-            }
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-semibold transition"
+            onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))}
+            className="px-3 sm:px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-semibold transition text-lg sm:text-base min-w-[44px] min-h-[44px]"
+            aria-label="เดือนถัดไป"
           >
             →
           </button>
         </div>
 
-        {/* Header วัน */}
-        <div className="grid grid-cols-7 gap-2 mb-2">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
           {["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map(day => (
-            <div key={day} className="text-center font-bold text-gray-600 text-sm">
+            <div key={day} className="text-center font-bold text-gray-600 text-xs sm:text-sm">
               {day}
             </div>
           ))}
         </div>
 
-        {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-2">{renderCalendar()}</div>
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
+          {renderCalendar()}
+        </div>
 
-        {/* Legend */}
         <div className="mt-4 flex items-center gap-4 text-sm text-gray-600">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-green-500 rounded" />
@@ -309,8 +309,7 @@ export const StepVote: React.FC<StepVoteProps> = ({
           </div>
         </div>
 
-        {/* ✅ เพิ่มส่วนนี้ */}
-        {/* Follow Majority Option */}
+        {/* Follow Majority */}
         <div className="mt-4 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
           <label className="flex items-start gap-3 cursor-pointer">
             <input 
@@ -320,229 +319,122 @@ export const StepVote: React.FC<StepVoteProps> = ({
               className="mt-1 w-5 h-5 text-purple-600"
             />
             <div>
-              <p className="font-semibold text-purple-900">
-                ✨ ตามใจเพื่อนส่วนใหญ่
-              </p>
+              <p className="font-semibold text-purple-900">✨ ตามใจเพื่อนส่วนใหญ่</p>
               <p className="text-sm text-purple-700 mt-1">
-                ระบบจะเลือกวันที่ที่เพื่อนส่วนใหญ่เลือกให้อัตโนมัติ 
-                (คุณยังสามารถแก้ไขได้ทีหลัง)
+                ระบบจะเลือกวันที่ที่เพื่อนส่วนใหญ่เลือกให้อัตโนมัติ
               </p>
-              {followMajority && (
-                <div className="mt-2 p-2 bg-white rounded text-xs text-purple-600">
-                  💡 เมื่อคุณกด "บันทึก" ระบบจะเลือกวันที่ให้โดยอัตโนมัติ
-                </div>
-              )}
             </div>
           </label>
         </div>
-        
-        {/* ปุ่มบันทึก */}
-        {/* <button
-          onClick={saveAvailability}
-          disabled={isSubmitting}
-          className={`
-            w-full mt-6 px-6 py-3 font-bold rounded-lg transition shadow-lg
-            ${isSubmitting 
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-              : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
-            }
-          `}
-        >
-          {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกวันที่ว่าง'}
-        </button> */}
       </div>
 
-      {/* ============== สรุปช่วงวันที่ที่เหมาะสม ============== */}
-      <div className="bg-white p-6 rounded-xl shadow-lg">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">
-          🏆 ช่วงวันที่เหมาะสมสำหรับทริป {trip.days} วัน
-        </h3>
+      {/* ✅ ปุ่มดูผลลัพธ์ */}
+      {selectedDates.length > 0 && (
+        <button
+          onClick={() => setShowResults(!showResults)}
+          className="w-full px-4 sm:px-6 py-3 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-sm sm:text-base rounded-xl transition shadow-lg flex items-center justify-center gap-2 min-h-[48px]"
+          aria-label={showResults ? 'ซ่อนผลลัพธ์' : 'ดูผลลัพธ์'}
+        >
+          <span>📊</span>
+          <span className="hidden sm:inline">{showResults ? 'ซ่อน' : 'ดู'}ผลลัพธ์ล่าสุด</span>
+          <span className="sm:hidden">{showResults ? 'ซ่อน' : 'ดู'}ผล</span>
+          {showResults ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+        </button>
+      )}
 
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
-          <p className="text-blue-800 text-sm">
-            <strong>💡 คำอธิบาย:</strong> แสดงช่วงวันที่ติดกัน {trip.days} วัน 
-            ที่สมาชิกว่างครบทุกวันมากที่สุด
-          </p>
-        </div>
+      {/* ============== Dashboard (Collapsible) ============== */}
+      {showResults && selectedDates.length > 0 && (
+        <>
+          {/* ช่วงวันที่แนะนำ */}
+          <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+            <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <span>🏆</span>
+              <span>ช่วงวันที่แนะนำ ({trip.days} วัน)</span>
+            </h3>
 
-        {bestDateRanges.length > 0 ? (
-          <div className="space-y-4">
-            {bestDateRanges.map((range, idx) => (
-              <div
-                key={idx}
-                className={`p-5 rounded-lg border-2 ${
-                  idx === 0
-                    ? "border-yellow-400 bg-yellow-50"
-                    : idx === 1
-                    ? "border-gray-400 bg-gray-50"
-                    : "border-orange-400 bg-orange-50"
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-3xl">
-                        {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}
-                      </span>
-                      <div>
-                        <p className="font-bold text-lg text-gray-800">
-                          อันดับ {idx + 1}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {range.count}/{trip.members?.length || 0} คน ({range.percentage}%)
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-3 rounded-lg border border-gray-200 mb-2">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Calendar className="w-4 h-4 text-blue-600" />
-                        <span className="font-semibold text-gray-700">
-                          ช่วงวันที่:
+            {bestDateRanges.length > 0 ? (
+              <div className="space-y-2">
+                {bestDateRanges.slice(0, 3).map((range, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-lg border ${
+                      idx === 0 ? 'border-yellow-400 bg-yellow-50' :
+                      idx === 1 ? 'border-gray-300 bg-gray-50' :
+                      'border-orange-300 bg-orange-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-xl">
+                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
                         </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {range.dates.map((date, dIdx) => (
-                          <div
-                            key={date}
-                            className="bg-blue-50 px-3 py-2 rounded text-center"
-                          >
-                            <p className="text-xs text-gray-600">
-                              วันที่ {dIdx + 1}
-                            </p>
-                            <p className="font-semibold text-sm text-gray-800">
+                        <div className="flex gap-1 flex-wrap">
+                          {range.dates.map((date) => (
+                            <span
+                              key={date}
+                              className="px-2 py-1 bg-white rounded text-xs font-medium text-gray-700"
+                            >
                               {new Date(date).toLocaleDateString("th-TH", {
                                 day: "numeric",
                                 month: "short"
                               })}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(date).toLocaleDateString("th-TH", {
-                                weekday: "short"
-                              })}
-                            </p>
-                          </div>
-                        ))}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="text-sm text-gray-600">
-                      <strong>สมาชิกที่ว่าง:</strong>{" "}
-                      {trip.memberAvailability
-                        ?.filter(m => 
-                          range.dates.every(date => m.availableDates.includes(date))
-                        )
-                        .map(m => m.memberName)
-                        .join(", ") || "ไม่มี"}
-                    </div>
-                  </div>
-
-                  <div className="ml-4">
-                    <div className="relative w-20 h-20">
-                      <svg className="w-20 h-20 transform -rotate-90">
-                        <circle
-                          cx="40"
-                          cy="40"
-                          r="32"
-                          stroke="currentColor"
-                          strokeWidth="6"
-                          fill="none"
-                          className="text-gray-200"
-                        />
-                        <circle
-                          cx="40"
-                          cy="40"
-                          r="32"
-                          stroke="currentColor"
-                          strokeWidth="6"
-                          fill="none"
-                          strokeDasharray={`${2 * Math.PI * 32}`}
-                          strokeDashoffset={`${
-                            2 * Math.PI * 32 * (1 - range.percentage / 100)
-                          }`}
-                          className={
-                            idx === 0
-                              ? "text-yellow-500"
-                              : idx === 1
-                              ? "text-gray-400"
-                              : "text-orange-400"
-                          }
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-lg font-bold text-gray-800">
-                          {range.percentage}%
-                        </span>
+                      
+                      <div className="text-right ml-3">
+                        <p className="text-lg font-bold text-gray-800">{range.percentage}%</p>
+                        <p className="text-xs text-gray-600">{range.count} คน</p>
                       </div>
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <p className="text-center text-gray-400 py-3 text-sm">
+                ยังหาช่วงวันที่ติดกัน {trip.days} วันไม่เจอ
+              </p>
+            )}
           </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <Calendar className="w-16 h-16 mx-auto mb-3 text-gray-300" />
-            <p className="text-lg font-semibold mb-2">
-              ยังหาช่วงวันที่เหมาะสมไม่เจอ
-            </p>
-            <p className="text-sm">
-              ต้องการให้สมาชิกเลือกวันที่ติดกันอย่างน้อย {trip.days} วัน
-            </p>
-          </div>
-        )}
-      </div>
 
-      {/* ============== วันเดี่ยวที่คนว่างมาก ============== */}
-      <div className="bg-white p-6 rounded-xl shadow-lg">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">
-          📅 วันเดี่ยวที่คนว่างมากที่สุด (Top 3)
-        </h3>
-        
-        <div className="bg-gray-50 border-l-4 border-gray-400 p-4 mb-6 rounded">
-          <p className="text-gray-700 text-sm">
-            <strong>ℹ️ หมายเหตุ:</strong> หากหาช่วงวันที่ติดกันไม่ได้ 
-            สามารถดูวันเดี่ยวที่คนว่างมากเพื่อประกอบการตัดสินใจ
-          </p>
-        </div>
-
-        {commonDates.length > 0 ? (
-          <div className="space-y-3">
-            {commonDates.map(({ date, count }, idx) => (
-              <div
-                key={date}
-                className="p-4 rounded-lg border-2 border-gray-300 bg-gray-50 hover:border-blue-400 transition"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">
-                      {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}
-                    </span>
-                    <div>
-                      <p className="font-semibold text-gray-800">
+          {/* วันยอดนิยม */}
+          {commonDates.length > 0 && (
+            <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span>📅</span>
+                <span>วันยอดนิยม (Top 3)</span>
+              </h3>
+              
+              <div className="space-y-2">
+                {commonDates.map(({ date, count }, idx) => (
+                  <div
+                    key={date}
+                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">
+                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                      </span>
+                      <span className="font-medium text-gray-800 text-sm">
                         {new Date(date).toLocaleDateString("th-TH", {
-                          year: "numeric",
-                          month: "long",
+                          month: "short",
                           day: "numeric",
-                          weekday: "long"
+                          weekday: "short"
                         })}
-                      </p>
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-blue-600">{count}</p>
+                      <p className="text-xs text-gray-600">คน</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-blue-600">{count}</p>
-                    <p className="text-sm text-gray-600">
-                      /{trip.members?.length || 0} คน
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-center text-gray-400 py-4">ยังไม่มีข้อมูล</p>
-        )}
-      </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
