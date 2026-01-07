@@ -7,6 +7,9 @@ import { CONFIG, log } from "../config/config";
 import { MOCK_MY_TRIPS, MOCK_JOIN_TRIP_RESPONSE, MOCK_CREATE_TRIP_RESPONSE, MOCK_INVITE_CODE_RESPONSE } from "../data/mockData";
 import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils/utils';
 import type { TripData } from "../data/mockData";
+import type { MyTripsResponse , MyTripCard, TripSummary} from "../services/api";
+
+
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -25,7 +28,7 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     loadTrips();
   }, []);
-
+/*
   const loadTrips = async () => {
     try {
       setLoading(true);
@@ -33,12 +36,12 @@ const HomePage: React.FC = () => {
       
       if (CONFIG.USE_MOCK_DATA) {
         log.mock('Loading trips from mock');
-        response = MOCK_MY_TRIPS;
+        response = MOCK_MY_TRIPS; 
         await new Promise(resolve => setTimeout(resolve, 500));
       } else {
         log.api('Loading trips from API');
         response = await tripAPI.getMyTrips();
-        
+        console.log('API response:', response);
         // ✅ Fallback to mock if API fails
         if (!response || !response.success) {
           log.warn('API failed, falling back to mock data');
@@ -57,7 +60,7 @@ const HomePage: React.FC = () => {
       
       setMyTrips(created.map(formatTripData));
       setInvitedTrips(invited.map(formatTripData));
-      
+    
     } catch (error) {
       log.error('Error loading trips:', error);
       
@@ -83,6 +86,52 @@ const HomePage: React.FC = () => {
       setLoading(false);
     }
   };
+  */
+
+  const loadTrips = async () => {
+  try {
+    setLoading(true);
+
+    let response: MyTripsResponse;
+
+    if (CONFIG.USE_MOCK_DATA) {
+      response = MOCK_MY_TRIPS;
+    } else {
+      response = await tripAPI.getMyTrips();
+    }
+
+    if (!response.success) {
+      throw new Error("API returned success=false");
+    }
+
+    const { owned, joined } = response.data;
+
+    setMyTrips(owned.map(formatTripSummary));
+    setInvitedTrips(joined.map(formatTripSummary));
+
+  } catch (error) {
+    console.error("Load trips failed:", error);
+    setMyTrips([]);
+    setInvitedTrips([]);
+    alert("ไม่สามารถโหลดข้อมูลทริปได้");
+  } finally {
+    setLoading(false);
+  }
+  };
+
+  const formatTripSummary = (trip: TripSummary): MyTripCard => {
+  const isCompleted = trip.status === "completed";
+
+  return {
+    id: trip.trip_id,
+    name: trip.trip_name,
+    people: trip.num_members,
+    status: isCompleted ? "เสร็จสิ้น" : "กำลังเดินทาง",
+    statusColor: isCompleted ? "gray" : "green",
+    isCompleted
+  };
+  };
+
 
   const formatTripData = (trip: TripData) => {
     const filled = trip.members?.filter((m: any) => 

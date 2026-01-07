@@ -1,3 +1,5 @@
+import { MyTripsResponse } from "../services/api";
+
 // ============== TYPE DEFINITIONS ==============
 export interface Member {
   id: string;
@@ -230,6 +232,7 @@ export const mockDelay = (ms: number = 500): Promise<void> => {
 };
 
 // ============== MOCK MY TRIPS (สำหรับ HomePage) ==============
+/*
 export const MOCK_MY_TRIPS: ApiResponse<TripData[]> = {
   success: true,
   data: [
@@ -381,6 +384,46 @@ export const MOCK_MY_TRIPS: ApiResponse<TripData[]> = {
       ]
     }
   ]
+};
+*/
+export const MOCK_MY_TRIPS: MyTripsResponse = {
+  success: true,
+  data: {
+    all: [
+      {
+        trip_id: "trip-001",
+        trip_name: "ทริปทะเล ภูเก็ต",
+        status: "active",
+        role: "owner",
+        num_members: 3
+      },
+      {
+        trip_id: "trip-002",
+        trip_name: "ทริปเหนือ เชียงใหม่",
+        status: "completed",
+        role: "member",
+        num_members: 2
+      }
+    ],
+    owned: [
+      {
+        trip_id: "trip-001",
+        trip_name: "ทริปทะเล ภูเก็ต",
+        status: "active",
+        role: "owner",
+        num_members: 3
+      }
+    ],
+    joined: [
+      {
+        trip_id: "trip-002",
+        trip_name: "ทริปเหนือ เชียงใหม่",
+        status: "completed",
+        role: "member",
+        num_members: 2
+      }
+    ]
+  }
 };
 
 // ============== MOCK CREATE TRIP RESPONSE ==============
@@ -542,6 +585,9 @@ export const mockUpdateBudget = async (
     message: "อัพเดทงบประมาณสำเร็จ"
   };
 };
+
+
+
 
 // ============== DEFAULT EXPORT ==============
 export default {

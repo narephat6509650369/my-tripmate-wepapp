@@ -19,7 +19,7 @@ function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
   const handleGoogleLogin = useGoogleLogin({
     flow: 'implicit',
@@ -29,13 +29,15 @@ function LoginPage() {
       try {
         const res = await axios.post<GoogleLoginResult>(`${API_BASE_URL}/auth/google`, { access_token: tokenResponse.access_token });   
         const { token, user } = res.data;
-        
+        console.log("Login response:", token);
+
         // ตรวจสอบว่ามีข้อมูลครบหรือไม่
         if (!token || !user?.user_id || !user?.email) {
           throw new Error('Invalid response from server');
         }
         
-        localStorage.setItem('jwtToken', token);
+        localStorage.setItem('token', token);
+        console.log("Saved token:", localStorage.getItem("token"));
         localStorage.setItem('userId', user.user_id);
         localStorage.setItem('userEmail', user.email);
         

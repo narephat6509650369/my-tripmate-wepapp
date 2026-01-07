@@ -4,7 +4,6 @@ import type { Express } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// ✅ Fix __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -32,7 +31,6 @@ const options = {
     },
   },
 
-  // ✅ ต้องอยู่ระดับเดียวกับ definition ไม่ใช่ใน components!
   apis: [
     path.join(__dirname, "../routes/*.ts"),
     path.join(__dirname, "../controllers/*.ts"),

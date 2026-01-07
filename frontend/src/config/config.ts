@@ -1,7 +1,7 @@
 export const CONFIG = {
-  USE_MOCK_DATA: true, // ✅ ใช้ Mock Data 
-  // USE_MOCK_DATA: false,  // ✅ ใช้ Real API
-  API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
+  //USE_MOCK_DATA: true, // ✅ ใช้ Mock Data 
+  USE_MOCK_DATA: false,  // ✅ ใช้ Real API
+  API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
   API_TIMEOUT: 10000,
   DEBUG_MODE: import.meta.env.DEV,
   ENABLE_CONSOLE_LOGS: true,

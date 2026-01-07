@@ -1,15 +1,15 @@
-// กำหนด Type สำหรับ Payload ที่ถอดรหัสจาก JWT
+import "express";
+
 export interface JwtPayload {
-    user_id: string;
+    userId: string;
     email: string;
     // อาจมี property อื่นๆ จาก JWT payload เช่น iat, exp
 }
-
-// ขยาย Request Interface ของ Express
 declare global {
-    namespace Express {
-        interface Request {
-            user?: JwtPayload; // กำหนดให้ req.user เป็น optional (อาจมีหรือไม่มีก็ได้)
-        }
+  namespace Express {
+    interface User {
+      userId: string;
+      email?: string;
     }
+  }
 }

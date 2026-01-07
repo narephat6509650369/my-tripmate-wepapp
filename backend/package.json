@@ -19,10 +19,13 @@
   "devDependencies": {
     "@types/express": "^5.0.5",
     "@types/express-session": "^1.18.2",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.10.1",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/uuid": "^9.0.8",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },

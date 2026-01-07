@@ -45,6 +45,33 @@ export interface TripResponse {
   };
 }
 
+export interface TripSummary {
+  trip_id: string;
+  trip_name: string;
+  status: "active" | "completed";
+  role: "owner" | "member";
+  num_members: number;
+}
+
+export interface MyTripsResponse {
+  success: boolean;
+  data: {
+    all: TripSummary[];
+    owned: TripSummary[];
+    joined: TripSummary[];
+  };
+}
+
+export interface MyTripCard {
+  id: string;
+  name: string;
+  people: number;
+  status: string;
+  statusColor: string;
+  isCompleted: boolean;
+}
+
+
 // ============== ERROR HANDLER ==============
 const handleApiError = (error: any): ApiResponse => {
   console.error('API Error:', error);
@@ -66,7 +93,7 @@ const checkAuthToken = (): boolean => {
 
 // ============== API FUNCTIONS ==============
 export const tripAPI = {
-  // ✅ 1. สร้างทริปใหม่
+  // 1. สร้างทริปใหม่
   createTrip: async (tripData: { name: string; days: string; detail: string }): Promise<ApiResponse> => {
   try {
     if (!checkAuthToken()) {
@@ -76,44 +103,55 @@ export const tripAPI = {
         error: 'NO_AUTH_TOKEN'
       };
     }
-    
+
+    const payload = {
+      trip_name: tripData.name,
+      description: tripData.detail,
+      num_days: Number(tripData.days) // ✅ สำคัญมาก
+    };
+
     const response = await fetch(`${API_URL}/trips/AddTrip`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        },
-        body: JSON.stringify(tripData)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('jwtToken')}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`HTTP ${response.status}: ${err}`);
     }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
   },
 
-  // ✅ 2. ดึงรายการทริปทั้งหมดของฉัน
-  // getMyTrips: async (): Promise<ApiResponse> => {
-  //   try {
-  //     const response = await fetch(`${API_URL}/trips/my-trips`, {
-  //       headers: {
-  //         'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-  //       }
-  //     });
-      
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  //     }
-      
-  //     return await response.json();
-  //   } catch (error) {
-  //     return handleApiError(error);
-  //   }
-  // },
+  // 2. ดึงรายการทริปทั้งหมดของฉัน
+  getMyTrips: async (): Promise<MyTripsResponse> => {
+  const token = localStorage.getItem("token"); 
+
+  console.log("JWT token:", token); // 🔥 debug สำคัญ
+
+  const response = await fetch(
+    `${API_URL}/trips/all-my-trips`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  return response.json();
+  },
+   /*
   getMyTrips: async (): Promise<ApiResponse> => {
     if (CONFIG.USE_MOCK_DATA) {
       console.log('🎭 Mock Mode: getMyTrips');
@@ -137,9 +175,9 @@ export const tripAPI = {
       console.error('❌ API Error, using mock data');
       return MOCK_MY_TRIPS; // ✅ fallback
     }
-  },
+  },*/
 
-  // ✅ 3. ลบทริป
+  //  3. ลบทริป
   deleteTrip: async (tripId: string): Promise<ApiResponse> => {
     try {
       const response = await fetch(`${API_URL}/trips/DeleteTrip`, {
@@ -161,7 +199,8 @@ export const tripAPI = {
     }
   },
 
-  // ✅ 4. สร้างรหัสเชิญ
+  /* สร้างโด้ดเชิญทำไมถ้าตอนเพิ่มทริปมีการสร้าง inviteCode อยู่แล้ว */
+  // 4. สร้างรหัสเชิญ
   generateInviteCode: async (tripId: string): Promise<ApiResponse> => {
     try {
       const response = await fetch(`${API_URL}/trips/${tripId}/invite`, {
@@ -181,7 +220,7 @@ export const tripAPI = {
     }
   },
 
-  // ✅ 5. เข้าร่วมทริปด้วยรหัสเชิญ
+  // 5. เข้าร่วมทริปด้วยรหัสเชิญ
   joinTrip: async (inviteCode: string): Promise<ApiResponse> => {
     try {
       const response = await fetch(`${API_URL}/trips/join`, {
@@ -203,7 +242,7 @@ export const tripAPI = {
     }
   },
 
-  // ✅ 6. ลบสมาชิกออกจากทริป
+  // 6. ลบสมาชิกออกจากทริป
   removeMember: async (tripId: string, memberId: string): Promise<ApiResponse> => {
     try {
       const response = await fetch(`${API_URL}/trips/${tripId}/members/${memberId}`, {
@@ -223,10 +262,10 @@ export const tripAPI = {
     }
   },
 
-  // ✅ 7. ดึงรายละเอียดทริป (สำหรับ VotePage และ SummaryPage)
+  // 7. ดึงรายละเอียดทริป (สำหรับ VotePage และ SummaryPage)
   getTripDetail: async (tripCode: string): Promise<ApiResponse<TripResponse>> => {
     try {
-      const response = await fetch(`${API_URL}/trips/${tripCode}`, {
+      const response = await fetch(`${API_URL}/trip/${tripCode}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
         }
@@ -242,7 +281,7 @@ export const tripAPI = {
     }
   },
 
-  // ✅ 8. ส่งผลโหวตจังหวัด (สำหรับ VotePage - StepPlace)
+  // 8. ส่งผลโหวตจังหวัด (สำหรับ VotePage - StepPlace)
   submitProvinceVotes: async (
     tripCode: string, 
     voteData: { votes: string[]; scores: Record<string, number> }
@@ -267,14 +306,18 @@ export const tripAPI = {
     }
   },
 
-  // ✅ 9. ปิดการโหวต (สำหรับ VotePage - StepSummary)
+  // 9. ปิดการโหวต (สำหรับ VotePage - StepSummary)
   closeTrip: async (tripCode: string): Promise<ApiResponse> => {
     try {
       const response = await fetch(`${API_URL}/trips/${tripCode}/close`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
+        },
+        body: JSON.stringify({ 
+          status: 'completed',
+          isCompleted: true
+        })
       });
       
       if (!response.ok) {
@@ -287,7 +330,7 @@ export const tripAPI = {
     }
   },
 
-  // ✅ 10. อัปเดตงบประมาณสมาชิก (สำหรับ VotePage - StepBudget)
+  // 10. อัปเดตงบประมาณสมาชิก (สำหรับ VotePage - StepBudget)
   updateMemberBudget: async (
     tripCode: string,
     memberId: string,
@@ -314,8 +357,11 @@ export const tripAPI = {
     } catch (error) {
       return handleApiError(error);
     }
-  }
+  },
+
 };
+
+
 
 // ============== USAGE EXAMPLES (สำหรับอ้างอิง) ==============
 /*

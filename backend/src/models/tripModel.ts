@@ -55,7 +55,6 @@ export interface MyTrip {
     days_left_7: number;
 }
 
-
 export interface TripDetail extends RowDataPacket {
     trip_id: string;
     owner_id: string;
@@ -68,6 +67,23 @@ export interface TripDetail extends RowDataPacket {
     created_at: Date;
     member_count: number;
 }
+
+export interface TripSummaryMember extends RowDataPacket {
+  user_id: string;
+  role: 'owner' | 'member';
+  full_name: string;
+  avatar_url: string | null;
+}
+
+export interface TripSummaryResult {
+  trip: any;
+  members: TripSummaryMember[];
+  budgetVoting: any;
+  budgetOptions: any[];
+  locationResult: any;
+  dateOptions: any[];
+}
+
 
 export async function createTripWithMember( tripData: Trip, member_id: string ): Promise<void> {
     const connection = await pool.getConnection(); // ขอ Connection แยกมาเพื่อทำ Transaction
@@ -259,7 +275,7 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
 
     if (rows.length === 0) return null;
 
-    return rows[0] || null;  // ✔ ไม่ต้อง || null
+    return rows[0] || null;  
 }
 
 // หาสมาชิกในทริป
@@ -339,6 +355,118 @@ export const reactivateTripMember = async (trip_id: string, user_id: string) => 
     );
 };
 
+// ดึงข้อมูลสรุปทริป
+export async function getTripSummaryById(tripId: string): Promise<TripSummaryResult | null> {
+  /* 1. Trip info */
+  const [tripRows] = await pool.query<RowDataPacket[]>(
+    `
+    SELECT 
+      trip_id,
+      trip_name,
+      description,
+      num_days,
+      status,
+      confirmed_at,
+      created_at
+    FROM trips
+    WHERE trip_id = ?
+    `,
+    [tripId]
+  );
+
+  if ((tripRows as any[]).length === 0) return null;
+
+  /* 2. Members */
+  const [memberRows] = await pool.query<TripSummaryMember[]>(
+    `
+    SELECT 
+      tm.user_id,
+      tm.role,
+      u.full_name,
+      u.avatar_url
+    FROM trip_members tm
+    JOIN users u ON tm.user_id = u.user_id
+    WHERE tm.trip_id = ?
+      AND tm.is_active = 1
+    `,
+    [tripId]
+  );
+
+  /* 3. Budget voting */
+  const [budgetVotingRows] = await pool.query<RowDataPacket[]>(
+    `
+    SELECT 
+      budget_voting_id,
+      total_budget,
+      status,
+      closed_at
+    FROM budget_votings
+    WHERE trip_id = ?
+    `,
+    [tripId]
+  );
+
+  let budgetOptions: any[] = [];
+  if ((budgetVotingRows as any[]).length > 0) {
+    const votingId = (budgetVotingRows as any)[0].budget_voting_id;
+
+    const [optionRows] = await pool.query<RowDataPacket[]>(
+      `
+      SELECT 
+        category_name,
+        estimated_amount,
+        priority,
+        is_backup
+      FROM budget_options
+      WHERE budget_voting_id = ?
+      ORDER BY priority ASC
+      `,
+      [votingId]
+    );
+
+    budgetOptions = optionRows as any[];
+  }
+
+  /* 4. Location result */
+  const [locationRows] = await pool.query<RowDataPacket[]>(
+    `
+    SELECT 
+      lo.province_name,
+      COUNT(lv.location_vote_id) AS vote_count
+    FROM location_votings lvo
+    JOIN location_options lo ON lvo.location_voting_id = lo.location_voting_id
+    LEFT JOIN location_votes lv ON lo.location_option_id = lv.location_option_id
+    WHERE lvo.trip_id = ?
+    GROUP BY lo.location_option_id
+    ORDER BY vote_count DESC
+    LIMIT 1
+    `,
+    [tripId]
+  );
+
+  /* 5. Date result */
+  const [dateRows] = await pool.query<RowDataPacket[]>(
+    `
+    SELECT 
+      start_date,
+      end_date
+    FROM trip_user_availabilities
+    WHERE trip_id = ?
+    `,
+    [tripId]
+  );
+
+  return {
+    trip: (tripRows as any)[0],
+    members: memberRows,
+    budgetVoting: (budgetVotingRows as any)[0] || null,
+    budgetOptions,
+    locationResult: (locationRows as any)[0] || null,
+    dateOptions: dateRows
+  };
+}
+
+
 export default {
     generateInviteCode,
     generateInviteLink,
@@ -354,8 +482,10 @@ export default {
     getTripByInviteCode,
     reactivateTripMember,
     findAllTripsByUserId,
-    getTripMembers
-        
+    getTripMembers,
+    findTripById,
+    updateInviteInfo,
+    getTripSummaryById
 };
 /*
     getTripById,

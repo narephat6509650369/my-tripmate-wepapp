@@ -1,7 +1,7 @@
 // backend/src/services/tripService.ts
 import { v4 as uuidv4 } from 'uuid';
 import * as tripModel from '../models/tripModel.js';
-import type { Trip } from '../models/tripModel.js';
+import { getTripSummaryById, type Trip } from '../models/tripModel.js';
 
 /**
  * สร้างทริปใหม่ พร้อมเพิ่มผู้สร้างเป็นสมาชิกคนแรก (Owner)
@@ -38,7 +38,10 @@ export const addTrip = async (
   
   return {
     trip_id,
+    owner_id,
     trip_name,
+    description,
+    num_days,
     invite_code,
     invite_link,
     status: 'planning'
@@ -62,6 +65,16 @@ export const getUserTrips = async (user_id: string) => {
     joined
   };
 };
+
+/**
+ * 
+ * ดึงทริป detail (เฉพาะทริปที่เป็นสมาชิกอยู่โดยข้อมูลทริปแบบละเอียดของทริปหนึ่ง)
+ *  
+ */
+export const getTripDetail = async (tripCode: string) => {
+  const trip = await tripModel.getTripDetail(tripCode);
+  return trip;
+}
 
 /**
  * ลบทริป (เฉพาะ Owner + สถานะต้องเป็น 'planning')
@@ -169,10 +182,43 @@ export const removeMemberService = async (params: {
   return { success: true, message: "ลบสมาชิกสำเร็จ" };
 };
 
+//
+export const TripDetail = async (tripCode: string) => {
+  const trip = await tripModel.getTripDetail(tripCode);
+  return trip;
+}
+
+export const findById = async (tripId: string) => {
+  const trip = await tripModel.findTripById(tripId);
+  return trip;
+}
+
+export async function getTripSummaryService(
+  tripId: string,
+  userId: string
+) {
+  const summary = await getTripSummaryById(tripId);
+
+  if (!summary) {
+    throw new Error("Trip not found");
+  }
+
+  // ตรวจสอบสิทธิ์: ต้องเป็นสมาชิก
+  const isMember = summary.members.some( (m: any) => m.user_id === userId );
+
+  if (!isMember) {
+    throw new Error("FORBIDDEN");
+  }
+
+  return summary;
+}
+
 export default {
   addTrip,
   getUserTrips,
   deleteTripService,
   joinTripByCode,
-  removeMemberService
+  removeMemberService,
+  TripDetail,
+  findById
 };

@@ -12,7 +12,7 @@ import type { JwtPayload } from '../express.d.js';
 export const submitAvailabilityController = async (req: Request, res: Response) => {
   try {
     const { trip_id, ranges } = req.body;
-    const user_id = (req.user as JwtPayload).user_id;
+    const userId = (req.user as JwtPayload).userId;
 
     // Validate input
     if (!trip_id || typeof trip_id !== 'string') {
@@ -40,7 +40,7 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
     }
 
     // Call service
-    const result = await voteService.submitAvailability(trip_id, user_id, ranges);
+    const result = await voteService.submitAvailability(trip_id, userId, ranges);
 
     res.status(200).json({ 
       success: true, 
@@ -98,7 +98,7 @@ export const getTripHeatmapController = async (req: Request, res: Response) => {
 export const startVotingController = async (req: Request, res: Response) => {
   try {
     const { trip_id } = req.body;
-    const user_id = (req.user as JwtPayload).user_id;
+    const userId = (req.user as JwtPayload).userId;
 
     if (!trip_id) {
       return res.status(400).json({ 
@@ -108,7 +108,7 @@ export const startVotingController = async (req: Request, res: Response) => {
     }
 
     // Call service
-    const result = await voteService.startVotingSession(trip_id, user_id);
+    const result = await voteService.startVotingSession(trip_id, userId);
 
     res.status(201).json({
       success: true,
@@ -193,7 +193,7 @@ export const updateBudgetController = async (req: Request, res: Response) => {
   try {
     const { tripCode } = req.params;
     const { category, amount } = req.body;
-    const user_id = (req.user as JwtPayload).user_id;
+    const userId = (req.user as JwtPayload).userId;
 
     // Validate
     if (!tripCode) {
@@ -218,7 +218,7 @@ export const updateBudgetController = async (req: Request, res: Response) => {
     }
 
     // Call service
-    const result = await voteService.updateBudget(tripCode, user_id, category, amount);
+    const result = await voteService.updateBudget(tripCode, userId, category, amount);
 
     res.status(200).json({ 
       success: true, 
@@ -257,7 +257,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
   try {
     const { tripCode } = req.params;
     const { votes } = req.body; // ["Phuket", "Krabi", "Trang"]
-    const user_id = (req.user as JwtPayload).user_id;
+    const userId = (req.user as JwtPayload).userId;
 
     // Validate
     if (!tripCode) {
@@ -275,7 +275,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
     }
 
     // Call service
-    const newScores = await voteService.voteLocation(tripCode, user_id, votes);
+    const newScores = await voteService.voteLocation(tripCode, userId, votes);
 
     // แปลง format ให้ตรงกับที่ frontend ต้องการ
     const scoreObj: Record<string, number> = {};
@@ -315,7 +315,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
 export const closeTripController = async (req: Request, res: Response) => {
   try {
     const { tripCode } = req.params;
-    const user_id = (req.user as JwtPayload).user_id;
+    const userId = (req.user as JwtPayload).userId;
 
     if (!tripCode) {
       return res.status(400).json({ 
@@ -325,7 +325,7 @@ export const closeTripController = async (req: Request, res: Response) => {
     }
 
     // Call service
-    const result = await voteService.closeTrip(tripCode, user_id);
+    const result = await voteService.closeTrip(tripCode, userId);
 
     res.status(200).json({ 
       success: true, 
