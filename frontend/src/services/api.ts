@@ -1,5 +1,6 @@
 import { MOCK_MY_TRIPS } from '../data/mockData';
 import { CONFIG } from '../config/config';
+
 // ============== API CONFIGURATION ==============
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -222,25 +223,26 @@ export const tripAPI = {
 
   // 5. เข้าร่วมทริปด้วยรหัสเชิญ
   joinTrip: async (inviteCode: string): Promise<ApiResponse> => {
-    try {
-      const response = await fetch(`${API_URL}/trips/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        },
-        body: JSON.stringify({ inviteCode })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
+  try {
+    const response = await fetch(`${API_URL}/trips/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
+      },
+      body: JSON.stringify({ invite_code: inviteCode  }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
   },
+
 
   // 6. ลบสมาชิกออกจากทริป
   removeMember: async (tripId: string, memberId: string): Promise<ApiResponse> => {
