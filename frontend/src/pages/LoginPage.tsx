@@ -13,6 +13,18 @@ interface GoogleLoginResult {
     email: string;
   };
 }
+interface GoogleLoginResult {
+  success: boolean;
+  code: string;
+  message: string;
+  data: {
+    token: string;
+    user: {
+      user_id: string;
+      email: string;
+    }
+  };
+}
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -24,36 +36,33 @@ function LoginPage() {
   const handleGoogleLogin = useGoogleLogin({
     flow: 'implicit',
     onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      setError('');
-      try {
-        const res = await axios.post<GoogleLoginResult>(`${API_BASE_URL}/auth/google`, { access_token: tokenResponse.access_token });   
-        const { token, user } = res.data;
-        console.log("Login response:", token);
+    setLoading(true);
+    setError('');
+    try {
+      const res = await axios.post<GoogleLoginResult>(
+        `${API_BASE_URL}/auth/google`, 
+        { access_token: tokenResponse.access_token }
+      );
 
-        // ตรวจสอบว่ามีข้อมูลครบหรือไม่
-        if (!token || !user?.user_id || !user?.email) {
-          throw new Error('Invalid response from server');
-        }
-        
-        localStorage.setItem('token', token);
-        console.log("Saved token:", localStorage.getItem("token"));
-        localStorage.setItem('userId', user.user_id);
-        localStorage.setItem('userEmail', user.email);
-        
-        navigate('/homepage');
-      } catch (err) {
-        console.error('Login failed:', err);
-        setError('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
-      } finally {
-        setLoading(false);
+      const { token, user } = res.data.data;
+
+      if (!token || !user?.user_id || !user?.email) {
+        throw new Error('Invalid response from server');
+      }
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('userId', user.user_id);
+      localStorage.setItem('userEmail', user.email);
+
+      navigate('/homepage');
+    } catch (err) {
+      console.error('Login failed:', err);
+    setError('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+    setLoading(false);
       }
     },
-    onError: () => {
-      setError('การเข้าสู่ระบบด้วย Google ล้มเหลว กรุณาลองใหม่อีกครั้ง');
-    },
   });
-
   return (
     <div className="wrap-login100">
       <div 
