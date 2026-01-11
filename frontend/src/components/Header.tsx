@@ -3,18 +3,9 @@ import { MapPin, Bell, Menu, X, ChevronDown, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Users, Vote, CheckCircle } from "lucide-react";
 
-// Types for notifications
-type NotificationType = "trip_invite" | "new_vote" | "vote_complete" | "trip_confirmed";
-
-interface Notification {
-  id: number;
-  type: NotificationType;
-  text: string;
-  read: boolean;
-  timestamp: Date;
-  tripId?: string;
-  tripName?: string;
-}
+// ✅ Import types และ utils
+import type { Notification, NotificationType } from '../types/app.types';
+import { formatRelativeTime } from '../utils/helpers';
 
 interface HeaderProps {
   onLogout?: () => void;
@@ -34,16 +25,16 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
       type: "trip_invite",
       text: "คุณถูกเชิญเข้าทริป 'สงขลา 3 วัน 2 คืน'",
       read: false,
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 mins ago
+      timestamp: new Date(Date.now() - 1000 * 60 * 30),
       tripId: "trip123",
       tripName: "สงขลา 3 วัน 2 คืน"
     },
     {
       id: 2,
       type: "new_vote",
-      text: "เปิดรอบโหวตใหม่ในทริป 'เชียงใหม่ 4 วัน 3 คืน' (รอบก่อนหาข้อสรุปไม่ได้)",
+      text: "เปิดรอบโหวตใหม่ในทริป 'เชียงใหม่ 4 วัน 3 คืน'",
       read: false,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
       tripId: "trip124",
       tripName: "เชียงใหม่ 4 วัน 3 คืน"
     },
@@ -52,7 +43,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
       type: "vote_complete",
       text: "ผลโหวตเสร็จสิ้นแล้ว พร้อมยืนยันทริป 'ภูเก็ต 5 วัน 4 คืน'!",
       read: false,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
       tripId: "trip125",
       tripName: "ภูเก็ต 5 วัน 4 คืน"
     },
@@ -61,7 +52,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
       type: "trip_confirmed",
       text: "ทริป 'กรุงเทพ 2 วัน 1 คืน' ได้รับการยืนยันแล้ว!",
       read: true,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
       tripId: "trip126",
       tripName: "กรุงเทพ 2 วัน 1 คืน"
     }
@@ -69,7 +60,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // Function to get icon based on notification type
   const getNotificationIcon = (type: NotificationType) => {
     switch (type) {
       case "trip_invite":
@@ -96,44 +86,25 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   const notiRef = React.useRef<HTMLDivElement>(null);
   const profileRef = React.useRef<HTMLDivElement>(null);
 
-  // Close menus when clicking outside
+  const handleClickOutside = React.useCallback((event: MouseEvent) => {
+    if (notiRef.current && !notiRef.current.contains(event.target as Node)) {
+      setNotiOpen(false);
+    }
+    if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+      setProfileMenuOpen(false);
+    }
+  }, []);
+
   React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (notiRef.current && !notiRef.current.contains(event.target as Node)) {
-        setNotiOpen(false);
-      }
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
-        setProfileMenuOpen(false);
-      }
-    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [handleClickOutside]);
 
   const handleNavigate = (path: string) => {
     navigate(path);
   }; 
-
-  // Function to format timestamp
-  const formatTimestamp = (date: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) {
-      return `${diffMins} นาทีที่แล้ว`;
-    } else if (diffHours < 24) {
-      return `${diffHours} ชั่วโมงที่แล้ว`;
-    } else if (diffDays < 7) {
-      return `${diffDays} วันที่แล้ว`;
-    } else {
-      return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-    }
-  };
 
   const handleLogout = () => {
     if (onLogout) onLogout();
@@ -152,10 +123,8 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id);
-    // Navigate to trip page or relevant page
     if (notification.tripId) {
       console.log(`Navigating to trip: ${notification.tripId}`);
-      // navigate(`/trip/${notification.tripId}`);
     }
   };
 
@@ -164,7 +133,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
-  // Simulate receiving new notifications
   const addMockNotification = () => {
     const mockNotifications = [
       {
@@ -174,7 +142,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
       },
       {
         type: "new_vote" as NotificationType,
-        text: "เปิดรอบโหวตใหม่ในทริป 'อยุธยา 1 วัน' (รอบก่อนหาข้อสรุปไม่ได้)",
+        text: "เปิดรอบโหวตใหม่ในทริป 'อยุธยา 1 วัน'",
         tripName: "อยุธยา 1 วัน"
       },
       {
@@ -198,6 +166,8 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
     setNotifications((prev) => [newNotif, ...prev]);
   };
+  
+  const MAX_BADGE_COUNT = 9;
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50 w-full">
@@ -242,7 +212,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
               <Bell className="w-5 h-5 text-gray-700" />
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold shadow-md animate-pulse">
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                  {unreadCount > MAX_BADGE_COUNT ? `${MAX_BADGE_COUNT}+` : unreadCount}
                 </span>
               )}
             </button>
@@ -295,7 +265,8 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
                               {item.text}
                             </p>
                             <p className="text-xs text-gray-500 mt-1">
-                              {formatTimestamp(item.timestamp)}
+                              {/* ✅ ใช้ formatRelativeTime */}
+                              {formatRelativeTime(item.timestamp.getTime())}
                             </p>
                           </div>
 
