@@ -160,27 +160,26 @@ export async function generateInviteCode(): Promise<string> {
     let code = '';
     let isUnique = false;
 
-    // วนลูปจนกว่าจะได้รหัสที่ไม่ซ้ำใน Database
     while (!isUnique) {
-        // 1. สร้างรหัส 16 ตัวอักษร (8 bytes แปลงเป็น hex จะได้ 16 ตัว)
-        code = crypto.randomBytes(8).toString('hex').toUpperCase(); 
-        
-        // หรือถ้าอยากได้ตัวอักษรผสมตัวเลขแบบสุ่มเอง (Custom Set) ให้ใช้ฟังก์ชันแถมด้านล่าง *
+        const raw = crypto.randomBytes(8).toString('hex').toUpperCase(); // 16 hex chars
 
-        // 2. เช็คใน Database ว่าซ้ำไหม
+        // แปลงเป็น XXXX-XXXX-XXXX-XXXX
+        const dashed = raw.match(/.{4}/g)!.join('-');
+
         const [rows] = await pool.query<RowDataPacket[]>(
             'SELECT trip_id FROM trips WHERE invite_code = ?', 
-            [code]
+            [dashed]
         );
 
-        // ถ้าไม่เจอ (rows.length === 0) แสดงว่าไม่ซ้ำ -> จบลูป
         if (rows.length === 0) {
+            code = dashed;
             isUnique = true;
         }
     }
 
     return code;
 }
+
 
 export async function generateInviteLink(tripId: string): Promise<string> {
     const baseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';

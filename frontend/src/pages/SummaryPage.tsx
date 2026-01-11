@@ -73,8 +73,8 @@ const SummaryPage: React.FC = () => {
         if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
-
-        setTripData(response.data);
+        
+        setTripData(response.data as TripData);
         log.success("โหลดข้อมูลสรุปผล:", response.data);
       } catch (error) {
         log.error("Error loading trip:", error);

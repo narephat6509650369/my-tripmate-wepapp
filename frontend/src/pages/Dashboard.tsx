@@ -103,11 +103,11 @@ const Dashboard: React.FC = () => {
           log.api('Loading trips from API');
           response = await tripAPI.getMyTrips();
         }
-
+        /*
         if (!response || !response.success) {
           throw new Error(response?.message || 'Failed to load trips');
         }
-        
+        */
         if (!response.data || !Array.isArray(response.data)) {
           throw new Error('Invalid data format from server');
         }

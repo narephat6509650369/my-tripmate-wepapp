@@ -6,6 +6,24 @@ import { generateInviteCode, getTripDetail } from '../models/tripModel.js';
 
 const router = express.Router();
 
+
+// ผู้ใช้ที่มีบัญชี join โดยใช้โค้ด
+/* returns: { success: true, message: "เข้าร่วมทริปสำเร็จ", trip_id, trip_name } */
+router.post("/join", auth, joinTripController);
+
+/* สร้างโด้ดเชิญทำไมถ้าตอนเพิ่มทริปมีการสร้าง inviteCode อยู่แล้ว */
+// เจ้าของทริปสร้างโค้ดเชิญ
+router.post("/:tripId/invite", auth, generateInviteCode);
+
+
+//  ดึงสรุปผลทริป (สำหรับหน้า summary)
+/* returns: { trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status } */
+router.get("/:tripId/summary",auth,requireTripMember,getTripSummaryController);
+
+// ดึงทริปทั้งหมดของผู้ใช้(เจ้าของ + เข้าร่วม)*  
+/* returns: { all, owned, joined } */
+router.get("/all-my-trips", auth, getMyTripsController);
+
 //เพิ่มทริปใหม่*
 /*
 returns:
@@ -24,21 +42,9 @@ router.post('/AddTrip', auth, addTripController);
 /* returns: { success: true, message: "ลบทริปสำเร็จ" } */
 router.delete('/DeleteTrip', auth, requireTripOwner,deleteTripController);
 
-// ดึงทริปทั้งหมดของผู้ใช้(เจ้าของ + เข้าร่วม)*  
-/* returns: { all, owned, joined } */
-router.get("/all-my-trips", auth, getMyTripsController);
-
 // ดึงรายละเอียดทริป
 /* returns: { trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status } */
 router.get("/:tripId", auth, getTripDetailController);
-
-/* สร้างโด้ดเชิญทำไมถ้าตอนเพิ่มทริปมีการสร้าง inviteCode อยู่แล้ว */
-// เจ้าของทริปสร้างโค้ดเชิญ
-router.post("/:tripId/invite", auth, generateInviteCode);
-
-// ผู้ใช้ที่มีบัญชี join โดยใช้โค้ด
-/* returns: { success: true, message: "เข้าร่วมทริปสำเร็จ", trip_id, trip_name } */
-router.post("/join", auth, joinTripController);
 
 // Owner ลบสมาชิกออกจากทริป  
 /* returns: { success: true, message: "ลบสมาชิกสำเร็จ" } */
@@ -52,13 +58,8 @@ router.patch("/:tripId/status",auth,requireTripOwner,updateTripStatusController)
 /* returns: { success: true, message: "อัปเดตงบประมาณสมาชิกสำเร็จ" } */
 router.patch("/:tripId/budget",auth,updateMemberBudgetController);
 
-// ดึงรายละเอียดทริปโดยใช้รหัสเชิญ
-/* returns: { trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status } */
-router.get("/trip/:tripCode", auth, getTripDetail);
 
-//  ดึงสรุปผลทริป (สำหรับหน้า summary)
-/* returns: { trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status } */
-router.get("/:tripId/summary",auth,requireTripMember,getTripSummaryController);
+
 
 // owner ปิดทริป
 /* returns: { success: true, message: "ปิดทริปสำเร็จ" } */

@@ -40,72 +40,123 @@ const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
 // ============== TYPES ==============
 export interface ApiResponse<T = any> {
   success: boolean;
+  code: string;
+  message: string;   
   data?: T;
-  message?: string;
-  error?: string;
+  error?: ApiError;
+}
+
+export interface ApiError {
+  field?: string;
+  reason?: string;
+  detail?: string | object;
 }
 
 export interface Member {
-  id: string;
-  name: string;
-  gender: "ชาย" | "หญิง";
-  role: "owner" | "member"; // ✅ เพิ่ม role
-  availability: boolean[];
-  budget: {
-    accommodation: number;
-    transport: number;
-    food: number;
-    other: number;
-    lastUpdated: number;
-  };
-  budgetPriorities?: { // ✅ เพิ่ม budgetPriorities
-    accommodation: 1 | 2 | 3;
-    transport: 1 | 2 | 3;
-    food: 1 | 2 | 3;
+  user_id: string;
+  full_name: string;
+  avatar_url: string | null;
+  role: 'owner' | 'member';
+}
+
+export interface TripDetail {
+  trip_id: string;
+  owner_id: string;
+  trip_name: string;
+  description: string | null;
+  num_days: number;
+  invite_code: string;
+  invite_link: string;
+  status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived';
+  created_at: string;
+  member_count: number;
+}
+
+export interface TripSummary {
+  trip_id: string;
+  trip_name: string;
+  status: string;
+  role: 'owner' | 'member';
+  num_members: number;
+}
+
+export interface MyTripsResponse {
+  success: boolean;
+  data: {
+    all: TripSummary[];
+    owned: TripSummary[];
+    joined: TripSummary[];
   };
 }
 
-// ✅ เพิ่ม DateRange interface
-export interface DateRange {
+export interface MyTripCard {
   id: string;
-  memberId: string;
-  memberName: string;
-  startDate: string;
-  endDate: string;
-  createdAt: number;
-}
-
-export interface TripResponse {
-  _id: string;
-  tripCode: string;
-  inviteCode?: string;
   name: string;
-  days: number;
-  detail: string;
-  createdBy: string;
-  createdAt: number;
-  members: Member[];
-  voteOptions: string[];
-  selectedDate: string | null;
+  people: number;
+  status: string;
+  statusColor: string;
   isCompleted: boolean;
-  closedAt?: number;
-  dateRanges?: DateRange[];
-  provinceVotes?: any[];
-  dateVotes?: any[]; 
-  memberAvailability?: any[];
-  voteResults?: {
-    provinces: { name: string; score: number }[];
-    dates: { date: string; votes: number }[];
+}
+
+export interface JoinTripResponse {
+  success: boolean;
+  data: {
+    trip_id: string;
+    trip_name: string;
+    rejoined: boolean;
+  };
+  message: string;
+}
+
+export interface CreateTripResponse {
+  success: boolean;
+  code: string;
+  message: string;
+  data: {
+    trip_id: string;
+    owner_id: string;
+    trip_name: string;
+    description: string | null;
+    num_days: number;
+    invite_code: string;
+    invite_link: string;
+    status: string;
   };
 }
+
+export interface CreateTripPayload {
+  trip_id: string;
+  owner_id: string;
+  trip_name: string;
+  description: string | null;
+  num_days: number;
+  invite_code: string;
+  invite_link: string;
+  status: string;
+}
+
+export interface JoinTripPayload {
+  tripId: string;
+  tripName: string;
+}
+
+export interface MyTripsPayload {
+  all: TripSummary[];
+  owned: TripSummary[];
+  joined: TripSummary[];
+}
+
+
 
 // ============== ERROR HANDLER ==============
 const handleApiError = (error: any): ApiResponse => {
-  console.error('API Error:', error);
   return {
     success: false,
-    message: error.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ',
-    error: error.name || 'UNKNOWN_ERROR'
+    code: "CLIENT_ERROR",
+    message: error.message || "เกิดข้อผิดพลาด",
+    error: {
+      detail: error
+    }
   };
 };
 
@@ -120,8 +171,193 @@ const checkAuthToken = (): boolean => {
 
 // ============== API FUNCTIONS ==============
 export const tripAPI = {
-  // ✅ 1. สร้างทริปใหม่
-  createTrip: async (tripData: { name: string; days: string; detail: string }): Promise<ApiResponse> => {
+  // 1. สร้างทริปใหม่
+createTrip: async (tripData: { name: string; days: string; detail: string }): Promise<ApiResponse<CreateTripPayload>> => {
+  try {
+    if (!checkAuthToken()) {
+      return {
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "กรุณาเข้าสู่ระบบใหม่",
+        error: { reason: "NO_AUTH_TOKEN" }
+      };
+    }
+
+    const res = await fetch(`${API_URL}/trips/AddTrip`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("jwtToken")}`
+      },
+      body: JSON.stringify({
+        trip_name: tripData.name,
+        description: tripData.detail || null,
+        num_days: Number(tripData.days)
+      })
+    });
+
+    return await res.json();
+  } catch (err) {
+    return handleApiError(err);
+  }
+},
+
+// 2. ดึงรายการทริปทั้งหมดของฉัน
+getMyTrips: async (): Promise<ApiResponse<MyTripsPayload>> => {
+  try {
+    if (!checkAuthToken()) {
+      return {
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "กรุณาเข้าสู่ระบบใหม่"
+      };
+    }
+
+    const res = await fetch(`${API_URL}/trips/all-my-trips`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("jwtToken")}`
+      }
+    });
+
+    return await res.json();
+  } catch (err) {
+    return handleApiError(err);
+  }
+},
+
+  // 3. ลบทริป
+  deleteTrip: async (tripId: string): Promise<ApiResponse> => {
+  try {
+    if (!checkAuthToken()) {
+      return {
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "กรุณาเข้าสู่ระบบใหม่"
+      };
+    }
+
+    const res = await fetch(`${API_URL}/trips/${tripId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("jwtToken")}`
+      }
+    });
+
+    return await res.json();
+  } catch (err) {
+    return handleApiError(err);
+  }
+},
+
+// 4. เข้าร่วมทริปด้วยรหัสเชิญ
+joinTrip: async (inviteCode: string): Promise<ApiResponse<JoinTripResponse['data']>> => {
+  try {
+    if (!checkAuthToken()) {
+      return {
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "กรุณาเข้าสู่ระบบใหม่"
+      };
+    }
+
+    const res = await fetch(`${API_URL}/trips/join`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("jwtToken")}`
+      },
+      body: JSON.stringify({ invite_code: inviteCode })
+    });
+
+    return await res.json();
+  } catch (err) {
+    return handleApiError(err);
+  }
+},
+
+
+  // 5. ลบสมาชิกออกจากทริป
+  removeMember: async (tripId: string, memberId: string): Promise<ApiResponse> => {
+  try {
+    if (!checkAuthToken()) {
+      return {
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "กรุณาเข้าสู่ระบบใหม่",
+        error: {
+          reason: "NO_AUTH_TOKEN"
+        }
+      };
+    }
+
+    const res = await fetch(
+      `${API_URL}/trips/${tripId}/members/${memberId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("jwtToken")}`
+        }
+      }
+    );
+
+    return await res.json();
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
+
+  // 6. ดึงรายละเอียดทริป
+  getTripDetail: async (tripCode: string): Promise<ApiResponse<TripDetail>> => {
+  try {
+    if (!checkAuthToken()) {
+      return {
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "กรุณาเข้าสู่ระบบใหม่"
+      };
+    }
+
+    const res = await fetch(`${API_URL}/trips/${tripCode}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("jwtToken")}`
+      }
+    });
+
+    return await res.json();
+  } catch (err) {
+    return handleApiError(err);
+  }
+},
+
+
+  // 7. ดึงสรุปทริป (สำหรับหน้า Summary)
+ getTripSummary: async (tripId: string): Promise<ApiResponse> => {
+  try {
+    if (!checkAuthToken()) {
+      return {
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "กรุณาเข้าสู่ระบบใหม่"
+      };
+    }
+
+    const res = await fetch(`${API_URL}/trips/${tripId}/summary`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("jwtToken")}`
+      }
+    });
+
+    return await res.json();
+  } catch (err) {
+    return handleApiError(err);
+  }
+},
+
+/*
+  // 8. อัปเดตสถานะทริป
+  updateTripStatus: async (tripId: string,status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived'): Promise<ApiResponse> => {
     try {
       if (!checkAuthToken()) {
         return {
@@ -130,423 +366,94 @@ export const tripAPI = {
           error: 'NO_AUTH_TOKEN'
         };
       }
-      
-      const response = await fetchWithTimeout(`${API_URL}/trips/AddTrip`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        },
-        body: JSON.stringify(tripData)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
 
-  // ✅ 2. ดึงรายการทริปทั้งหมดของฉัน
-  getMyTrips: async (): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      console.log('🎭 Mock Mode: getMyTrips');
-      await new Promise(r => setTimeout(r, 300));
-      return MOCK_MY_TRIPS;
-    }
-
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/my-trips`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('❌ API Error, using mock data');
-      return MOCK_MY_TRIPS;
-    }
-  },
-
-  // ✅ 3. ลบทริป
-  deleteTrip: async (tripCode: string): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      console.log('🎭 Mock Mode: deleteTrip');
-      return await mockDeleteTrip(tripCode);
-    }
-
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/DeleteTrip`, {
-        method: 'DELETE',
+      const response = await fetch(`${API_URL}/trips/${tripId}/status`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
+          Authorization: `Bearer ${localStorage.getItem('jwtToken')}`
         },
-        body: JSON.stringify({ tripCode })
+        body: JSON.stringify({ status })
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       return handleApiError(error);
     }
   },
-
-  // ✅ 4. สร้างรหัสเชิญ
-  generateInviteCode: async (tripId: string): Promise<ApiResponse> => {
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}/invite`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  // ✅ 5. เข้าร่วมทริปด้วยรหัสเชิญ
-  joinTrip: async (inviteCode: string): Promise<ApiResponse> => {
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        },
-        body: JSON.stringify({ inviteCode })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  // ✅ 6. ลบสมาชิกออกจากทริป
-  deleteMember: async (tripCode: string, memberId: string): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      console.log('🎭 Mock Mode: deleteMember');
-      return await mockDeleteMember(tripCode, memberId);
-    }
-
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/members/${memberId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  /**
-   * Leave trip - สมาชิกออกจากทริป
-   */
-  leaveTrip: async (tripCode: string): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      log.mock('Leaving trip (mock):', tripCode);
+*/
+  // 9. ปิดทริป (เปลี่ยนเป็น completed)
+  closeTrip: async (tripId: string): Promise<ApiResponse> => {
+  try {
+    if (!checkAuthToken()) {
       return {
-        success: true,
-        message: 'ออกจากทริปสำเร็จ'
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "กรุณาเข้าสู่ระบบใหม่",
+        error: {
+          reason: "NO_AUTH_TOKEN"
+        }
       };
     }
 
-    try {
-      // ✅ ใช้ fetchWithTimeout แทน apiClient
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripCode}/leave`, 
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      log.success('Left trip successfully');
-      return await response.json();
-    } catch (error) {
-      log.error('Failed to leave trip:', error);
-      return handleApiError(error);
-    }
-  },
-  // ✅ 7. ดึงรายละเอียดทริป
-  getTripDetail: async (tripCode: string): Promise<ApiResponse<TripResponse>> => {
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  // เพิ่มใน tripAPI object
-  submitDateVotes: async (
-    tripCode: string,
-    votes: Record<string, boolean>
-  ): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      await new Promise(r => setTimeout(r, 300));
-      return { success: true };
-    }
-
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/votes/date`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        },
-        body: JSON.stringify({ votes })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  // ✅ 8. ส่งผลโหวตจังหวัด
-  submitProvinceVotes: async (
-    tripCode: string, 
-    voteData: { votes: string[]; scores: Record<string, number> }
-  ): Promise<ApiResponse> => {
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/votes/province`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        },
-        body: JSON.stringify(voteData)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  // ✅ 9. ปิดการโหวต
-  closeTrip: async (tripCode: string): Promise<ApiResponse> => {
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/close`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  // ✅ 10. อัปเดตงบประมาณสมาชิก
-  updateMemberBudget: async (
-    tripCode: string,
-    memberId: string,
-    budget: Partial<Member['budget']>
-  ): Promise<ApiResponse> => {
-    try {
-      const response = await fetchWithTimeout(
-      `${API_URL}/trips/${tripCode}/members/${memberId}/budget`,
+    const response = await fetch(
+      `${API_URL}/trips/${tripId}/close`,
       {
-        method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-          },
-          body: JSON.stringify(budget)
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("jwtToken")}`
         }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
+    );
 
-  // 🆕 11. เพิ่มช่วงวันที่
-  addDateRange: async (tripCode: string, dateRange: DateRange): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      console.log('🎭 Mock Mode: addDateRange');
-      return await mockAddDateRange(tripCode, dateRange);
-    }
+    return await response.json();
 
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+/*
+  // 10. อัปเดตงบประมาณ (ถ้ามีการใช้งาน)
+  updateBudget: async (
+    tripId: string,
+    budgetData: {
+      category_name: string;
+      estimated_amount: number;
+    }
+  ): Promise<ApiResponse> => {
     try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/date-ranges`, {
-        method: 'POST',
+      if (!checkAuthToken()) {
+        return {
+          success: false,
+          message: 'กรุณาเข้าสู่ระบบใหม่',
+          error: 'NO_AUTH_TOKEN'
+        };
+      }
+
+      const response = await fetch(`${API_URL}/trips/${tripId}/budget`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
+          Authorization: `Bearer ${localStorage.getItem('jwtToken')}`
         },
-        body: JSON.stringify(dateRange)
+        body: JSON.stringify(budgetData)
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
 
-  // 🆕 12. ลบช่วงวันที่
-  removeDateRange: async (tripCode: string, rangeId: string): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      console.log('🎭 Mock Mode: removeDateRange');
-      return await mockRemoveDateRange(tripCode, rangeId);
-    }
-
-    try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripCode}/date-ranges/${rangeId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  // 🆕 13. อัปเดต Budget Priority
-  updateBudgetPriority: async (
-    tripCode: string,
-    memberId: string,
-    priorities: Member['budgetPriorities']
-  ): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      console.log('🎭 Mock Mode: updateBudgetPriority');
-      return await mockUpdateBudgetPriority(tripCode, memberId, priorities);
-    }
-
-    try {
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripCode}/members/${memberId}/budget-priority`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-          },
-          body: JSON.stringify({ priorities })
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  // 🆕 14. อัปเดตวันที่ว่างของสมาชิก
-  updateMemberAvailability: async (
-    tripCode: string, 
-    data: {
-      memberId: string;
-      availableDates: string[];
-    }
-  ): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      console.log('🎭 Mock Mode: updateMemberAvailability');
-      return await mockUpdateMemberAvailability(tripCode, data);
-    }
-
-    try {
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripCode}/availability`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-          },
-          body: JSON.stringify(data)
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
       return await response.json();
     } catch (error) {
       return handleApiError(error);
     }
   }
+  */
 };
+
+export default tripAPI;

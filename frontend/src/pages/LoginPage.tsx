@@ -7,13 +7,20 @@ import bgImage from '../assets/login-bg.jpg';
 import { CONFIG, log } from '../config/app.config';
 import { safeLocalStorage } from '../utils/safeStorage';
 
+
 interface GoogleLoginResult {
-  token: string;
-  user: {
-    user_id: string;
-    email: string;
+  success: boolean;
+  code: string;
+  message: string;
+  data: {
+    token: string;
+    user: {
+      user_id: string;
+      email: string;
+    };
   };
 }
+
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -39,7 +46,7 @@ function LoginPage() {
           { access_token: tokenResponse.access_token }
         );   
         
-        const { token, user } = res.data;
+        const { token, user } = res.data.data;
         
         if (!token || !user?.user_id || !user?.email) {
           throw new Error('Invalid response from server');

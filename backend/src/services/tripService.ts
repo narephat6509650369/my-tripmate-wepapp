@@ -101,47 +101,39 @@ export const deleteTripService = async (trip_id: string) => {
  * เข้าร่วมทริปด้วยรหัสเชิญ
  */
 export const joinTripByCode = async (invite_code: string, user_id: string) => {
-  // 1. หาทริปจากโค้ด
   const trip = await tripModel.getTripByInviteCode(invite_code);
-  
-  if (!trip) {
-    throw new Error("Invalid invite code");
-  }
-  
-  // 2. เช็คว่าทริปปิดไปแล้วหรือยัง
+
+  if (!trip) throw new Error("Invalid invite code");
+
   if (trip.status === 'archived' || trip.status === 'completed') {
-    throw new Error("This trip is closed");
+    throw new Error("Trip closed");
   }
-  
-  // 3. เช็คว่าเป็นสมาชิกอยู่แล้วหรือไม่
+
   const members = await tripModel.getTripMembers(trip.trip_id);
   const existingMember = members.find(m => m.user_id === user_id);
-  
+
   if (existingMember && existingMember.is_active) {
     throw new Error("You are already a member of this trip");
   }
-  
-  // 4. ถ้าเคยเป็นสมาชิกแต่ออกไป -> Reactivate
+
   if (existingMember && !existingMember.is_active) {
     await tripModel.reactivateTripMember(trip.trip_id, user_id);
     return {
-      success: true,
-      message: "กลับเข้าร่วมทริปสำเร็จ",
       trip_id: trip.trip_id,
-      trip_name: trip.trip_name
+      trip_name: trip.trip_name,
+      rejoined: true
     };
   }
-  
-  // 5. เพิ่มสมาชิกใหม่
+
   await tripModel.addMemberIfNotExists(trip.trip_id, user_id);
-  
+
   return {
-    success: true,
-    message: "เข้าร่วมทริปสำเร็จ",
     trip_id: trip.trip_id,
-    trip_name: trip.trip_name
+    trip_name: trip.trip_name,
+    rejoined: false
   };
 };
+
 
 /**
  * ลบสมาชิกออกจากทริป (เฉพาะ Owner)
@@ -220,5 +212,8 @@ export default {
   joinTripByCode,
   removeMemberService,
   TripDetail,
-  findById
+  findById,
+  getTripDetail,
+  getTripSummaryService,
+  
 };
