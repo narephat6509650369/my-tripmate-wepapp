@@ -209,7 +209,7 @@ export const findTripByInviteCode = async (inviteCode: string) => {
 
 export const addMemberIfNotExists = async (tripId: string, userId: string) => {
   const [rows] = await pool.execute(
-    "SELECT * FROM tripmember WHERE trip_id = ? AND user_id = ?",
+    "SELECT * FROM trip_members WHERE trip_id = ? AND user_id = ?",
     [tripId, userId]
   );
 
@@ -217,7 +217,7 @@ export const addMemberIfNotExists = async (tripId: string, userId: string) => {
 
   const role = "member";
   await pool.execute(
-    `INSERT INTO tripmember (member_id, trip_id, user_id, role) VALUES (UUID(), ?, ?, ?)`,
+    `INSERT INTO trip_members (member_id, trip_id, user_id, role) VALUES (UUID(), ?, ?, ?)`,
     [tripId, userId, role]
   );
 
