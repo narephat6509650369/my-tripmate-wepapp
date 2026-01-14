@@ -1,4 +1,3 @@
-// backend/src/services/tripService.ts
 import { v4 as uuidv4 } from 'uuid';
 import * as tripModel from '../models/tripModel.js';
 import { getTripSummaryById, type Trip } from '../models/tripModel.js';
@@ -72,7 +71,9 @@ export const getUserTrips = async (user_id: string) => {
  *  
  */
 export const getTripDetail = async (tripCode: string) => {
+  
   const trip = await tripModel.getTripDetail(tripCode);
+
   return trip;
 }
 

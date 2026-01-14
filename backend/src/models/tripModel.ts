@@ -18,6 +18,42 @@ export interface Trip {
     is_active?: boolean;
 }
 
+export interface TripData {
+  trip_id: string;
+  tripCode: string;
+  inviteCode?: string;
+  inviteLink?: string;
+  name: string;
+  days: number;
+  detail: string;
+  status?: string;
+  createdAt: number;
+  members: MemberTrip[];
+  voteOptions: {
+    dateOptions: {
+      startDate: string;
+      endDate: string;
+    }[];
+    locationOptions: {
+      location_option_id: string;
+      province_name: string;
+    }[];
+    budgetOptions: {
+      category_name: string;
+      estimated_amount: number;
+      is_backup: boolean;
+    }[];
+  }
+
+}
+
+export interface MemberTrip {
+    id: string;
+    name: string;
+    email: string;
+    role: 'owner' | 'member';
+}
+
 export interface TripMember extends RowDataPacket{
     member_id: string;
     trip_id: string;
@@ -55,6 +91,17 @@ export interface MyTrip {
     days_left_7: number;
 }
 
+export interface DateRange {
+    id: string;
+    user_id: string;
+    dates: Date[];
+    created_at: Date;
+}
+
+export interface Date{
+    start: string;
+    end: string;
+}
 export interface TripDetail extends RowDataPacket {
     trip_id: string;
     owner_id: string;
@@ -66,6 +113,25 @@ export interface TripDetail extends RowDataPacket {
     status: string;
     created_at: Date;
     member_count: number;
+    members?: TripMember[];
+    dateRanges?: DateRange[];
+    provinceVotes?: {
+        province_name: string;
+        score: number;
+    }[];
+    budgetOptions?: {
+        category_name: string;
+        estimated_amount: number;
+        is_backup: boolean;
+    }[];
+    memberAvailabilitys?: {
+        id: string;
+        user_id: string;
+        full_name: string;
+        start_date: string;
+        end_date: string;
+        created_at: Date;
+    }[];
 }
 
 export interface TripSummaryMember extends RowDataPacket {
@@ -249,33 +315,142 @@ export async function getMyTrips(userId: string): Promise<MyTrip[]> {
     return rows as MyTrip[];   
 }
 
-//ข้อมูลทริปแบบละเอียดของทริปหนึ่ง
+// ข้อมูลทริปแบบละเอียดของทริปหนึ่ง
 export async function getTripDetail(tripId: string): Promise<TripDetail | null> {
-    const sql = `
-        SELECT 
-            t.trip_id,
-            t.owner_id,
-            t.trip_name,
-            t.description,
-            t.num_days,
-            t.invite_code,
-            t.invite_link,
-            t.status,
-            t.created_at,
-            COUNT(tm.user_id) AS member_count
-        FROM trips t
-        LEFT JOIN trip_members tm 
-            ON t.trip_id = tm.trip_id AND tm.is_active = TRUE
-        WHERE t.trip_id = ?
-        GROUP BY t.trip_id
-    `;
+  /** 1. Trip info */
+  const tripSql = `
+    SELECT 
+      t.trip_id,
+      t.owner_id,
+      t.trip_name,
+      t.description,
+      t.num_days,
+      t.invite_code,
+      t.invite_link,
+      t.status,
+      t.created_at,
+      COUNT(tm.user_id) AS member_count
+    FROM trips t
+    LEFT JOIN trip_members tm 
+      ON t.trip_id = tm.trip_id AND tm.is_active = 1
+    WHERE t.trip_id = ?
+    GROUP BY t.trip_id
+  `;
 
-    const [rows] = await pool.query<TripDetail[]>(sql, [tripId]);
+  /** 2. Members */
+  const memberSql = `
+    SELECT
+      tm.user_id AS id,
+      u.full_name AS name,
+      u.email,
+      tm.role,
+      tm.joined_at
+    FROM trip_members tm
+    JOIN users u ON tm.user_id = u.user_id
+    WHERE tm.trip_id = ?
+      AND tm.is_active = 1
+  `;
 
-    if (rows.length === 0) return null;
+  const dateRange=`
+    SELECT
+      availability_id AS id,
+      user_id,
+      start_date,
+      end_date,
+      created_at
+      FROM trip_user_availabilities
+    WHERE trip_id = ?
+  `;
 
-    return rows[0] || null;  
+  const provinceVotes=`
+    SELECT
+      lo.province_name,
+      COUNT(lv.location_vote_id) AS score
+    FROM location_votings lvg
+    JOIN location_options lo 
+      ON lvg.location_voting_id = lo.location_voting_id
+    LEFT JOIN location_votes lv
+      ON lo.location_option_id = lv.location_option_id
+    WHERE lvg.trip_id = ?
+    GROUP BY lo.province_name
+    ORDER BY score DESC
+  `;
+
+  const budgetOptions=`
+    SELECT
+      bo.category_name,
+      bo.estimated_amount,
+      bo.is_backup
+    FROM budget_votings bvg
+    JOIN budget_options bo
+      ON bvg.budget_voting_id = bo.budget_voting_id
+    WHERE bvg.trip_id = ?
+    ORDER BY bo.priority ASC
+  `;
+  
+  const MemberAvailabilitys = `
+    SELECT
+      tua.availability_id AS id,
+      tua.user_id,
+      u.full_name AS full_name,
+      tua.start_date,
+      tua.end_date,
+      tua.created_at
+    FROM trip_user_availabilities tua
+    JOIN users u ON tua.user_id = u.user_id
+    WHERE tua.trip_id = ?
+  `;
+
+  const [tripRows] = await pool.query<any[]>(tripSql, [tripId]);
+  if (tripRows.length === 0) return null;
+
+  const [memberRows] = await pool.query<any[]>(memberSql, [tripId]);
+
+  const [dateRows] = await pool.query<any[]>(dateRange, [tripId]);
+
+  const [provinceRows] = await pool.query<any[]>(provinceVotes, [tripId]);
+  
+  const [budgetRows] = await pool.query<any[]>(budgetOptions, [tripId]);
+
+  const [memberAvailabilityRows] = await pool.query<any[]>(MemberAvailabilitys, [tripId]);
+
+  return {
+    ...tripRows[0],
+    members: memberRows,
+    dateRanges: dateRows,
+    provinceVotes: provinceRows,
+    budgetOptions: budgetRows,
+    memberAvailabilitys: memberAvailabilityRows
+  };
 }
+
+export async function groupDatesToRanges(dates: string[]): Promise<{ start: string; end: string }[]> {
+  const sorted = dates.sort();
+  const ranges: { start: string; end: string }[] = [];
+
+  if (sorted.length === 0) return ranges;
+
+  let start = sorted[0]!;
+  let prev = sorted[0]!;
+
+  for (let i = 1; i < sorted.length; i++) {
+    const curr = sorted[i];
+    if (!prev) break;
+    const prevDate = new Date(prev);
+    prevDate.setDate(prevDate.getDate() + 1);
+
+    if (curr === prevDate.toISOString().slice(0, 10)) {
+      prev = curr;
+    } else {
+      ranges.push({ start, end: prev });
+      start = curr!;
+      prev = curr!;
+    }
+  }
+  
+  return ranges;
+}
+
 
 // หาสมาชิกในทริป
 export const findMemberInTrip = async (trip_id: string, member_id: string) => {

@@ -1,8 +1,6 @@
 import type { Request, Response } from "express";
 import { getUserTrips, joinTripByCode, removeMemberService, deleteTripService, addTrip, getTripDetail, findById, getTripSummaryService} from "../services/tripService.js";
 
-
-
 //เพิ่มสมาชิก
 export const addTripController = async (req: Request, res: Response) => {
   try {
@@ -277,7 +275,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
       });
     }
 
-    const isMember = trip.members.some(
+    const isMember = trip.members?.some(
       (m: any) => m.userId.toString() === userId
     );
 
