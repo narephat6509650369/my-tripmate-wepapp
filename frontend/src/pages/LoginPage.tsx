@@ -1,37 +1,15 @@
+// src/pages/LoginPage.tsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
-import axios from 'axios';
-import DOMPurify from 'dompurify';
+import { useAuth } from '../contexts/AuthContext';
 import bgImage from '../assets/login-bg.jpg';
-import { CONFIG, log } from '../config/app.config';
-import { safeLocalStorage } from '../utils/safeStorage';
-
-
-interface GoogleLoginResult {
-  success: boolean;
-  code: string;
-  message: string;
-  data: {
-    token: string;
-    user: {
-      user_id: string;
-      email: string;
-    };
-  };
-}
-
 
 function LoginPage() {
-  const navigate = useNavigate();
+  const { login } = useAuth();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const API_BASE_URL = CONFIG.API_BASE_URL;
-
-  // ✅ Debug: ดู path ของรูป
-  console.log('Background image path:', bgImage);
-
+  // ✅ ใช้ useAuth hook แทนการ call API โดยตรง
   const handleGoogleLogin = useGoogleLogin({
     flow: 'implicit',
     onSuccess: async (tokenResponse) => {
@@ -39,56 +17,31 @@ function LoginPage() {
       setError('');
       
       try {
-        log.info('Attempting Google login');
+        console.log('🔐 Attempting Google login...');
         
-        const res = await axios.post<GoogleLoginResult>(
-          `${API_BASE_URL}/auth/google`, 
-          { access_token: tokenResponse.access_token }
-        );   
+        // ✅ ใช้ login จาก AuthContext
+        await login(tokenResponse.access_token);
         
-        const { token, user } = res.data.data;
+        // AuthContext จะจัดการ navigate ให้เอง
+        console.log('✅ Login successful');
         
-        if (!token || !user?.user_id || !user?.email) {
-          throw new Error('Invalid response from server');
-        }
-        
-        // Sanitize email before storing
-        const sanitizedEmail = DOMPurify.sanitize(user.email.trim());
-        
-        const tokenSaved = safeLocalStorage.setItem('jwtToken', token);
-        const userIdSaved = safeLocalStorage.setItem('userId', user.user_id);
-        const emailSaved = safeLocalStorage.setItem('userEmail', sanitizedEmail);
-
-        if (!tokenSaved || !userIdSaved || !emailSaved) {
-          alert('ไม่สามารถบันทึกข้อมูลได้ กรุณาล้างข้อมูลในเบราว์เซอร์');
-          return;
-        }
-        
-        log.success('Login successful', { email: sanitizedEmail });
-        navigate('/homepage');
-        
-      } catch (err) {
-        log.error('Login failed', err);
-        
-        const errorMessage = axios.isAxiosError(err)
-          ? err.response?.data?.message || err.message
-          : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
-        
-        setError(`เข้าสู่ระบบไม่สำเร็จ: ${errorMessage}`);
+      } catch (err: any) {
+        console.error('❌ Login failed:', err);
+        setError(`เข้าสู่ระบบไม่สำเร็จ: ${err.message}`);
       } finally {
         setLoading(false);
       }
     },
     
     onError: () => {
-      log.error('Google login error');
+      console.error('❌ Google login error');
       setError('การเข้าสู่ระบบด้วย Google ล้มเหลว กรุณาลองใหม่อีกครั้ง');
     },
   });
 
   return (
     <div className="wrap-login100">
-      {/* ✅ Background Image Section - แก้ไขให้แสดงรูปชัดเจน */}
+      {/* Background Image */}
       <div 
         className="login100-more" 
         style={{ 
@@ -100,8 +53,7 @@ function LoginPage() {
           minHeight: '100vh'
         }}
       >
-        {/* ✅ Overlay แบบเบาๆ - ปรับ opacity ได้ตามใจชอบ */}
-        {/* ค่า 0.15 = เบามาก, 0.3 = ปานกลาง, 0 = ไม่มี overlay */}
+        {/* Overlay */}
         <div style={{
           position: 'absolute',
           top: 0,
@@ -113,6 +65,7 @@ function LoginPage() {
         }} />
       </div>
 
+      {/* Login Form */}
       <div className="login100-form-container">
         <form className="login100-form validate-form">
           <div className="form-header">
@@ -123,8 +76,16 @@ function LoginPage() {
             </p>
           </div>
 
+          {/* Error Message */}
           {error && (
-            <div className="error-message">
+            <div className="error-message" style={{
+              backgroundColor: '#fee',
+              border: '1px solid #fcc',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '16px',
+              color: '#c33'
+            }}>
               <i 
                 className="fas fa-exclamation-circle" 
                 style={{ marginRight: '8px' }}
@@ -133,16 +94,31 @@ function LoginPage() {
             </div>
           )}
 
+          {/* Google Login Button */}
           <div className="login100-form-social">
             <button
               type="button"
               onClick={() => handleGoogleLogin()}
               className="login100-form-social-item bg-google"
               disabled={loading}
+              style={{
+                opacity: loading ? 0.6 : 1,
+                cursor: loading ? 'not-allowed' : 'pointer'
+              }}
             >
               <i className="fab fa-google" style={{ marginRight: '8px' }} />
               {loading ? 'Signing in...' : 'Sign in with Google'}
             </button>
+          </div>
+
+          {/* Footer */}
+          <div style={{ 
+            marginTop: '24px', 
+            textAlign: 'center', 
+            fontSize: '14px', 
+            color: '#666' 
+          }}>
+            <p>By signing in, you agree to our Terms & Privacy Policy</p>
           </div>
         </form>
       </div>

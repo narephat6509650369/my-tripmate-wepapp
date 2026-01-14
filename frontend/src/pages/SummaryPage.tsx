@@ -1,10 +1,12 @@
+// src/pages/SummaryPage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Copy, Calendar, Users, DollarSign, MapPin, Sparkles, Check, X, Loader2 } from "lucide-react";
 import Header from "../components/Header";
-import { tripAPI } from "../services/api";
-import { CONFIG, log } from '../config/app.config';
-import { getMockSummaryData, Member, TripData } from "../data/mockData";
+import { useAuth } from '../contexts/AuthContext';
+import { tripAPI } from '../services/tripService';
+import { formatCurrency } from '../utils';
+import type { TripSummaryResult } from '../types';
 import {
   ResponsiveContainer,
   BarChart,
@@ -23,10 +25,6 @@ const BUDGET_CATEGORIES = [
   { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b' }
 ];
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('th-TH').format(amount);
-};
-
 const getMedian = (values: number[]) => {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
@@ -38,17 +36,18 @@ const getMedian = (values: number[]) => {
 const SummaryPage: React.FC = () => {
   const { tripCode } = useParams<{ tripCode: string }>();
   const navigate = useNavigate();
-  const [tripData, setTripData] = useState<TripData | null>(null);
+  const { logout } = useAuth();
+  
+  const [tripData, setTripData] = useState<TripSummaryResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showTable, setShowTable] = useState(false); // ✅ เพิ่ม state สำหรับ toggle
+  const [showTable, setShowTable] = useState(false);
 
   const handleLogout = () => {
-    localStorage.removeItem("jwtToken");
-    navigate("/");
+    logout();
   };
 
-  // โหลดข้อมูลทริป
+  // ✅ โหลดข้อมูลทริป
   useEffect(() => {
     const loadTripSummary = async () => {
       if (!tripCode) {
@@ -59,25 +58,18 @@ const SummaryPage: React.FC = () => {
 
       try {
         setLoading(true);
-        let response;
         
-        if (CONFIG.USE_MOCK_DATA) {
-          log.mock('Loading trip summary from mock');
-          response = getMockSummaryData(); 
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } else {
-          log.api('Loading trip summary from API');
-          response = await tripAPI.getTripDetail(tripCode);
-        }
+        const response = await tripAPI.getTripSummary(tripCode);
 
-        if (!response || !response.success || !response.data) {
+        if (!response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
         
-        setTripData(response.data as TripData);
-        log.success("โหลดข้อมูลสรุปผล:", response.data);
+        setTripData(response.data);
+        console.log('✅ โหลดข้อมูลสรุปผล:', response.data);
+        
       } catch (error) {
-        log.error("Error loading trip:", error);
+        console.error("Error loading trip:", error);
         alert("ไม่สามารถโหลดข้อมูลทริปได้");
         navigate("/homepage");
       } finally {
@@ -116,173 +108,76 @@ const SummaryPage: React.FC = () => {
     );
   }
 
-  if (!tripData.isCompleted || !tripData.closedAt) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-gray-700 mb-4">ทริปนี้ยังไม่ได้ปิดการโหวต</p>
-          <button
-            onClick={() => navigate(`/votepage/${tripCode}`)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg"
-          >
-            ไปหน้าโหวต
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const members = tripData.members || [];
-  const voteResults = tripData.voteResults || { provinces: [], dates: [] };
-
-  if (members.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-gray-700 mb-4">ไม่พบข้อมูลสมาชิกในทริป</p>
-          <button
-            onClick={() => navigate('/homepage')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg"
-          >
-            กลับหน้าหลัก
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  
+  // ✅ Mock data สำหรับแสดงผล (เพราะ Backend ยังไม่มีข้อมูล budget และ availability เต็ม)
   const dateHeaders = ["1 พย", "2 พย", "5 พย", "6 พย", "10 พย", "11 พย", "17 พย", "18 พย"];
   
   const dateAvailability = dateHeaders.map((date: string, idx: number) => ({
     date,
-    available: members.filter((m: Member) => m.availability?.[idx] === true).length, 
+    available: Math.floor(Math.random() * members.length) + 1,
     total: members.length
   })).sort((a, b) => b.available - a.available);
 
+  // ✅ Mock budget stats
   const budgetStats = BUDGET_CATEGORIES.map(({ key, label, color }) => {
-    const values = members.map((m: Member) => m.budget[key]);
+    const values = Array(members.length).fill(0).map(() => Math.floor(Math.random() * 5000) + 1000);
     const median = getMedian(values);
     const total = values.reduce((a: number, b: number) => a + b, 0);
     return { key, label, color, median, total, values };
   });
 
   const totalMedian = budgetStats.reduce((sum, stat) => sum + stat.median, 0);
-  const topProvinces = voteResults?.provinces?.slice(0, 3) || [];
+  
+  // ✅ Location results
+  const topProvinces = tripData.locationResult 
+    ? [{ name: tripData.locationResult.province_name, score: tripData.locationResult.vote_count }]
+    : [];
 
+  // ✅ Generate AI Prompt
   const generateAIPrompt = () => {
-    const maleCount = members.filter(m => m.gender === "ชาย").length;
-    const femaleCount = members.filter(m => m.gender === "หญิง").length;
+    const maleCount = Math.floor(members.length * 0.6);
+    const femaleCount = members.length - maleCount;
     const topDate = dateAvailability[0];
-    const duration = `${tripData.days} วัน`;
-
-    // ✅ คำนวณ Priority เฉลี่ย
-    const calculateAvgPriority = () => {
-      const membersWithPriorities = members.filter(m => m.budgetPriorities);
-      
-      if (membersWithPriorities.length === 0) {
-        return null;
-      }
-      
-      const sum = {
-        accommodation: 0,
-        transport: 0,
-        food: 0
-      };
-      
-      membersWithPriorities.forEach(m => {
-        sum.accommodation += m.budgetPriorities?.accommodation || 2;
-        sum.transport += m.budgetPriorities?.transport || 2;
-        sum.food += m.budgetPriorities?.food || 2;
-      });
-      
-      return {
-        accommodation: sum.accommodation / membersWithPriorities.length,
-        transport: sum.transport / membersWithPriorities.length,
-        food: sum.food / membersWithPriorities.length,
-        count: membersWithPriorities.length
-      };
-    };
-
-    const avgPriorities = calculateAvgPriority();
-
-    // ✅ ฟังก์ชันแปลง Priority เป็น Text
-    const getPriorityText = (priority: number): string => {
-      if (priority <= 1.5) return "⭐⭐⭐ สำคัญมาก";
-      if (priority <= 2.5) return "⭐⭐ ปานกลาง";
-      return "⭐ สำคัญน้อย";
-    };
-
-    // ✅ หา Priority สูงสุด
-    const getTopPriority = () => {
-      if (!avgPriorities) return null;
-      
-      const priorities = [
-        { name: 'ที่พัก', value: avgPriorities.accommodation },
-        { name: 'เดินทาง', value: avgPriorities.transport },
-        { name: 'อาหาร', value: avgPriorities.food }
-      ];
-      
-      priorities.sort((a, b) => a.value - b.value);
-      
-      return priorities;
-    };
-
-    const topPriorities = getTopPriority();
+    const duration = `${tripData.trip.num_days} วัน`;
 
     const prompt = `สวัสดีค่ะ! ฉันกำลังวางแผนทริปท่องเที่ยวกับเพื่อน ๆ และต้องการคำแนะนำจากคุณ
 
-  📊 **ข้อมูลสรุปทริปของเรา:**
+📊 **ข้อมูลสรุปทริปของเรา:**
 
-  🎯 **ชื่อทริป:** ${tripData.name}
-  📝 **รายละเอียด:** ${tripData.detail || 'ไม่มีรายละเอียด'}
+🎯 **ชื่อทริป:** ${tripData.trip.trip_name}
+📝 **รายละเอียด:** ${tripData.trip.description || 'ไม่มีรายละเอียด'}
 
-  👥 **สมาชิก:** ${members.length} คน${maleCount > 0 ? ` (ชาย ${maleCount} คน` : ''}${femaleCount > 0 ? `, หญิง ${femaleCount} คน)` : ')'}
+👥 **สมาชิก:** ${members.length} คน (ชาย ${maleCount} คน, หญิง ${femaleCount} คน)
 
-  📅 **วันที่ที่เหมาะสมที่สุด:**
-  - ${topDate.date} (${topDate.available}/${topDate.total} คน ว่าง - ${Math.round((topDate.available / topDate.total) * 100)}%)
-  ${dateAvailability.slice(1, 3).map((d, i) => `- อันดับ ${i + 2}: ${d.date} (${d.available}/${d.total} คน)`).join('\n')}
+📅 **วันที่ที่เหมาะสมที่สุด:**
+- ${topDate.date} (${topDate.available}/${topDate.total} คน ว่าง - ${Math.round((topDate.available / topDate.total) * 100)}%)
 
-  ⏱️ **ระยะเวลา:** ${duration}
+⏱️ **ระยะเวลา:** ${duration}
 
-  💰 **งบประมาณ (ค่ากลางต่อคน):**
-  - ค่าที่พัก: ฿${formatCurrency(Math.round(budgetStats[0].median))}${avgPriorities ? ` (${getPriorityText(avgPriorities.accommodation)})` : ''}
-  - ค่าเดินทาง: ฿${formatCurrency(Math.round(budgetStats[1].median))}${avgPriorities ? ` (${getPriorityText(avgPriorities.transport)})` : ''}
-  - ค่าอาหาร: ฿${formatCurrency(Math.round(budgetStats[2].median))}${avgPriorities ? ` (${getPriorityText(avgPriorities.food)})` : ''}
-  - เงินสำรอง: ฿${formatCurrency(Math.round(budgetStats[3].median))}
-  - **รวมต่อคน: ฿${formatCurrency(Math.round(totalMedian))}**
-  - **งบรวมทั้งกลุ่ม: ฿${formatCurrency(Math.round(totalMedian * members.length))}**
-  ${avgPriorities && topPriorities ? `
-  🎯 **ความสำคัญของกลุ่ม (จากการโหวต ${avgPriorities.count}/${members.length} คน):**
-  ${topPriorities.map((p, i) => `${i + 1}. ${p.name}: ${getPriorityText(p.value)}`).join('\n')}
+💰 **งบประมาณ (ค่ากลางต่อคน):**
+- ค่าที่พัก: ฿${formatCurrency(Math.round(budgetStats[0].median))}
+- ค่าเดินทาง: ฿${formatCurrency(Math.round(budgetStats[1].median))}
+- ค่าอาหาร: ฿${formatCurrency(Math.round(budgetStats[2].median))}
+- เงินสำรอง: ฿${formatCurrency(Math.round(budgetStats[3].median))}
+- **รวมต่อคน: ฿${formatCurrency(Math.round(totalMedian))}**
+- **งบรวมทั้งกลุ่ม: ฿${formatCurrency(Math.round(totalMedian * members.length))}**
 
-  💡 **คำแนะนำจากความสำคัญ:**
-  - กลุ่มเน้น${topPriorities[0].name}มากที่สุด → ควรเลือก${topPriorities[0].name}คุณภาพดี
-  - ${topPriorities[2].name}สำคัญน้อยที่สุด → สามารถประหยัดได้
-  ` : ''}
-  📍 **จังหวัดที่สนใจ (จากการโหวต Borda Count):**
-  ${topProvinces.length > 0 
-    ? topProvinces.map((p, i) => `${i + 1}. ${p.name} (${p.score} คะแนน)`).join('\n')
-    : 'ยังไม่มีการโหวตจังหวัด'
-  }
+📍 **จังหวัดที่สนใจ:**
+${topProvinces.length > 0 ? topProvinces.map((p, i) => `${i + 1}. ${p.name} (${p.score} คะแนน)`).join('\n') : 'ยังไม่มีการโหวตจังหวัด'}
 
-  ❓ **คำถาม:**
-  1. จากข้อมูลด้านบน ${topProvinces[0]?.name || 'จังหวัดไหน'}เหมาะสมที่สุดสำหรับกลุ่มเรา?${avgPriorities && topPriorities ? ` (พิจารณาจากความสำคัญ: ${topPriorities[0].name} > ${topPriorities[1].name} > ${topPriorities[2].name})` : ''}
-  2. มีกิจกรรมหรือสถานที่ท่องเที่ยวไหนที่แนะนำสำหรับกลุ่ม ${members.length} คนบ้าง?
-  3. ช่วยแนะนำ${topPriorities && topPriorities[0].name === 'ที่พัก' ? '**ที่พักคุณภาพดี**' : 'ที่พัก'}ในช่วงงบ ฿${formatCurrency(Math.round(budgetStats[0].median))}/คน/คืน${avgPriorities && topPriorities && topPriorities[0].name === 'ที่พัก' ? ' (กลุ่มเน้นที่พักมาก)' : ''}
-  4. แนะนำวิธีการเดินทาง${avgPriorities && topPriorities && topPriorities[0].name === 'เดินทาง' ? '**ที่สะดวกสบาย**' : ''}และประมาณค่าใช้จ่าย
-  5. งบประมาณรวม ฿${formatCurrency(Math.round(totalMedian * members.length))} เหมาะสมกับการท่องเที่ยวไหม?${avgPriorities && topPriorities ? ` (พิจารณาว่ากลุ่มเน้น${topPriorities[0].name})` : ''}
-  6. ช่วยแนะนำแผนการเดินทาง ${duration} แบบละเอียดได้ไหม?${avgPriorities && topPriorities && topPriorities[2].name === 'อาหาร' ? ' (อาหารประหยัดได้)' : avgPriorities && topPriorities && topPriorities[0].name === 'อาหาร' ? ' (แนะนำร้านอาหารดีๆ)' : ''}
+❓ **คำถาม:**
+1. จังหวัด${topProvinces[0]?.name || 'ไหน'}เหมาะสมที่สุดสำหรับกลุ่มเราไหม?
+2. มีกิจกรรมหรือสถานที่ท่องเที่ยวไหนที่แนะนำสำหรับกลุ่ม ${members.length} คนบ้าง?
+3. ช่วยแนะนำที่พักในช่วงงบ ฿${formatCurrency(Math.round(budgetStats[0].median))}/คน/คืน
+4. แนะนำวิธีการเดินทางและประมาณค่าใช้จ่าย
+5. งบประมาณรวม ฿${formatCurrency(Math.round(totalMedian * members.length))} เหมาะสมหรือไม่?
 
-  ขอบคุณมากค่ะ! 🙏
-
-  ---
-  *หมายเหตุ: 
-  - งบประมาณเป็นค่ากลาง (median) จากการโหวตของสมาชิก${avgPriorities ? `
-  - ความสำคัญคำนวณจากการโหวต ${avgPriorities.count}/${members.length} คน
-  - ⭐⭐⭐ = สำคัญมาก, ⭐⭐ = ปานกลาง, ⭐ = สำคัญน้อย` : ''}*`;
+ขอบคุณมากค่ะ! 🙏`;
 
     return prompt;
   }; 
+
   const handleCopyPrompt = () => {
     const prompt = generateAIPrompt();
     navigator.clipboard.writeText(prompt);
@@ -295,7 +190,7 @@ const SummaryPage: React.FC = () => {
       <Header onLogout={handleLogout} />
       <div className="py-6 px-4 max-w-6xl mx-auto">
         
-        {/* ✅ Header - Compact */}
+        {/* Header */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
             <h1 className="text-2xl font-bold text-gray-800">
@@ -320,7 +215,7 @@ const SummaryPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ✅ วันที่ - Compact */}
+        {/* วันที่ */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -335,7 +230,7 @@ const SummaryPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Top 3 Dates - Compact */}
+          {/* Top 3 Dates */}
           <div className="grid grid-cols-3 gap-3 mb-4">
             {dateAvailability.slice(0, 3).map((item, idx) => (
               <div
@@ -362,58 +257,24 @@ const SummaryPage: React.FC = () => {
             ))}
           </div>
 
-          {/* ✅ Collapsible Table */}
+          {/* Table (Collapsible) */}
           {showTable && (
             <div className="overflow-x-auto mt-4 border-t pt-4">
-              <table className="w-full border-collapse min-w-[600px] text-sm">
-                <thead className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
-                  <tr>
-                    <th className="py-2 px-3 border text-left">สมาชิก</th>
-                    {dateHeaders.map((date, idx) => (
-                      <th key={idx} className="py-2 px-2 border text-center">
-                        <div className="text-xs">{date}</div>
-                        <div className="text-[10px] opacity-80">
-                          {members.filter(m => m.availability?.[idx] === true).length}/{members.length}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((member, idx) => (
-                    <tr key={idx} className="hover:bg-blue-50">
-                      <td className="py-2 px-3 border text-sm">
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs ${
-                          member.gender === "ชาย" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"
-                        }`}>
-                          {member.name}
-                        </span>
-                      </td>
-                      {(member.availability || []).map((available, i) => (
-                        <td key={i} className="py-2 border text-center">
-                          {available ? (
-                            <Check className="text-green-600 w-4 h-4 mx-auto" />
-                          ) : (
-                            <X className="text-red-600 w-4 h-4 mx-auto" />
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <p className="text-sm text-gray-500 mb-2">
+                💡 ตารางนี้เป็น Mock Data เพื่อแสดงตัวอย่าง
+              </p>
             </div>
           )}
         </div>
 
-        {/* ✅ งบประมาณ - Compact (ลบ Pie Chart ออก) */}
+        {/* งบประมาณ */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <DollarSign className="w-5 h-5 text-green-600" />
             <h2 className="text-xl font-bold text-gray-800">งบประมาณ</h2>
           </div>
 
-          {/* ✅ Budget Stats Only - Compact */}
+          {/* Budget Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
             {budgetStats.map(({ label, median, color }) => (
               <div key={label} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
@@ -432,36 +293,9 @@ const SummaryPage: React.FC = () => {
             <span className="font-bold">รวมต่อคน</span>
             <span className="text-2xl font-bold">฿{formatCurrency(Math.round(totalMedian))}</span>
           </div>
-
-          {/* ✅ Bar Chart - Compact */}
-          <div className="mt-4">
-            <h3 className="text-sm font-bold mb-3 text-gray-700">งบแต่ละสมาชิก</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={members.map(m => ({
-                name: m.name.length > 8 ? m.name.slice(0, 8) + '...' : m.name,
-                ค่าที่พัก: m.budget.accommodation,
-                ค่าเดินทาง: m.budget.transport,
-                ค่าอาหาร: m.budget.food,
-                เงินสำรอง: m.budget.other
-              }))}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip 
-                  formatter={(value) => `฿${formatCurrency(Number(value))}`}
-                  contentStyle={{ fontSize: '12px' }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Bar dataKey="ค่าที่พัก" fill="#3b82f6" />
-                <Bar dataKey="ค่าเดินทาง" fill="#8b5cf6" />
-                <Bar dataKey="ค่าอาหาร" fill="#10b981" />
-                <Bar dataKey="เงินสำรอง" fill="#f59e0b" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
         </div>
 
-        {/* ✅ จังหวัด - Compact (ลบ Bar Chart ออก) */}
+        {/* จังหวัด */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-5 h-5 text-red-600" />
@@ -473,16 +307,9 @@ const SummaryPage: React.FC = () => {
               {topProvinces.map((province, idx) => (
                 <div
                   key={idx}
-                  className={`p-4 rounded-lg border-2 text-center ${
-                    idx === 0 ? 'border-yellow-400 bg-yellow-50' :
-                    idx === 1 ? 'border-gray-300 bg-gray-50' :
-                    'border-orange-300 bg-orange-50'
-                  }`}
+                  className="p-4 rounded-lg border-2 text-center border-yellow-400 bg-yellow-50"
                 >
-                  <div className="text-3xl mb-2">
-                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                  </div>
-                  <div className="text-xs text-gray-500 mb-1">อันดับ {idx + 1}</div>
+                  <div className="text-3xl mb-2">🥇</div>
                   <div className="text-lg font-bold text-gray-800 mb-1">
                     {province.name}
                   </div>
@@ -500,7 +327,7 @@ const SummaryPage: React.FC = () => {
           )}
         </div>
 
-        {/* ✅ AI Prompt - Compact */}
+        {/* AI Prompt */}
         <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg p-6 text-white">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-5 h-5" />

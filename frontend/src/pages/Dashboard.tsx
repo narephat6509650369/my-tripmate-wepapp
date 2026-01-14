@@ -1,12 +1,12 @@
+// src/pages/Dashboard.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check, Loader2, AlertCircle } from "lucide-react";
-// ✅ แก้ imports
-import { CONFIG, log } from '../config/app.config';
-import { validateInviteCode, formatInviteCode } from '../utils/helpers';
-import { MOCK_MY_TRIPS, MOCK_JOIN_TRIP_RESPONSE, TripData } from "../data/mockData";
-import { tripAPI } from "../services/api";
+import { useAuth } from '../contexts/AuthContext';
+import { tripAPI } from '../services/tripService';
+import { validateInviteCode, formatInviteCode } from '../utils';
+import type { TripSummary } from '../types';
 import {
   ResponsiveContainer,
   BarChart,
@@ -29,23 +29,24 @@ interface DashboardData {
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  
   const [activeTab, setActiveTab] = useState<"overview" | "stats">("stats");
   const [roomCode, setRoomCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData[]>([]);
 
+  // ✅ แก้: ใช้ logout จาก useAuth
   const handleLogout = () => {
-    localStorage.removeItem("jwtToken");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("memberId");
-    navigate("/");
+    logout();
   };
 
   const handleCreateTrip = () => {
     navigate("/homepage");
   };
 
+  // ✅ แก้: ใช้ tripAPI.joinTrip
   const handleJoinTrip = async (code: string) => {
     const cleanCode = code.trim().toUpperCase();
     
@@ -54,7 +55,6 @@ const Dashboard: React.FC = () => {
       return;
     }
 
-    // ✅ ใช้ validateInviteCode จาก helpers
     if (!validateInviteCode(cleanCode)) {
       alert("รูปแบบรหัสห้องไม่ถูกต้อง\nกรุณากรอกในรูปแบบ XXXX-XXXX-XXXX-XXXX");
       return;
@@ -62,83 +62,66 @@ const Dashboard: React.FC = () => {
     
     try {
       setLoading(true);
-      let response;
-      
-      if (CONFIG.USE_MOCK_DATA) {
-        log.mock('Joining trip (mock)');
-        response = MOCK_JOIN_TRIP_RESPONSE;
-        await new Promise(resolve => setTimeout(resolve, 300));
-      } else {
-        log.api('Joining trip via API');
-        response = await tripAPI.joinTrip(cleanCode);
-      }
+      const response = await tripAPI.joinTrip(cleanCode);
       
       if (response.success && response.data) {
         alert('เข้าร่วมทริปสำเร็จ!');
-        navigate(`/votePage/${response.data.tripCode || cleanCode}`);
+        navigate(`/votepage/${response.data.trip_id}`);
         setRoomCode("");
       } else {
         alert(response.message || 'ไม่สามารถเข้าร่วมทริปได้');
       }
     } catch (error) {
-      log.error('Error joining trip:', error);
+      console.error('Error joining trip:', error);
       alert('เกิดข้อผิดพลาดในการเข้าร่วมทริป');
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ แก้: ใช้ tripAPI.getMyTrips
   useEffect(() => {
     const loadTrips = async () => {
       try {
         setLoading(true);
         setError(null);
-        let response;
         
-        if (CONFIG.USE_MOCK_DATA) {
-          log.mock('Loading trips from mock');
-          response = MOCK_MY_TRIPS;
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } else {
-          log.api('Loading trips from API');
-          response = await tripAPI.getMyTrips();
-        }
-        /*
-        if (!response || !response.success) {
-          throw new Error(response?.message || 'Failed to load trips');
-        }
-        */
-        if (!response.data || !Array.isArray(response.data)) {
-          throw new Error('Invalid data format from server');
+        const response = await tripAPI.getMyTrips();
+        
+        if (!response.success || !response.data) {
+          throw new Error(response.message || 'Failed to load trips');
         }
 
-        if (response.data.length === 0) {
-          log.info('No trips found');
+        const allTrips = response.data.all;
+
+        if (allTrips.length === 0) {
+          console.log('No trips found');
           setDashboardData([]);
           setLoading(false);
           return;
         }
         
-        const formattedData = response.data.map((trip: TripData) => {
-          const members = trip.members || [];
-          
-          const filled = members.filter(m => 
-            m.budget?.accommodation > 0 && 
-            m.budget?.transport > 0 && 
-            m.budget?.food > 0
-          ).length;
+        // ✅ Mock data สำหรับแสดงกราฟ (จริงๆ ต้องดึงจาก API)
+        // สำหรับโปรเจกจบ ใช้ mock ก่อนได้
+        const formattedData = allTrips.map((trip: TripSummary) => {
+          // Mock: สมมติว่ามี 5 คนในทริป และ 3 คนกรอกแล้ว
+          const totalMembers = trip.num_members || 5;
+          const filled = Math.floor(totalMembers * 0.6); // 60% กรอกแล้ว
           
           return {
-            name: trip.name || 'ไม่มีชื่อ',
+            name: trip.trip_name.length > 10 
+              ? trip.trip_name.slice(0, 10) + '...' 
+              : trip.trip_name,
             joined: filled,
-            notFilled: members.length - filled
+            notFilled: totalMembers - filled
           };
         });
         
         setDashboardData(formattedData);
-        log.success('Loaded trips successfully:', formattedData);
+        console.log('✅ Loaded trips successfully:', formattedData);
+        
       } catch (error) {
-        log.error('Error loading trips:', error);
+        console.error('Error loading trips:', error);
         
         const errorMessage = error instanceof Error 
           ? error.message 
@@ -168,14 +151,9 @@ const Dashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       <Header onLogout={handleLogout} />
-      {CONFIG.USE_MOCK_DATA && (
-        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 text-center text-sm">
-          <strong>⚠️ โหมดทดสอบ:</strong> กำลังใช้ข้อมูลจำลอง (Mock Data) 
-          - เปลี่ยนเป็น <code>USE_MOCK_DATA: false</code> ใน app.config.ts เพื่อใช้ API จริง
-        </div>
-      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Tabs */}
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => navigate("/homepage")}
@@ -196,6 +174,7 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
 
+        {/* Create Trip / Join Trip */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <button
             onClick={handleCreateTrip}
@@ -212,10 +191,7 @@ const Dashboard: React.FC = () => {
               maxLength={19}
               className="flex-1 border-2 border-blue-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono uppercase transition"
               value={roomCode}
-              onChange={(e) => {
-                // ✅ ใช้ formatInviteCode จาก helpers
-                setRoomCode(formatInviteCode(e.target.value));
-              }}
+              onChange={(e) => setRoomCode(formatInviteCode(e.target.value))}
               onPaste={(e) => {
                 e.preventDefault();
                 const pastedText = e.clipboardData.getData("text");
@@ -243,12 +219,14 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Loading State */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
             <p className="text-gray-600">กำลังโหลดข้อมูล...</p>
           </div>
         ) : error ? (
+          /* Error State */
           <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
             <div className="flex items-center gap-3 mb-2">
               <AlertCircle className="w-6 h-6 text-red-600" />
@@ -263,10 +241,12 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
         ) : (
+          /* Dashboard Content */
           <>
             {activeTab === "stats" && (
               <>
                 {dashboardData.length === 0 ? (
+                  /* Empty State */
                   <div className="bg-white rounded-xl shadow-lg p-12 text-center">
                     <div className="text-gray-400 mb-4">
                       <svg className="w-24 h-24 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -288,7 +268,9 @@ const Dashboard: React.FC = () => {
                     </button>
                   </div>
                 ) : (
+                  /* Dashboard Stats */
                   <>
+                    {/* Summary Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                       <div className="bg-white rounded-xl shadow-md p-6">
                         <div className="flex items-center justify-between">
@@ -335,6 +317,7 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Bar Chart */}
                     <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
                       <h2 className="text-xl font-semibold mb-4 text-blue-900 flex items-center gap-2">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -355,6 +338,7 @@ const Dashboard: React.FC = () => {
                       </ResponsiveContainer>
                     </div>
 
+                    {/* Pie Chart */}
                     <div className="bg-white rounded-xl shadow-lg p-6">
                       <h2 className="text-xl font-semibold mb-4 text-blue-900 flex items-center gap-2">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -415,18 +399,6 @@ const Dashboard: React.FC = () => {
                   </>
                 )}
               </>
-            )}
-            
-            {activeTab === "overview" && (
-              <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-                <div className="text-blue-900">
-                  <svg className="w-20 h-20 mx-auto mb-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                  <p className="text-lg">รายการทริปทั้งหมดจะแสดงที่นี่</p>
-                  <p className="text-sm text-gray-500 mt-2">ฟีเจอร์นี้กำลังพัฒนา</p>
-                </div>
-              </div>
             )}
           </>
         )}

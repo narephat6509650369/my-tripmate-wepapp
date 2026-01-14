@@ -1,14 +1,26 @@
+// src/pages/HomePage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check, User } from "lucide-react";
-import { tripAPI } from "../services/api";
-import { CONFIG, log } from "../config/app.config";
-import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils/utils';
-import type { MyTripCard, TripSummary } from "../services/api";
+import { useAuth } from '../contexts/AuthContext';
+import { tripAPI } from '../services/tripService';
+import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils';
+import type { TripSummary } from '../types';
+
+interface TripCard {
+  id: string;
+  name: string;
+  people: number;
+  status: string;
+  statusColor: string;
+  isCompleted: boolean;
+}
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  
   const [roomCode, setRoomCode] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTrip, setNewTrip] = useState({
@@ -16,10 +28,25 @@ const HomePage: React.FC = () => {
     days: "",
     detail: "",
   });
-  const [myTrips, setMyTrips] = useState<MyTripCard[]>([]);
-  const [invitedTrips, setInvitedTrips] = useState<MyTripCard[]>([]);
+  const [myTrips, setMyTrips] = useState<TripCard[]>([]);
+  const [invitedTrips, setInvitedTrips] = useState<TripCard[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // ✅ Helper: แปลง TripSummary → TripCard
+  const formatTripSummary = (trip: TripSummary): TripCard => {
+    const isCompleted = trip.status === 'completed' || trip.status === 'archived';
+
+    return {
+      id: trip.trip_id,
+      name: trip.trip_name,
+      people: trip.num_members,
+      status: isCompleted ? 'เสร็จสิ้น' : 'กำลังดำเนินการ',
+      statusColor: isCompleted ? 'bg-gray-100 text-gray-700' : 'bg-green-100 text-green-700',
+      isCompleted
+    };
+  };
+
+  // ✅ โหลดทริปทั้งหมด
   useEffect(() => {
     loadTrips();
   }, []);
@@ -29,14 +56,16 @@ const HomePage: React.FC = () => {
       setLoading(true);
       const response = await tripAPI.getMyTrips();
 
-      if (!response.success) {
+      if (!response.success || !response.data) {
         throw new Error(response.message || "ไม่สามารถโหลดข้อมูลได้");
       }
 
-      const { owned, joined } = response.data!;
+      const { owned, joined } = response.data;
 
       setMyTrips(owned.map(formatTripSummary));
       setInvitedTrips(joined.map(formatTripSummary));
+
+      console.log('✅ Loaded trips:', { owned: owned.length, joined: joined.length });
 
     } catch (error) {
       console.error("Load trips failed:", error);
@@ -48,19 +77,7 @@ const HomePage: React.FC = () => {
     }
   };
 
-  const formatTripSummary = (trip: TripSummary): MyTripCard => {
-    const isCompleted = trip.status === "completed";
-
-    return {
-      id: trip.trip_id,
-      name: trip.trip_name,
-      people: trip.num_members,
-      status: isCompleted ? "เสร็จสิ้น" : "กำลังดำเนินการ",
-      statusColor: isCompleted ? "bg-gray-100 text-gray-700" : "bg-green-100 text-green-700",
-      isCompleted
-    };
-  };
-
+  // ✅ เข้าร่วมทริป
   const handleJoinTrip = async (code: string) => {
     const cleanCode = code.trim().toUpperCase();
     
@@ -83,7 +100,7 @@ const HomePage: React.FC = () => {
           : 'เข้าร่วมทริปสำเร็จ!';
         
         alert(message);
-        navigate(`/votePage/${response.data.trip_id}`);
+        navigate(`/votepage/${response.data.trip_id}`);
         setRoomCode("");
         loadTrips();
       } else {
@@ -95,6 +112,7 @@ const HomePage: React.FC = () => {
     }
   };
 
+  // ✅ สร้างทริป
   const handleCreateTrip = async () => {
     const nameValidation = validateTripName(newTrip.name);
     if (!nameValidation.valid) {
@@ -109,7 +127,11 @@ const HomePage: React.FC = () => {
     }
 
     try {
-      const response = await tripAPI.createTrip(newTrip);
+      const response = await tripAPI.createTrip({
+        trip_name: newTrip.name,
+        description: newTrip.detail || null,
+        num_days: Number(newTrip.days)
+      });
 
       if (!response.data) {
         throw new Error(response.message || "ไม่สามารถสร้างทริปได้");
@@ -121,7 +143,7 @@ const HomePage: React.FC = () => {
         `สร้างทริปสำเร็จ!\n\nรหัสเชิญ: ${inviteCode}\n\nกรุณาบันทึกรหัสนี้ไว้`
       );
 
-      navigate(`/votePage/${response.data.trip_id}`);
+      navigate(`/votepage/${response.data.trip_id}`);
       setShowCreateModal(false);
       setNewTrip({ name: "", days: "", detail: "" });
       loadTrips();
@@ -133,10 +155,9 @@ const HomePage: React.FC = () => {
     }
   };
   
+  // ✅ Logout
   const handleLogout = () => {
-    localStorage.removeItem("jwtToken");
-    localStorage.removeItem("userId");
-    navigate("/");
+    logout();
   };
 
   return (
@@ -219,7 +240,7 @@ const HomePage: React.FC = () => {
                       <div
                         key={trip.id}
                         className="bg-blue-100 hover:bg-blue-200 rounded-lg p-5 transition relative cursor-pointer"
-                        onClick={() => navigate(`/votePage/${trip.id}`)}
+                        onClick={() => navigate(`/votepage/${trip.id}`)}
                       >
                         <div className="absolute top-3 right-3">
                           <span className={`text-xs font-medium px-3 py-1 rounded-full ${trip.statusColor}`}>
@@ -251,7 +272,7 @@ const HomePage: React.FC = () => {
                       <div
                         key={trip.id}
                         className="bg-blue-100 hover:bg-blue-200 rounded-lg p-5 transition relative cursor-pointer"
-                        onClick={() => navigate(`/votePage/${trip.id}`)}
+                        onClick={() => navigate(`/votepage/${trip.id}`)}
                       >
                         <div className="absolute top-3 right-3">
                           <span className={`text-xs font-medium px-3 py-1 rounded-full ${trip.statusColor}`}>

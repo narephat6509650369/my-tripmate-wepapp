@@ -3,9 +3,12 @@ import { MapPin, Bell, Menu, X, ChevronDown, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Users, Vote, CheckCircle } from "lucide-react";
 
-// ✅ Import types และ utils
-import type { Notification, NotificationType } from '../types/app.types';
-import { formatRelativeTime } from '../utils/helpers';
+// ✅ แก้ไข imports
+import { formatRelativeTime } from "../utils";
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface HeaderProps {
   onLogout?: () => void;
@@ -15,6 +18,27 @@ interface UserInfo {
   name: string;
   email: string;
 }
+
+// ✅ เพิ่ม Type Definition
+type NotificationType = 
+  | 'trip_invite' 
+  | 'new_vote' 
+  | 'vote_complete' 
+  | 'trip_confirmed';
+
+interface Notification {
+  id: number;
+  type: NotificationType;
+  text: string;
+  read: boolean;
+  timestamp: Date;
+  tripId?: string;
+  tripName?: string;
+}
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   
@@ -265,7 +289,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
                               {item.text}
                             </p>
                             <p className="text-xs text-gray-500 mt-1">
-                              {/* ✅ ใช้ formatRelativeTime */}
                               {formatRelativeTime(item.timestamp.getTime())}
                             </p>
                           </div>
