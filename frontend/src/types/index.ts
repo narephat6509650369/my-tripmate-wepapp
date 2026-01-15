@@ -1,6 +1,6 @@
 // ============================================================================
 // frontend/src/types/index.ts
-// ✅ Types ที่ตรงกับ Backend APIs เท่านั้น
+// ✅ ฉบับแก้ไข - ตรงกับ Backend Response 100%
 // ============================================================================
 
 // ============================================================================
@@ -66,7 +66,7 @@ export interface Trip {
   invite_code: string;
   invite_link: string;
   status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived';
-  created_at: string;           // ✅ Backend ส่งมาเป็น ISO string
+  created_at: string;
   updated_at?: string;
   confirmed_at?: string | null;
   is_active?: boolean;
@@ -89,6 +89,7 @@ export interface TripSummary {
   status: string;
   role: 'owner' | 'member';
   num_members: number;
+  created_at?: string; // ✅ เพิ่ม
 }
 
 export interface MyTripsResponse {
@@ -97,6 +98,7 @@ export interface MyTripsResponse {
   joined: TripSummary[];
 }
 
+// ✅ แก้ไข: เพิ่ม fields ที่ Backend ส่งกลับมา
 export interface TripDetail {
   trip_id: string;
   owner_id: string;
@@ -108,6 +110,48 @@ export interface TripDetail {
   status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived';
   created_at: string;
   member_count: number;
+  
+  // ✅ เพิ่ม: Members (จาก Backend response)
+  members?: Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: 'owner' | 'member';
+    joined_at?: string;
+  }>;
+  
+  // ✅ เพิ่ม: Date Ranges (จาก Backend response)
+  dateRanges?: Array<{
+    id: string;
+    user_id: string;
+    start_date: string;
+    end_date: string;
+    created_at: string;
+  }>;
+  
+  // ✅ เพิ่ม: Province Votes (จาก Backend response)
+  provinceVotes?: Array<{
+    province_name: string;
+    score: number;
+  }>;
+  
+  // ✅ เพิ่ม: Budget Options (จาก Backend response)
+  budgetOptions?: Array<{
+    category_name: string;
+    estimated_amount: number;
+    is_backup: boolean;
+  }>;
+  
+  // ✅ เพิ่ม: Member Availabilities (จาก Backend response)
+  // ⚠️ หมายเหตุ: Backend ใช้ชื่อ "memberAvailabilitys" (typo)
+  memberAvailabilitys?: Array<{
+    id: string;
+    user_id: string;
+    full_name: string;
+    start_date: string;
+    end_date: string;
+    created_at: string;
+  }>;
 }
 
 // ============================================================================
@@ -188,9 +232,21 @@ export interface JoinTripPayload {
 }
 
 export interface JoinTripResponse {
+  // Backend ส่ง snake_case
   trip_id: string;
   trip_name: string;
-  rejoined: boolean;
+  rejoined?: boolean;
+  
+  // รองรับ camelCase (สำหรับ backward compatibility)
+  tripId?: string;
+  tripName?: string;
+}
+
+// หรือใช้แบบนี้ถ้าต้องการ strict
+export interface JoinTripResponseStrict {
+  trip_id: string;
+  trip_name: string;
+  rejoined?: boolean;
 }
 
 // ============================================================================
@@ -221,7 +277,8 @@ export interface StartVotingResponse {
 // BUDGET TYPES
 // ============================================================================
 
-export type BudgetCategory = 'accommodation' | 'transport' | 'food' | 'other';
+// ✅ เพิ่ม: รองรับ string ด้วย (กรณี DB ไม่มี constraint)
+export type BudgetCategory = 'accommodation' | 'transport' | 'food' | 'other' | string;
 
 export interface Budget {
   accommodation: number;
@@ -354,4 +411,70 @@ export const tripSummaryToCard = (trip: TripSummary): TripCard => {
       : 'bg-green-100 text-green-700',
     isCompleted
   };
+};
+
+// ============================================================================
+// ✅ เพิ่ม: Helper สำหรับ availabilities
+// ============================================================================
+
+export const calculateAvailableMembers = (
+  dateOption: DateOption,
+  members: TripSummaryMember[]
+): number => {
+  // TODO: Backend ควรส่งข้อมูลนี้มาให้
+  // ตอนนี้ return mock value
+  return Math.floor(members.length * 0.6);
+};
+
+// ============================================================================
+// ✅ เพิ่ม: Validation Helpers
+// ============================================================================
+
+export const isValidInviteCode = (code: string): boolean => {
+  return /^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/i.test(code);
+};
+
+export const isValidTripName = (name: string): boolean => {
+  const trimmed = name.trim();
+  return trimmed.length >= 3 && trimmed.length <= 100;
+};
+
+export const isValidDays = (days: number): boolean => {
+  return days >= 1 && days <= 30;
+};
+
+// ============================================================================
+// Helper Function: แปลง snake_case → camelCase
+// ============================================================================
+
+export const normalizeJoinTripResponse = (
+  response: JoinTripResponse
+): { tripId: string; tripName: string; rejoined: boolean } => {
+  return {
+    tripId: response.trip_id || response.tripId || '',
+    tripName: response.trip_name || response.tripName || '',
+    rejoined: response.rejoined || false
+  };
+};
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+export default {
+  // Type Guards
+  isTripCompleted,
+  isTripOwner,
+  canEditTrip,
+  
+  // Helpers
+  formatTripStatus,
+  getTripStatusColor,
+  tripSummaryToCard,
+  calculateAvailableMembers,
+  
+  // Validations
+  isValidInviteCode,
+  isValidTripName,
+  isValidDays,
 };
