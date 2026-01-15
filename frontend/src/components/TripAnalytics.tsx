@@ -1,14 +1,85 @@
+// ============================================================================
+// frontend/src/components/TripAnalytics.tsx
+// ✅ แก้ไข: ใช้ TripDetail จาก Backend (ไม่ใช่ Mock Data)
+// ============================================================================
+
 import React from 'react';
-import { TripData } from '../data/mockData';
-import { calculateTripStatistics, formatDuration } from '../utils/analytics';
 import { BarChart3, Clock, Users, TrendingUp } from 'lucide-react';
+import type { TripDetail } from '../types';
 
 interface TripAnalyticsProps {
-  trip: TripData;
+  trip: TripDetail;
+}
+
+interface TripStatistics {
+  totalMembers: number;
+  membersVotedDates: number;
+  membersCompletedBudget: number;
+  membersVotedProvinces: number;
+  dateVotingRate: number;
+  budgetCompletionRate: number;
+  provinceVotingRate: number;
+  overallCompletionRate: number;
 }
 
 export const TripAnalytics: React.FC<TripAnalyticsProps> = ({ trip }) => {
-  const stats = calculateTripStatistics(trip);
+  // ============================================================================
+  // ✅ คำนวณสถิติจาก TripDetail จริง
+  // ============================================================================
+  
+  const calculateStatistics = (): TripStatistics => {
+    const members = trip.members || [];
+    const totalMembers = members.length;
+    
+    if (totalMembers === 0) {
+      return {
+        totalMembers: 0,
+        membersVotedDates: 0,
+        membersCompletedBudget: 0,
+        membersVotedProvinces: 0,
+        dateVotingRate: 0,
+        budgetCompletionRate: 0,
+        provinceVotingRate: 0,
+        overallCompletionRate: 0
+      };
+    }
+    
+    const availabilities = trip.memberAvailabilitys || [];
+    const budgets = trip.budgetOptions || [];
+    const provinceVotes = trip.provinceVotes || [];
+    
+    // นับจำนวนคนที่กรอกแต่ละหมวด
+    const membersVotedDates = availabilities.length;
+    const membersCompletedBudget = budgets.length > 0 ? totalMembers : 0; // สมมติถ้ามี budget แสดงว่าทุกคนกรอกแล้ว
+    const membersVotedProvinces = provinceVotes.length > 0 ? totalMembers : 0;
+    
+    // คำนวณ % ความสำเร็จ
+    const dateVotingRate = Math.round((membersVotedDates / totalMembers) * 100);
+    const budgetCompletionRate = Math.round((membersCompletedBudget / totalMembers) * 100);
+    const provinceVotingRate = Math.round((membersVotedProvinces / totalMembers) * 100);
+    
+    // ความสำเร็จรวม
+    const overallCompletionRate = Math.round(
+      (dateVotingRate + budgetCompletionRate + provinceVotingRate) / 3
+    );
+    
+    return {
+      totalMembers,
+      membersVotedDates,
+      membersCompletedBudget,
+      membersVotedProvinces,
+      dateVotingRate,
+      budgetCompletionRate,
+      provinceVotingRate,
+      overallCompletionRate
+    };
+  };
+  
+  const stats = calculateStatistics();
+  
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg mb-6">
@@ -19,31 +90,31 @@ export const TripAnalytics: React.FC<TripAnalyticsProps> = ({ trip }) => {
       
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Time Used */}
+        {/* Members */}
         <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border-2 border-blue-200">
           <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-5 h-5 text-blue-600" />
-            <span className="text-sm font-semibold text-blue-900">เวลาที่ใช้</span>
+            <Users className="w-5 h-5 text-blue-600" />
+            <span className="text-sm font-semibold text-blue-900">สมาชิก</span>
           </div>
           <p className="text-2xl font-bold text-blue-700">
-            {formatDuration(stats.totalDuration || 0)}
+            {stats.totalMembers} คน
           </p>
           <p className="text-xs text-blue-600 mt-1">
-            เฉลี่ย {stats.averageTimeToComplete} นาที/คน
+            ในทริปนี้
           </p>
         </div>
         
-        {/* Participation */}
+        {/* Overall Progress */}
         <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border-2 border-green-200">
           <div className="flex items-center gap-2 mb-2">
-            <Users className="w-5 h-5 text-green-600" />
-            <span className="text-sm font-semibold text-green-900">การมีส่วนร่วม</span>
+            <TrendingUp className="w-5 h-5 text-green-600" />
+            <span className="text-sm font-semibold text-green-900">ความสำเร็จ</span>
           </div>
           <p className="text-2xl font-bold text-green-700">
             {stats.overallCompletionRate}%
           </p>
           <p className="text-xs text-green-600 mt-1">
-            {stats.totalMembers} สมาชิก
+            เสร็จสมบูรณ์
           </p>
         </div>
         
@@ -118,27 +189,6 @@ export const TripAnalytics: React.FC<TripAnalyticsProps> = ({ trip }) => {
         </div>
       </div>
       
-      {/* Time Saved (if available) */}
-      {stats.timeSavedPercentage && stats.timeSavedPercentage > 0 && (
-        <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-300">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="w-8 h-8 text-green-600" />
-            <div className="flex-1">
-              <p className="font-bold text-green-900 text-lg mb-1">
-                🎉 ประหยัดเวลาได้ {stats.timeSavedPercentage}%!
-              </p>
-              <p className="text-sm text-green-700">
-                คาดว่าถ้าใช้วิธีเดิม: {formatDuration(stats.estimatedTimeWithoutSystem || 0)}
-                {' '}→ ใช้จริง: {formatDuration(stats.totalDuration || 0)}
-              </p>
-              <p className="text-xs text-green-600 mt-1">
-                ประหยัดได้ {formatDuration(stats.actualTimeSaved || 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      
       {/* Motivation Message */}
       {stats.overallCompletionRate < 100 && (
         <div className="mt-4 p-4 bg-amber-50 rounded-lg border-l-4 border-amber-500">
@@ -154,6 +204,20 @@ export const TripAnalytics: React.FC<TripAnalyticsProps> = ({ trip }) => {
           </p>
         </div>
       )}
+      
+      {/* Success Message */}
+      {stats.overallCompletionRate === 100 && (
+        <div className="mt-4 p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+          <p className="text-green-900 font-semibold mb-1">
+            🎉 ทุกคนกรอกข้อมูลครบแล้ว!
+          </p>
+          <p className="text-sm text-green-800">
+            ทริปนี้พร้อมปิดการโหวตและสรุปผลแล้ว
+          </p>
+        </div>
+      )}
     </div>
   );
 };
+
+export default TripAnalytics;

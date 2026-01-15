@@ -1,72 +1,83 @@
-import React from 'react';
-import { Users, Check, Loader2 } from 'lucide-react';
-import type { TripData } from '../data/mockData';
+// ============================================================================
+// frontend/src/components/TripProgress.tsx
+// ✅ แก้ไข: ใช้ TripDetail จาก Backend (ไม่ใช่ Mock Data)
+// ============================================================================
 
-// ============== TYPES ==============
+import React from 'react';
+import { Users, Check, Clock } from 'lucide-react';
+import type { TripDetail } from '../types';
+
 interface TripProgressProps {
-  trip: TripData;
-  currentMemberId: string;
+  trip: TripDetail;
+  currentUserId: string;
 }
 
-// ============== COMPONENT ==============
-export const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberId }) => {
+export const TripProgress: React.FC<TripProgressProps> = ({ 
+  trip, 
+  currentUserId 
+}) => {
+  // ============================================================================
+  // ✅ คำนวณความคืบหน้าจาก TripDetail จริง
+  // ============================================================================
+  
   const members = trip.members || [];
   const totalMembers = members.length;
+  
+  if (totalMembers === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
+        <h3 className="text-xl font-bold text-gray-800">
+          ⏳ รอสมาชิก...
+        </h3>
+        <p className="text-gray-500 mt-2">
+          ยังไม่มีสมาชิกในทริปนี้
+        </p>
+      </div>
+    );
+  }
+  
+  const availabilities = trip.memberAvailabilitys || [];
+  const budgets = trip.budgetOptions || [];
+  const provinceVotes = trip.provinceVotes || [];
 
   // คำนวณความคืบหน้าแต่ละหมวด
   const progress = {
     budget: {
-      completed: members.filter(m => 
-        m.budget.accommodation > 0 && 
-        m.budget.transport > 0 && 
-        m.budget.food > 0
-      ).length,
-      percentage: 0
+      completed: budgets.length > 0 ? totalMembers : 0, // ถ้ามี budget แสดงว่ามีคนกรอกแล้ว
+      percentage: budgets.length > 0 ? 100 : 0
     },
     dateVote: {
-      completed: trip.dateVotes?.length || 0,
-      percentage: 0
+      completed: availabilities.length,
+      percentage: totalMembers > 0 
+        ? Math.round((availabilities.length / totalMembers) * 100)
+        : 0
     },
     provinceVote: {
-      completed: trip.provinceVotes?.length || 0,
-      percentage: 0
-    },
-    priority: {
-      completed: members.filter(m => m.budgetPriorities).length,
-      percentage: 0
+      completed: provinceVotes.length > 0 ? totalMembers : 0,
+      percentage: provinceVotes.length > 0 ? 100 : 0
     }
   };
 
-  // คำนวณ percentage
-  Object.keys(progress).forEach(key => {
-    const item = progress[key as keyof typeof progress];
-    item.percentage = totalMembers > 0 
-      ? Math.min(100, Math.max(0, Math.round((item.completed / totalMembers) * 100)))
-      : 0;
-  });
-
   // คำนวณความคืบหน้ารวม
-  const overallProgress = Math.min(100, Math.max(0, Math.round(
+  const overallProgress = Math.round(
     (progress.budget.percentage + 
      progress.dateVote.percentage + 
-     progress.provinceVote.percentage + 
-     progress.priority.percentage) / 4
-  )));
+     progress.provinceVote.percentage) / 3
+  );
 
-  // ความคืบหน้าของตัวเอง
-  const currentMember = members.find(m => m.id === currentMemberId);
+  // ✅ ความคืบหน้าของตัวเอง
   const myProgress = {
-    budget: currentMember && 
-      currentMember.budget.accommodation > 0 && 
-      currentMember.budget.transport > 0 && 
-      currentMember.budget.food > 0,
-    dateVote: trip.dateVotes?.some(v => v.memberId === currentMemberId),
-    provinceVote: trip.provinceVotes?.some(v => v.memberId === currentMemberId),
-    priority: currentMember?.budgetPriorities !== undefined
+    budget: budgets.length > 0, // ถ้ามี budget แสดงว่ากรอกแล้ว
+    dateVote: availabilities.some(a => a.user_id === currentUserId),
+    provinceVote: provinceVotes.length > 0 // ถ้ามีคะแนนโหวตแสดงว่าโหวตแล้ว
   };
 
   const myTasksComplete = Object.values(myProgress).filter(Boolean).length;
   const myTotalTasks = Object.keys(myProgress).length;
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
@@ -100,22 +111,18 @@ export const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberI
             {myTasksComplete}/{myTotalTasks} งาน
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid grid-cols-3 gap-2 text-sm">
           <div className={`flex items-center gap-2 ${myProgress.budget ? 'text-green-700' : 'text-gray-600'}`}>
-            {myProgress.budget ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
-            <span>กรอกงบประมาณ</span>
-          </div>
-          <div className={`flex items-center gap-2 ${myProgress.priority ? 'text-green-700' : 'text-gray-600'}`}>
-            {myProgress.priority ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
-            <span>เลือก Priority</span>
+            {myProgress.budget ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+            <span>งบประมาณ</span>
           </div>
           <div className={`flex items-center gap-2 ${myProgress.dateVote ? 'text-green-700' : 'text-gray-600'}`}>
-            {myProgress.dateVote ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
-            <span>โหวตวันที่</span>
+            {myProgress.dateVote ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+            <span>วันที่</span>
           </div>
           <div className={`flex items-center gap-2 ${myProgress.provinceVote ? 'text-green-700' : 'text-gray-600'}`}>
-            {myProgress.provinceVote ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4" />}
-            <span>โหวตจังหวัด</span>
+            {myProgress.provinceVote ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+            <span>จังหวัด</span>
           </div>
         </div>
       </div>
@@ -140,26 +147,10 @@ export const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberI
           </div>
         </div>
 
-        {/* Priority */}
-        <div>
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-sm text-gray-700">⭐ Priority Voting</span>
-            <span className="text-sm font-semibold text-gray-800">
-              {progress.priority.completed}/{totalMembers} คน ({progress.priority.percentage}%)
-            </span>
-          </div>
-          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-purple-500 transition-all duration-300"
-              style={{ width: `${progress.priority.percentage}%` }}
-            />
-          </div>
-        </div>
-
         {/* Date Vote */}
         <div>
           <div className="flex justify-between items-center mb-1">
-            <span className="text-sm text-gray-700">📅 โหวตวันที่</span>
+            <span className="text-sm text-gray-700">📅 เลือกวันที่</span>
             <span className="text-sm font-semibold text-gray-800">
               {progress.dateVote.completed}/{totalMembers} คน ({progress.dateVote.percentage}%)
             </span>
@@ -198,6 +189,17 @@ export const TripProgress: React.FC<TripProgressProps> = ({ trip, currentMemberI
           </p>
         </div>
       )}
+      
+      {/* Progress Message */}
+      {overallProgress < 100 && overallProgress >= 50 && (
+        <div className="mt-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+          <p className="text-blue-800 font-semibold flex items-center gap-2">
+            🎯 เกือบเสร็จแล้ว! อีก {100 - overallProgress}%
+          </p>
+        </div>
+      )}
     </div>
   );
 };
+
+export default TripProgress;

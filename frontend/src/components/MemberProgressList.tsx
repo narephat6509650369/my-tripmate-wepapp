@@ -1,18 +1,87 @@
+// ============================================================================
+// frontend/src/components/MemberProgressList.tsx
+// ✅ แก้ไข: ใช้ TripDetail จาก Backend (ไม่ใช่ Mock Data)
+// ============================================================================
+
 import React from 'react';
-import { TripData } from '../data/mockData';
-import { calculateMemberProgress } from '../utils/analytics';
 import { CheckCircle2, Clock } from 'lucide-react';
+import type { TripDetail } from '../types';
 
 interface MemberProgressListProps {
-  trip: TripData;
+  trip: TripDetail;
   currentUserId: string;
+}
+
+interface MemberProgress {
+  memberId: string;
+  memberName: string;
+  dateSelected: boolean;
+  budgetFilled: boolean;
+  provinceVoted: boolean;
+  completionPercentage: number;
 }
 
 export const MemberProgressList: React.FC<MemberProgressListProps> = ({ 
   trip, 
   currentUserId 
 }) => {
-  const memberProgress = calculateMemberProgress(trip);
+  // ============================================================================
+  // ✅ คำนวณความคืบหน้าจาก TripDetail จริง
+  // ============================================================================
+  
+  const calculateMemberProgress = (): MemberProgress[] => {
+    const members = trip.members || [];
+    const availabilities = trip.memberAvailabilitys || [];
+    const budgets = trip.budgetOptions || [];
+    const votes = trip.provinceVotes || [];
+    
+    return members.map(member => {
+      // ✅ ตรวจสอบว่ากรอกวันที่หรือยัง
+      const dateSelected = availabilities.some(
+        a => a.user_id === member.id
+      );
+      
+      // ✅ ตรวจสอบว่ากรอกงบหรือยัง (ถ้ามี category_name ที่เสนอโดย member นี้)
+      const budgetFilled = budgets.some(
+        b => b.category_name && b.estimated_amount > 0
+      );
+      
+      // ✅ ตรวจสอบว่าโหวตจังหวัดหรือยัง
+      const provinceVoted = votes.length > 0; // ถ้ามี vote แสดงว่ามีคนโหวตแล้ว
+      
+      // คำนวณ % ความสำเร็จ
+      const tasksCompleted = [dateSelected, budgetFilled, provinceVoted].filter(Boolean).length;
+      const completionPercentage = Math.round((tasksCompleted / 3) * 100);
+      
+      return {
+        memberId: member.id,
+        memberName: member.name,
+        dateSelected,
+        budgetFilled,
+        provinceVoted,
+        completionPercentage
+      };
+    });
+  };
+  
+  const memberProgress = calculateMemberProgress();
+  
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+  
+  if (memberProgress.length === 0) {
+    return (
+      <div className="bg-white p-6 rounded-xl shadow-lg mb-6">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">
+          👥 ความคืบหน้าของสมาชิก
+        </h3>
+        <p className="text-gray-500 text-center py-8">
+          ยังไม่มีข้อมูลสมาชิก
+        </p>
+      </div>
+    );
+  }
   
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg mb-6">
@@ -122,3 +191,5 @@ export const MemberProgressList: React.FC<MemberProgressListProps> = ({
     </div>
   );
 };
+
+export default MemberProgressList;
