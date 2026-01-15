@@ -1,11 +1,16 @@
+// ============================================================================
 // frontend/src/contexts/AuthContext.tsx
-// ✅ Authentication Context สำหรับจัดการ User State ทั้งระบบ
+// ✅ รองรับ Development Mode (Skip Auth)
+// ============================================================================
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { ApiResponse } from '../types/apiResponse';
+import { CONFIG, MOCK_USER, MOCK_TOKEN } from '../config/app.config';
 
-// ============== TYPES ==============
+// ============================================================================
+// TYPES
+// ============================================================================
+
 export interface User {
   user_id: string;
   email: string;
@@ -35,10 +40,41 @@ interface AuthContextType extends AuthState {
   checkAuth: () => boolean;
 }
 
-// ============== CONTEXT ==============
+// ============================================================================
+// CONTEXT
+// ============================================================================
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ============== PROVIDER ==============
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const exp = payload.exp * 1000;
+    return Date.now() >= exp;
+  } catch (error) {
+    console.error('❌ Token decode failed:', error);
+    return true;
+  }
+};
+
+const getUserIdFromToken = (token: string): string | null => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.userId || payload.user_id || null;
+  } catch (error) {
+    console.error('❌ Cannot extract userId from token:', error);
+    return null;
+  }
+};
+
+// ============================================================================
+// PROVIDER
+// ============================================================================
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   
@@ -49,15 +85,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading: true
   });
 
-  // ✅ Initialize auth state from localStorage
+  // ============================================================================
+  // ✅ Initialize Auth State
+  // ============================================================================
+
   useEffect(() => {
     const initializeAuth = () => {
       try {
+        // 🎭 Development Mode: Skip Auth
+        if (CONFIG.SKIP_AUTH_IN_DEV) {
+          console.log('🎭 Development Mode: Auto-login with mock user');
+          
+          localStorage.setItem('jwtToken', MOCK_TOKEN);
+          localStorage.setItem('userId', MOCK_USER.user_id);
+          localStorage.setItem('userEmail', MOCK_USER.email);
+          
+          setAuthState({
+            user: MOCK_USER,
+            token: MOCK_TOKEN,
+            isAuthenticated: true,
+            isLoading: false
+          });
+          return;
+        }
+
+        // 🔒 Production Mode: Normal Auth
         const token = localStorage.getItem('jwtToken');
         const userId = localStorage.getItem('userId');
         const userEmail = localStorage.getItem('userEmail');
 
-        if (token && userId && userEmail) {
+        if (!token) {
+          console.log('ℹ️ No token found');
+          setAuthState({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+          return;
+        }
+
+        if (isTokenExpired(token)) {
+          console.warn('⚠️ Token expired - clearing auth');
+          localStorage.removeItem('jwtToken');
+          localStorage.removeItem('userId');
+          localStorage.removeItem('userEmail');
+          localStorage.removeItem('userName');
+          localStorage.removeItem('userAvatar');
+          
+          setAuthState({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+          return;
+        }
+
+        if (userId && userEmail) {
           setAuthState({
             user: {
               user_id: userId,
@@ -69,16 +154,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             isAuthenticated: true,
             isLoading: false
           });
+          console.log('✅ Auth initialized:', userEmail);
         } else {
-          setAuthState({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false
-          });
+          const extractedUserId = getUserIdFromToken(token);
+          if (extractedUserId) {
+            setAuthState({
+              user: {
+                user_id: extractedUserId,
+                email: userEmail || 'unknown@email.com'
+              },
+              token,
+              isAuthenticated: true,
+              isLoading: false
+            });
+          } else {
+            setAuthState({
+              user: null,
+              token: null,
+              isAuthenticated: false,
+              isLoading: false
+            });
+          }
         }
       } catch (error) {
-        console.error('Failed to initialize auth:', error);
+        console.error('❌ Failed to initialize auth:', error);
         setAuthState({
           user: null,
           token: null,
@@ -91,12 +190,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
   }, []);
 
-  // ✅ Login with Google
+  // ============================================================================
+  // ✅ Token Expiry Check (ข้ามใน Dev Mode)
+  // ============================================================================
+
+  useEffect(() => {
+    if (CONFIG.SKIP_AUTH_IN_DEV) {
+      return; // ข้ามการตรวจสอบใน Dev Mode
+    }
+
+    const checkTokenExpiry = () => {
+      const token = localStorage.getItem('jwtToken');
+      
+      if (token && isTokenExpired(token)) {
+        console.warn('⚠️ Token expired during session');
+        logout();
+        alert('Session หมดอายุ กรุณาเข้าสู่ระบบใหม่');
+      }
+    };
+
+    const interval = setInterval(checkTokenExpiry, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ============================================================================
+  // ✅ Login
+  // ============================================================================
+
   const login = useCallback(async (accessToken: string) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
 
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      
+      console.log('🔐 Attempting Google login...');
       
       const response = await fetch(`${API_URL}/auth/google`, {
         method: 'POST',
@@ -108,7 +235,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })
       });
 
-      const result: ApiResponse<GoogleLoginResponse> = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
 
       if (!result.success || !result.data) {
         throw new Error(result.message || 'Login failed');
@@ -116,12 +247,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { token, user } = result.data;
 
-      // Save to localStorage
+      if (isTokenExpired(token)) {
+        throw new Error('Received expired token from server');
+      }
+
       localStorage.setItem('jwtToken', token);
       localStorage.setItem('userId', user.user_id);
       localStorage.setItem('userEmail', user.email);
 
-      // Update state
       setAuthState({
         user: {
           user_id: user.user_id,
@@ -133,6 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       console.log('✅ Login successful:', user.email);
+      navigate('/homepage');
 
     } catch (error: any) {
       console.error('❌ Login failed:', error);
@@ -146,19 +280,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       throw error;
     }
-  }, []);
+  }, [navigate]);
 
+  // ============================================================================
   // ✅ Logout
+  // ============================================================================
+
   const logout = useCallback(() => {
     try {
-      // Clear localStorage
+      console.log('🚪 Logging out...');
+      
       localStorage.removeItem('jwtToken');
       localStorage.removeItem('userId');
       localStorage.removeItem('userEmail');
       localStorage.removeItem('userName');
       localStorage.removeItem('userAvatar');
 
-      // Clear state
       setAuthState({
         user: null,
         token: null,
@@ -168,21 +305,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('✅ Logout successful');
 
-      // Redirect to login
-      navigate('/');
+      // 🎭 ใน Dev Mode ไม่ต้อง redirect
+      if (!CONFIG.SKIP_AUTH_IN_DEV) {
+        navigate('/');
+      }
     } catch (error) {
       console.error('❌ Logout error:', error);
     }
   }, [navigate]);
 
-  // ✅ Update user data
+  // ============================================================================
+  // ✅ Update User
+  // ============================================================================
+
   const updateUser = useCallback((userData: Partial<User>) => {
     setAuthState(prev => ({
       ...prev,
       user: prev.user ? { ...prev.user, ...userData } : null
     }));
 
-    // Update localStorage
     if (userData.full_name) {
       localStorage.setItem('userName', userData.full_name);
     }
@@ -195,20 +336,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // ✅ Check if authenticated
+  // ============================================================================
+  // ✅ Check Auth
+  // ============================================================================
+
   const checkAuth = useCallback((): boolean => {
+    // 🎭 Dev Mode: Always authenticated
+    if (CONFIG.SKIP_AUTH_IN_DEV) {
+      return true;
+    }
+
     const token = localStorage.getItem('jwtToken');
-    const userId = localStorage.getItem('userId');
     
-    const isValid = !!(token && userId);
-    
-    if (!isValid && authState.isAuthenticated) {
-      // Token หมดอายุหรือถูกลบ → logout
+    if (!token) {
+      return false;
+    }
+
+    if (isTokenExpired(token)) {
+      console.warn('⚠️ Token expired in checkAuth');
       logout();
+      return false;
     }
     
-    return isValid;
-  }, [authState.isAuthenticated, logout]);
+    return true;
+  }, [logout]);
+
+  // ============================================================================
+  // CONTEXT VALUE
+  // ============================================================================
 
   const value: AuthContextType = {
     ...authState,
@@ -225,7 +380,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-// ============== HOOK ==============
+// ============================================================================
+// HOOK
+// ============================================================================
+
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   
@@ -236,11 +394,10 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
 
-// ============== HELPER HOOKS ==============
+// ============================================================================
+// HELPER HOOKS
+// ============================================================================
 
-/**
- * Hook สำหรับตรวจสอบว่า user เป็น owner ของทริปหรือไม่
- */
 export const useIsTripOwner = (ownerId: string | null | undefined): boolean => {
   const { user } = useAuth();
   
@@ -251,9 +408,6 @@ export const useIsTripOwner = (ownerId: string | null | undefined): boolean => {
   return user.user_id === ownerId;
 };
 
-/**
- * Hook สำหรับตรวจสอบว่า user เป็นสมาชิกของทริปหรือไม่
- */
 export const useIsTripMember = (memberIds: string[]): boolean => {
   const { user } = useAuth();
   
@@ -264,19 +418,19 @@ export const useIsTripMember = (memberIds: string[]): boolean => {
   return memberIds.includes(user.user_id);
 };
 
-/**
- * Hook สำหรับ redirect ถ้ายังไม่ได้ login
- */
 export const useRequireAuth = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, checkAuth } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      console.warn('⚠️ Not authenticated, redirecting to login');
-      navigate('/', { replace: true });
+    if (!isLoading) {
+      const isValid = checkAuth();
+      if (!isValid && !CONFIG.SKIP_AUTH_IN_DEV) {
+        console.warn('⚠️ Not authenticated, redirecting to login');
+        navigate('/', { replace: true });
+      }
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, checkAuth, navigate]);
 
   return { isAuthenticated, isLoading };
 };
