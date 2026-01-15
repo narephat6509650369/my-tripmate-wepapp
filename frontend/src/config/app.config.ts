@@ -1,48 +1,74 @@
 // ============================================================================
-// config/app.config.ts
-// Application Configuration & Logging
+// frontend/src/config/app.config.ts
+// ✅ Configuration สำหรับ Development / Production
 // ============================================================================
 
 /**
- * ตั้งค่าแอปพลิเคชัน
+ * ✅ ตั้งค่าโหมดการทำงาน
  */
-export const CONFIG = {
-  USE_MOCK_DATA: true,              // เปลี่ยนเป็น false เมื่อต่อ API จริง
-  API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
+export const APP_CONFIG = {
+  // 🔧 Development Settings
+  USE_MOCK_DATA: import.meta.env.VITE_USE_MOCK_DATA === 'true' || false,
+  
+  // 🌐 API Settings
+  API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+  
+  // 🔑 Auth Settings
+  SKIP_AUTH_IN_DEV: import.meta.env.VITE_SKIP_AUTH === 'true' || false,
+  
+  // 🎨 UI Settings
+  ENABLE_DEV_TOOLS: import.meta.env.DEV || false,
+  
+  // ⏱️ Timeouts
   API_TIMEOUT: 10000,
-  DEBUG_MODE: import.meta.env.DEV,
-  ENABLE_CONSOLE_LOGS: true,
+  MOCK_DELAY: 500,
 } as const;
 
 /**
- * ฟังก์ชันสำหรับ log ข้อมูล
+ * ✅ Development Mode Status
  */
-export const log = {
-  info: (message: string, data?: any) => { 
-    if (!CONFIG.ENABLE_CONSOLE_LOGS) return;
-    console.log(`ℹ️ [INFO] ${message}`, data || ''); 
-  },
-  warn: (...args: any[]) => {
-    if (!CONFIG.ENABLE_CONSOLE_LOGS) return;
-    console.warn('⚠️', ...args);
-  },
-  success: (message: string, data?: any) => { 
-    if (!CONFIG.ENABLE_CONSOLE_LOGS) return;
-    console.log(`✅ [SUCCESS] ${message}`, data || ''); 
-  },
-  error: (message: string, data?: any) => { 
-    console.error(`❌ [ERROR] ${message}`, data || ''); 
-  },
-  mock: (message: string, data?: any) => { 
-    if (!CONFIG.ENABLE_CONSOLE_LOGS || !CONFIG.USE_MOCK_DATA) return;
-    console.log(`🎭 [MOCK] ${message}`, data || ''); 
-  },
-  api: (message: string, data?: any) => { 
-    if (!CONFIG.ENABLE_CONSOLE_LOGS) return;
-    console.log(`🌐 [API] ${message}`, data || ''); 
-  },
-  debug: (...args: any[]) => {
-    if (!CONFIG.DEBUG_MODE) return;
-    console.debug('🔍', ...args);
+export const isDevelopment = import.meta.env.DEV;
+export const isProduction = import.meta.env.PROD;
+
+/**
+ * ✅ Feature Flags
+ */
+export const FEATURES = {
+  ENABLE_MOCK_DATA: APP_CONFIG.USE_MOCK_DATA,
+  ENABLE_AUTH_BYPASS: APP_CONFIG.SKIP_AUTH_IN_DEV,
+  ENABLE_CONSOLE_LOGS: isDevelopment,
+} as const;
+
+/**
+ * ✅ Mock User สำหรับ Development
+ */
+export const MOCK_USER = {
+  user_id: 'mock-user-123',
+  email: 'dev@tripmate.com',
+  full_name: 'Developer',
+  avatar_url: null,
+};
+
+/**
+ * ✅ Mock Token สำหรับ Development
+ */
+export const MOCK_TOKEN = 'mock-jwt-token-for-development';
+
+/**
+ * ✅ Helper: Log Configuration
+ */
+export const logConfig = () => {
+  if (isDevelopment) {
+    console.log('🔧 App Configuration:', {
+      mode: import.meta.env.MODE,
+      useMockData: APP_CONFIG.USE_MOCK_DATA,
+      skipAuth: APP_CONFIG.SKIP_AUTH_IN_DEV,
+      apiUrl: APP_CONFIG.API_BASE_URL,
+    });
   }
 };
+
+// ✅ Export แบบเก่าด้วย (backward compatibility)
+export const CONFIG = APP_CONFIG;
+
+export default APP_CONFIG;
