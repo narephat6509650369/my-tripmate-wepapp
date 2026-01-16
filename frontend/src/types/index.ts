@@ -53,6 +53,8 @@ export interface AuthResponse {
   };
 }
 
+
+
 // ============================================================================
 // TRIP TYPES (ตรงกับ Backend Model)
 // ============================================================================
@@ -98,16 +100,57 @@ export interface MyTripsResponse {
 }
 
 export interface TripDetail {
-  trip_id: string;
-  owner_id: string;
-  trip_name: string;
+  tripid: string;
+  ownerid: string;
+  tripname: string;
   description: string | null;
-  num_days: number;
-  invite_code: string;
-  invite_link: string;
-  status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived';
-  created_at: string;
-  member_count: number;
+  numdays: number;
+  invitecode: string;
+  invitelink: string;
+  status: string;
+  createdat: string;
+  updatedat?: string;
+  confirmedat?: string | null;
+  isactive?: boolean;
+  members: Member[];
+  dateRanges: DateRange[];
+  provinceVotes: ProvinceVote[];
+  budgetOptions: BudgetOption[];
+  memberAvailabilitys: MemberAvailability[];
+}
+
+export interface Member {
+  id: string;
+  userId: string;
+  role: string;
+  fullName: string;
+  avatarUrl: string | null;
+  joinedAt: number;
+  isActive: boolean;
+}
+
+export interface DateRange {
+  startDate: string;
+  endDate: string;
+}
+
+export interface ProvinceVote {
+  provinceName: string;
+  voteCount: number;
+}
+
+export interface BudgetOption {
+  categoryName: string;
+  estimatedAmount: number;
+  priority: number;
+  isBackup: boolean;
+}
+
+export interface MemberAvailability {
+  userId: string;
+  fullName: string;
+  avatarUrl: string | null;
+  availableDates: string[]; // ["2025-12-25", "2025-12-26"]
 }
 
 // ============================================================================
@@ -355,3 +398,5 @@ export const tripSummaryToCard = (trip: TripSummary): TripCard => {
     isCompleted
   };
 };
+
+

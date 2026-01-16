@@ -52,14 +52,14 @@ const VotePage: React.FC = () => {
         setError(null);
         
         const response = await tripAPI.getTripDetail(tripCode);
-        
+        console.log("Trip detail response:", response);
         if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
 
         const tripData = response.data;
         
-        setInviteCode(tripData.invite_code);
+        setInviteCode(tripData.invitecode);
         setTrip(tripData);
         setLoading(false);
         
@@ -93,7 +93,7 @@ const VotePage: React.FC = () => {
     
     try {
       const response = await voteAPI.submitAvailability({
-        trip_id: trip.trip_id,
+        trip_id: trip.tripid,
         ranges
       });
       
@@ -113,7 +113,7 @@ const VotePage: React.FC = () => {
     if (!trip) return;
     
     try {
-      const response = await voteAPI.updateBudget(trip.invite_code, {
+      const response = await voteAPI.updateBudget(trip.invitecode, {
         category: category as any,
         amount
       });
@@ -134,7 +134,7 @@ const VotePage: React.FC = () => {
     if (!trip) return;
     
     try {
-      const response = await voteAPI.submitLocationVote(trip.invite_code, { votes });
+      const response = await voteAPI.submitLocationVote(trip.invitecode, { votes });
       
       if (response.success) {
         setToast({ message: 'โหวตสำเร็จ', type: 'success' });
@@ -332,7 +332,7 @@ const VotePage: React.FC = () => {
           {step === 5 && (
             <StepSummary 
               trip={trip}
-              onNavigateToSummary={() => navigate(`/summary/${tripCode}`)}
+              //onNavigateToSummary={() => navigate(`/summary/${tripCode}`)}
             />
           )}
         </div>
