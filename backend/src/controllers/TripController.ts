@@ -245,7 +245,7 @@ export const removeMemberController = async (req: Request, res: Response) => {
 // ดึงรายละเอียดทริป แค่ทริปที่เป็นสมาชิกอยู่เท่านั้น
 export const getTripDetailController = async (req: Request, res: Response) => {
   try {
-    const { tripId } = req.params;
+    const { tripCode } = req.params;
     const userId = req.user?.userId;
 
     if (!userId) {
@@ -256,16 +256,17 @@ export const getTripDetailController = async (req: Request, res: Response) => {
       });
     }
 
-    if (!tripId) {
+    if (!tripCode) {
       return res.status(400).json({
         success: false,
         code: "MISSING_FIELD",
-        message: "tripId is required",
-        error: { field: "tripId" }
+        message: "tripCode is required",
+        error: { field: "tripCode" }
       });
     }
 
-    const trip = await getTripDetail(tripId);
+    const trip = await getTripDetail(tripCode);
+
     if (!trip) {
       return res.status(404).json({
         success: false,
@@ -275,7 +276,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
     }
 
     const isMember = trip.members?.some(
-      (m: any) => m.id === userId
+      (m: any) => m.userId.toString() === userId
     );
 
     if (!isMember) {

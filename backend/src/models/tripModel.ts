@@ -103,16 +103,16 @@ export interface Date{
     end: string;
 }
 export interface TripDetail extends RowDataPacket {
-    tripid: string;
-    ownerid: string;
-    tripname: string;
+    trip_id: string;
+    owner_id: string;
+    trip_name: string;
     description: string | null;
-    numdays: number;
-    invitecode: string;
-    invitelink: string;
+    num_days: number;
+    invite_code: string;
+    invite_link: string;
     status: string;
-    createdat: Date;
-    membercount: number;
+    created_at: Date;
+    member_count: number;
     members?: TripMember[];
     dateRanges?: DateRange[];
     provinceVotes?: {
@@ -414,23 +414,14 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
 
   const [memberAvailabilityRows] = await pool.query<any[]>(MemberAvailabilitys, [tripId]);
 
-return {
-  tripid: tripRows[0].trip_id,
-  ownerid: tripRows[0].owner_id,
-  tripname: tripRows[0].trip_name,
-  description: tripRows[0].description,
-  numdays: tripRows[0].num_days,
-  invitecode: tripRows[0].invite_code,
-  invitelink: tripRows[0].invite_link,
-  status: tripRows[0].status,
-  createdat: tripRows[0].created_at,
-  membercount: tripRows[0].member_count,
-  members: memberRows,
-  dateRanges: dateRows,
-  provinceVotes: provinceRows,
-  budgetOptions: budgetRows,
-  memberAvailabilitys: memberAvailabilityRows,
-} as TripDetail;
+  return {
+    ...tripRows[0],
+    members: memberRows,
+    dateRanges: dateRows,
+    provinceVotes: provinceRows,
+    budgetOptions: budgetRows,
+    memberAvailabilitys: memberAvailabilityRows
+  };
 }
 
 export async function groupDatesToRanges(dates: string[]): Promise<{ start: string; end: string }[]> {

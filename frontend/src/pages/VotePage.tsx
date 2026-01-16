@@ -71,7 +71,7 @@ const VotePage: React.FC = () => {
         console.log('🔍 Loading trip:', tripCode);
         
         const response = await tripAPI.getTripDetail(tripCode);
-        console.log("Trip detail response:", response);
+        
         if (!response || !response.success || !response.data) {
           throw new Error(response?.message || 'ไม่พบข้อมูลทริป');
         }
@@ -162,7 +162,7 @@ const VotePage: React.FC = () => {
       console.log('💾 Saving dates:', ranges);
       
       const response = await voteAPI.submitAvailability({
-        trip_id: trip.tripid,
+        trip_id: trip.trip_id,
         ranges
       });
       
@@ -203,16 +203,10 @@ const VotePage: React.FC = () => {
   // ============================================================================
 
   const handleSaveBudget = async (category: string, amount: number) => {
-    if (!trip) {
-      setToast({ message: 'ไม่พบข้อมูลทริป', type: 'error' });
-      return;
-    }
-    
-    setSaving(true);
+    if (!trip) return;
     
     try {
-<<<<<<< HEAD
-      const response = await voteAPI.updateBudget(trip.invitecode, {
+      const response = await voteAPI.updateBudget(trip.invite_code, {
         category: category as any,
 =======
       console.log('💾 Saving budget:', { category, amount });
@@ -250,21 +244,10 @@ const VotePage: React.FC = () => {
   // ============================================================================
 
   const handleVoteLocation = async (votes: [string, string, string]) => {
-    if (!trip) {
-      setToast({ message: 'ไม่พบข้อมูลทริป', type: 'error' });
-      return;
-    }
-    
-    setSaving(true);
+    if (!trip) return;
     
     try {
-<<<<<<< HEAD
-      const response = await voteAPI.submitLocationVote(trip.invitecode, { votes });
-=======
-      console.log('💾 Voting location:', votes);
-      
       const response = await voteAPI.submitLocationVote(trip.invite_code, { votes });
->>>>>>> 59dcfd2d1d16c01491237a32cdfa0ce1fc61ca1d
       
       if (response.success) {
         setToast({ message: 'โหวตสำเร็จ ✅', type: 'success' });
@@ -482,11 +465,7 @@ const VotePage: React.FC = () => {
             <StepSummary 
 <<<<<<< HEAD
               trip={trip}
-              //onNavigateToSummary={() => navigate(`/summary/${tripCode}`)}
-=======
-              trip={trip} 
-              onNavigateToStep={setStep} 
->>>>>>> 59dcfd2d1d16c01491237a32cdfa0ce1fc61ca1d
+              onNavigateToSummary={() => navigate(`/summary/${tripCode}`)}
             />
           )}
         </div>

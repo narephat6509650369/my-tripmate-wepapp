@@ -53,8 +53,6 @@ export interface AuthResponse {
   };
 }
 
-
-
 // ============================================================================
 // TRIP TYPES (ตรงกับ Backend Model)
 // ============================================================================
@@ -102,9 +100,9 @@ export interface MyTripsResponse {
 
 // ✅ แก้ไข: เพิ่ม fields ที่ Backend ส่งกลับมา
 export interface TripDetail {
-  tripid: string;
-  ownerid: string;
-  tripname: string;
+  trip_id: string;
+  owner_id: string;
+  trip_name: string;
   description: string | null;
   num_days: number;
   invite_code: string;
