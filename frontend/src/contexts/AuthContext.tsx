@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { ApiResponse } from '../types/apiResponse';
+import type { ApiResponse } from '../types/index';
 
 // ============== TYPES ==============
 export interface User {
@@ -133,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       console.log('✅ Login successful:', user.email);
+      navigate('/homepage');
 
     } catch (error: any) {
       console.error('❌ Login failed:', error);
