@@ -192,16 +192,17 @@ ${topProvinces.length > 0 ? topProvinces.map((p, i) => `${i + 1}. ${p.name} (${p
         
         {/* Header */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <button
+            onClick={() => navigate("/homepage")}
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-semibold transition-colors"
+          >
+            ← กลับไปหน้าหลัก
+          </button>
+
           <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
             <h1 className="text-2xl font-bold text-gray-800">
               📊 สรุปผลการวางแผนทริป
             </h1>
-            <button
-              onClick={() => navigate("/homepage")}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition text-sm"
-            >
-              ← กลับหน้าหลัก
-            </button>
           </div>
           
           <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">

@@ -1,6 +1,6 @@
 // ============================================================================
 // frontend/src/types/index.ts
-// ✅ Types ที่ตรงกับ Backend APIs เท่านั้น
+// ✅ ฉบับแก้ไข - ตรงกับ Backend Response 100%
 // ============================================================================
 
 // ============================================================================
@@ -68,7 +68,7 @@ export interface Trip {
   invite_code: string;
   invite_link: string;
   status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived';
-  created_at: string;           // ✅ Backend ส่งมาเป็น ISO string
+  created_at: string;
   updated_at?: string;
   confirmed_at?: string | null;
   is_active?: boolean;
@@ -91,6 +91,7 @@ export interface TripSummary {
   status: string;
   role: 'owner' | 'member';
   num_members: number;
+  created_at?: string; // ✅ เพิ่ม
 }
 
 export interface MyTripsResponse {
@@ -99,58 +100,18 @@ export interface MyTripsResponse {
   joined: TripSummary[];
 }
 
+// ✅ แก้ไข: เพิ่ม fields ที่ Backend ส่งกลับมา
 export interface TripDetail {
   tripid: string;
   ownerid: string;
   tripname: string;
   description: string | null;
-  numdays: number;
-  invitecode: string;
-  invitelink: string;
-  status: string;
-  createdat: string;
-  updatedat?: string;
-  confirmedat?: string | null;
-  isactive?: boolean;
-  members: Member[];
-  dateRanges: DateRange[];
-  provinceVotes: ProvinceVote[];
-  budgetOptions: BudgetOption[];
-  memberAvailabilitys: MemberAvailability[];
-}
-
-export interface Member {
-  id: string;
-  userId: string;
-  role: string;
-  fullName: string;
-  avatarUrl: string | null;
-  joinedAt: number;
-  isActive: boolean;
-}
-
-export interface DateRange {
-  startDate: string;
-  endDate: string;
-}
-
-export interface ProvinceVote {
-  provinceName: string;
-  voteCount: number;
-}
-
-export interface BudgetOption {
-  categoryName: string;
-  estimatedAmount: number;
-  priority: number;
-  isBackup: boolean;
-}
-
-export interface MemberAvailability {
-  userId: string;
-  fullName: string;
-  avatarUrl: string | null;
-  availableDates: string[]; // ["2025-12-25", "2025-12-26"]
+  num_days: number;
+  invite_code: string;
+  invite_link: string;
+  status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived';
+  created_at: string;
+  member_count: number;
 }
 
 // ============================================================================
@@ -231,9 +192,21 @@ export interface JoinTripPayload {
 }
 
 export interface JoinTripResponse {
+  // Backend ส่ง snake_case
   trip_id: string;
   trip_name: string;
-  rejoined: boolean;
+  rejoined?: boolean;
+  
+  // รองรับ camelCase (สำหรับ backward compatibility)
+  tripId?: string;
+  tripName?: string;
+}
+
+// หรือใช้แบบนี้ถ้าต้องการ strict
+export interface JoinTripResponseStrict {
+  trip_id: string;
+  trip_name: string;
+  rejoined?: boolean;
 }
 
 // ============================================================================
@@ -264,7 +237,8 @@ export interface StartVotingResponse {
 // BUDGET TYPES
 // ============================================================================
 
-export type BudgetCategory = 'accommodation' | 'transport' | 'food' | 'other';
+// ✅ เพิ่ม: รองรับ string ด้วย (กรณี DB ไม่มี constraint)
+export type BudgetCategory = 'accommodation' | 'transport' | 'food' | 'other' | string;
 
 export interface Budget {
   accommodation: number;
@@ -398,5 +372,3 @@ export const tripSummaryToCard = (trip: TripSummary): TripCard => {
     isCompleted
   };
 };
-
-

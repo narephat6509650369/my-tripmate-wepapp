@@ -1,22 +1,31 @@
+// ============================================================================
 // src/pages/VotePage.tsx
+// ✅ แก้ไข: แก้ getHeatmap error
+// ============================================================================
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, AlertCircle, Copy, Clock } from "lucide-react";
+import { Loader2, AlertCircle, Copy } from "lucide-react";
 
 // Components
 import Header from "../components/Header";
-import { Toast } from "../components/Toast";
+import Toast from "../components/Toast";
 import StepVote from "./VotePage/components/StepVote";
-import StepBudget from './VotePage/components/StepBudget';
-import StepPlace from './VotePage/components/StepPlace';
-import StepSummary from './VotePage/components/StepSummary';
+import StepBudget from "./VotePage/components/StepBudget";
+import StepPlace from "./VotePage/components/StepPlace";
+import StepSummary from "./VotePage/components/StepSummary";
+import OwnerControls from "./VotePage/components/OwnerControls";
+import MemberControls from "./VotePage/components/MemberControls";
 
 // Hooks & Utils
 import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, voteAPI } from '../services/tripService';
-import type { TripDetail, DateRange } from '../types';
+import type { TripDetail, DateRange, HeatmapData } from '../types';
 
-// ============== MAIN COMPONENT ==============
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 const VotePage: React.FC = () => {
   const { tripCode: urlCode } = useParams<{ tripCode: string }>();
   const tripCode = urlCode || "UNKNOWN";
@@ -28,17 +37,25 @@ const VotePage: React.FC = () => {
     type: 'success' | 'error' | 'info';
   } | null>(null);
 
-  // ============== STATE ==============
+  // ============================================================================
+  // STATE
+  // ============================================================================
+
   const [trip, setTrip] = useState<TripDetail | null>(null);
+  const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
   const [inviteCode, setInviteCode] = useState<string>("");
   const [step, setStep] = useState(2);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const displayCode = inviteCode || tripCode;
 
-  // ============== LOAD TRIP DATA ==============
+  // ============================================================================
+  // ✅ LOAD TRIP DATA
+  // ============================================================================
+
   useEffect(() => {
     const loadTripData = async () => {
       if (tripCode === "UNKNOWN") {
@@ -51,32 +68,74 @@ const VotePage: React.FC = () => {
         setLoading(true);
         setError(null);
         
+        console.log('🔍 Loading trip:', tripCode);
+        
         const response = await tripAPI.getTripDetail(tripCode);
         console.log("Trip detail response:", response);
         if (!response || !response.success || !response.data) {
-          throw new Error('ไม่พบข้อมูลทริป');
+          throw new Error(response?.message || 'ไม่พบข้อมูลทริป');
         }
 
         const tripData = response.data;
         
-        setInviteCode(tripData.invitecode);
+        setInviteCode(tripData.invite_code);
         setTrip(tripData);
-        setLoading(false);
         
-        console.log('✅ Trip loaded:', tripData);
+        console.log('✅ Trip loaded:', {
+          trip_id: tripData.trip_id,
+          trip_name: tripData.trip_name,
+          invite_code: tripData.invite_code
+        });
         
       } catch (error: any) {
-        console.error("Error loading trip:", error);
-        setError("ไม่สามารถโหลดข้อมูลทริปได้");
-        setLoading(false);
+        console.error("❌ Error loading trip:", error);
+        setError(error.message || "ไม่สามารถโหลดข้อมูลทริปได้");
         setTimeout(() => navigate("/homepage"), 3000);
+      } finally {
+        setLoading(false);
       }
     };
     
     loadTripData();
   }, [tripCode, navigate]);
 
-  // ============== HANDLERS ==============
+  // ============================================================================
+  // ✅ LOAD HEATMAP DATA (แก้ไข)
+  // ============================================================================
+
+  useEffect(() => {
+    const loadHeatmap = async () => {
+      if (!trip?.tripid) {
+        console.log('⏭️ Skip heatmap: no trip_id yet');
+        return;
+      }
+      
+      try {
+        console.log('🔥 Loading heatmap for trip:', trip.tripid);
+        
+        // ✅ แก้ไข: เรียก getTripHeatmap แทน getHeatmap
+        const response = await voteAPI.getTripHeatmap(trip.tripid);
+        
+        if (response.success && response.data) {
+          setHeatmapData(response.data);
+          console.log('✅ Heatmap loaded:', response.data);
+        } else {
+          console.warn('⚠️ Heatmap not available:', response.message);
+        }
+      } catch (error: any) {
+        // ✅ ไม่แสดง error เพราะไม่ critical
+        console.warn('⚠️ Failed to load heatmap:', error.message);
+        // Heatmap เป็น optional feature
+      }
+    };
+    
+    loadHeatmap();
+  }, [trip?.trip_id]);
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
     setCopied(type);
@@ -87,74 +146,151 @@ const VotePage: React.FC = () => {
     logout();
   };
 
-  // ✅ Save Dates
+  // ============================================================================
+  // ✅ SAVE DATES
+  // ============================================================================
+
   const handleSaveDates = async (ranges: DateRange[]) => {
-    if (!trip) return;
+    if (!trip) {
+      setToast({ message: 'ไม่พบข้อมูลทริป', type: 'error' });
+      return;
+    }
+    
+    setSaving(true);
     
     try {
+      console.log('💾 Saving dates:', ranges);
+      
       const response = await voteAPI.submitAvailability({
         trip_id: trip.tripid,
         ranges
       });
       
       if (response.success) {
-        setToast({ message: 'บันทึกวันที่สำเร็จ', type: 'success' });
+        setToast({ message: 'บันทึกวันที่สำเร็จ ✅', type: 'success' });
+        
+        // ✅ Reload trip data
+        const updatedTrip = await tripAPI.getTripDetail(tripCode);
+        if (updatedTrip.success && updatedTrip.data) {
+          setTrip(updatedTrip.data);
+        }
+        
+        // ✅ Reload heatmap
+        try {
+          const updatedHeatmap = await voteAPI.getTripHeatmap(trip.trip_id);
+          if (updatedHeatmap.success && updatedHeatmap.data) {
+            setHeatmapData(updatedHeatmap.data);
+          }
+        } catch (heatmapError) {
+          console.warn('⚠️ Failed to reload heatmap:', heatmapError);
+        }
       } else {
-        throw new Error(response.message);
+        throw new Error(response.message || 'เกิดข้อผิดพลาด');
       }
-    } catch (error) {
-      console.error('Error saving dates:', error);
-      setToast({ message: 'เกิดข้อผิดพลาด', type: 'error' });
+    } catch (error: any) {
+      console.error('❌ Error saving dates:', error);
+      setToast({ 
+        message: error.message || 'เกิดข้อผิดพลาด ❌', 
+        type: 'error' 
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
-  // ✅ Save Budget
+  // ============================================================================
+  // ✅ SAVE BUDGET
+  // ============================================================================
+
   const handleSaveBudget = async (category: string, amount: number) => {
-    if (!trip) return;
+    if (!trip) {
+      setToast({ message: 'ไม่พบข้อมูลทริป', type: 'error' });
+      return;
+    }
+    
+    setSaving(true);
     
     try {
+<<<<<<< HEAD
       const response = await voteAPI.updateBudget(trip.invitecode, {
         category: category as any,
+=======
+      console.log('💾 Saving budget:', { category, amount });
+      
+      const response = await voteAPI.updateBudget(trip.invite_code, {
+        category,
+>>>>>>> 59dcfd2d1d16c01491237a32cdfa0ce1fc61ca1d
         amount
       });
       
       if (response.success) {
-        setToast({ message: 'บันทึกงบประมาณสำเร็จ', type: 'success' });
+        setToast({ message: 'บันทึกงบประมาณสำเร็จ ✅', type: 'success' });
+        
+        // ✅ Reload trip data
+        const updatedTrip = await tripAPI.getTripDetail(tripCode);
+        if (updatedTrip.success && updatedTrip.data) {
+          setTrip(updatedTrip.data);
+        }
       } else {
-        throw new Error(response.message);
+        throw new Error(response.message || 'เกิดข้อผิดพลาด');
       }
-    } catch (error) {
-      console.error('Error saving budget:', error);
-      setToast({ message: 'เกิดข้อผิดพลาด', type: 'error' });
+    } catch (error: any) {
+      console.error('❌ Error saving budget:', error);
+      setToast({ 
+        message: error.message || 'เกิดข้อผิดพลาด ❌', 
+        type: 'error' 
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
-  // ✅ Vote Location
+  // ============================================================================
+  // ✅ VOTE LOCATION
+  // ============================================================================
+
   const handleVoteLocation = async (votes: [string, string, string]) => {
-    if (!trip) return;
+    if (!trip) {
+      setToast({ message: 'ไม่พบข้อมูลทริป', type: 'error' });
+      return;
+    }
+    
+    setSaving(true);
     
     try {
+<<<<<<< HEAD
       const response = await voteAPI.submitLocationVote(trip.invitecode, { votes });
+=======
+      console.log('💾 Voting location:', votes);
+      
+      const response = await voteAPI.submitLocationVote(trip.invite_code, { votes });
+>>>>>>> 59dcfd2d1d16c01491237a32cdfa0ce1fc61ca1d
       
       if (response.success) {
-        setToast({ message: 'โหวตสำเร็จ', type: 'success' });
+        setToast({ message: 'โหวตสำเร็จ ✅', type: 'success' });
+        
+        // ✅ Reload trip data
+        const updatedTrip = await tripAPI.getTripDetail(tripCode);
+        if (updatedTrip.success && updatedTrip.data) {
+          setTrip(updatedTrip.data);
+        }
       } else {
-        throw new Error(response.message);
+        throw new Error(response.message || 'เกิดข้อผิดพลาด');
       }
-    } catch (error) {
-      console.error('Error voting location:', error);
-      setToast({ message: 'เกิดข้อผิดพลาด', type: 'error' });
+    } catch (error: any) {
+      console.error('❌ Error voting location:', error);
+      setToast({ 
+        message: error.message || 'เกิดข้อผิดพลาด ❌', 
+        type: 'error' 
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const next = async () => {
-    if (step >= 5) return;
-    
-    try {
-      // Auto-save logic here if needed
+  const next = () => {
+    if (step < 5) {
       setStep(step + 1);
-    } catch (error) {
-      setToast({ message: '❌ เกิดข้อผิดพลาด', type: 'error' });
     }
   };
 
@@ -162,7 +298,10 @@ const VotePage: React.FC = () => {
     if (step > 2) setStep(step - 1); 
   };
 
-  // ============== LOADING & ERROR STATES ==============
+  // ============================================================================
+  // LOADING & ERROR STATES
+  // ============================================================================
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -193,13 +332,17 @@ const VotePage: React.FC = () => {
     );
   }
 
-  // ============== MAIN RENDER ==============
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+
   const stepLabels = ["สร้างทริป", "เลือกวันที่", "งบประมาณ", "สถานที่", "สรุปผล"];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       <Header onLogout={handleLogout} />
 
+      {/* Toast Notification */}
       {toast && (
         <Toast 
           message={toast.message}
@@ -252,6 +395,10 @@ const VotePage: React.FC = () => {
       </div>
       
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Owner/Member Controls */}
+        <OwnerControls trip={trip} />
+        <MemberControls trip={trip} />
+
         {/* Progress Steps */}
         <div className="mb-8 sm:mb-12">
           <div className="relative">
@@ -270,7 +417,6 @@ const VotePage: React.FC = () => {
                 
                 return (
                   <div key={idx} className="flex flex-col items-center">
-                    {/* Step Circle */}
                     <div className={`
                       w-10 h-10 sm:w-12 sm:h-12 
                       flex items-center justify-center 
@@ -287,7 +433,6 @@ const VotePage: React.FC = () => {
                       {isCompleted ? "✓" : stepNum}
                     </div>
                     
-                    {/* Step Label */}
                     <span className={`
                       text-[10px] sm:text-xs 
                       mt-2 sm:mt-3 
@@ -310,29 +455,38 @@ const VotePage: React.FC = () => {
         <div className="mb-8">
           {step === 2 && (
             <StepVote 
-              trip={trip}
+              trip={trip} 
               onSave={handleSaveDates}
+              heatmapData={heatmapData}
+              memberAvailabilities={trip.memberAvailabilitys || []}
             />
           )}
-
+          
           {step === 3 && (
             <StepBudget 
-              trip={trip}
+              trip={trip} 
               onSave={handleSaveBudget}
+              budgetOptions={trip.budgetOptions || []}
             />
           )}
-
+          
           {step === 4 && (
             <StepPlace 
-              trip={trip}
+              trip={trip} 
               onVote={handleVoteLocation}
+              provinceVotes={trip.provinceVotes || []}
             />
           )}
-
+          
           {step === 5 && (
             <StepSummary 
+<<<<<<< HEAD
               trip={trip}
               //onNavigateToSummary={() => navigate(`/summary/${tripCode}`)}
+=======
+              trip={trip} 
+              onNavigateToStep={setStep} 
+>>>>>>> 59dcfd2d1d16c01491237a32cdfa0ce1fc61ca1d
             />
           )}
         </div>
@@ -341,19 +495,30 @@ const VotePage: React.FC = () => {
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <button 
             onClick={back}
-            disabled={step === 2}
+            disabled={step === 2 || saving}
             className="bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-gray-700 font-semibold text-sm sm:text-base border-2 border-gray-200 hover:border-gray-300 transition-all shadow-sm min-h-[48px]"
           >
             <span className="hidden sm:inline">← ย้อนกลับ</span>
             <span className="sm:hidden">← ย้อน</span>
           </button>
+          
           <button 
             onClick={next}
-            disabled={step === stepLabels.length}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-white font-semibold text-sm sm:text-base transition-all shadow-lg hover:shadow-xl min-h-[48px]"
+            disabled={step === stepLabels.length || saving}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-white font-semibold text-sm sm:text-base transition-all shadow-lg hover:shadow-xl min-h-[48px] flex items-center justify-center gap-2"
           >
-            <span className="hidden sm:inline">หน้าถัดไป →</span>
-            <span className="sm:hidden">ถัดไป →</span>
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="hidden sm:inline">กำลังบันทึก...</span>
+                <span className="sm:hidden">บันทึก...</span>
+              </>
+            ) : (
+              <>
+                <span className="hidden sm:inline">หน้าถัดไป →</span>
+                <span className="sm:hidden">ถัดไป →</span>
+              </>
+            )}
           </button>
         </div>
       </main>
