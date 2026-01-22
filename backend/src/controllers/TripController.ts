@@ -266,6 +266,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
     }
 
     const trip = await getTripDetail(tripId);
+    console.log("trip detail controller:",trip);
     if (!trip) {
       return res.status(404).json({
         success: false,

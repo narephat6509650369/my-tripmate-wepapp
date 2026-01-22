@@ -2,19 +2,18 @@ import { pool } from "../config/db.js";
 import type { RowDataPacket } from "mysql2";
 import { v4 as uuidv4 } from 'uuid';
 
+export const getConnection = async () => {
+  return await pool.getConnection();
+};
+
 // ================= DATE VOTING SECTION =================
 
-export const addAvailability = async (
-  trip_id: string, 
-  user_id: string, 
-  start_date: string, 
-  end_date: string
-) => {
+export const addAvailability = async ( trip_id: string, user_id: string, available_date: Date ) => {
   const [result] = await pool.query(
     `INSERT INTO trip_user_availabilities 
-     (availability_id, trip_id, user_id, start_date, end_date)
-     VALUES (UUID(), ?, ?, ?, ?)`,
-    [trip_id, user_id, start_date, end_date]
+     (availability_id, trip_id, user_id, available_date)
+     VALUES (UUID(), ?, ?, ?)`,
+    [trip_id, user_id, available_date]
   );
   return result;
 };
@@ -29,7 +28,10 @@ export const clearUserAvailability = async (trip_id: string, user_id: string) =>
 
 export const getTripAvailabilities = async (trip_id: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT user_id, start_date, end_date 
+    `SELECT 
+      user_id, 
+      start_date, 
+      end_date 
      FROM trip_user_availabilities 
      WHERE trip_id = ?`,
     [trip_id]
@@ -37,7 +39,7 @@ export const getTripAvailabilities = async (trip_id: string) => {
   return rows;
 };
 
-export const insertDateVoting = async (date_voting_id: string, trip_id: string) => {
+export const saveUserAvailability = async (date_voting_id: string, trip_id: string) => {
   const [result] = await pool.query(
     `INSERT INTO date_votings (date_voting_id, trip_id, status)
      VALUES (?, ?, 'active')`,
@@ -48,12 +50,102 @@ export const insertDateVoting = async (date_voting_id: string, trip_id: string) 
 
 export const getActiveDateVotingByTrip = async (trip_id: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT * FROM date_votings 
-     WHERE trip_id = ? AND status = 'active'
-     LIMIT 1`,
+    `
+      SELECT * FROM date_votings
+      WHERE trip_id = ? AND status = 'active'
+      LIMIT 1
+    `,
     [trip_id]
   );
-  return rows[0];
+  return rows[0] ?? null;
+};
+
+
+//กรณีที่ algorithm ต้องเก็บ top-N
+export const insertRankingResults = async (trip_id: string, results: { rank: number; date: string; matching_score: number; num_available: number; total_members: number; }[]) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    await conn.query(
+      `DELETE FROM date_ranking_results 
+       WHERE trip_id = ?`,
+      [trip_id]
+    );
+
+    for (const r of results) {
+      await conn.query(
+        `INSERT INTO date_ranking_results 
+         (ranking_id, trip_id, rank, date, matching_score, num_available, total_members)
+         VALUES (UUID(), ?, ?, ?, ?, ?, ?)`,
+        [
+          trip_id,
+          r.rank,
+          r.date,
+          r.matching_score,
+          r.num_available,
+          r.total_members
+        ]
+      );
+    }
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
+export const getRankingResults = async (trip_id: string) => {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT rank, date, matching_score, num_available, total_members
+     FROM date_ranking_results
+     WHERE trip_id = ?
+     ORDER BY rank ASC`,
+    [trip_id]
+  );
+  return rows;
+};
+
+export const getAvailabilitiesByTrip = async (tripId: string) => {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT user_id, start_date, end_date
+     FROM trip_user_availabilities
+     WHERE trip_id = ?`,
+    [tripId]
+  );
+  return rows;
+};
+
+export const getActiveMemberCount = async (tripId: string): Promise<number> => {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) as total 
+     FROM trip_members 
+     WHERE trip_id = ? AND is_active = 1`,
+    [tripId]
+  );
+  return rows?.[0]?.total ?? 0;
+};
+
+export const insertDateVoting  = async (connection: unknown, trip_id: string, date_voting_id: string) => {
+  await pool.query(
+    `INSERT INTO date_votings (date_voting_id, trip_id, status) 
+       VALUES (?, ?, 'active')`,
+      [date_voting_id, trip_id]
+  );
+};
+
+export const clearActiveVotingByTrip = async (conn: any, trip_id: string) => {
+  await conn.query(
+    `
+      UPDATE date_votings
+      SET status = 'closed'
+      WHERE trip_id = ? AND status = 'active'
+    `,
+    [trip_id]
+  );
 };
 
 // ================= BUDGET SECTION =================
@@ -95,12 +187,7 @@ export const getBudgetLogs = async (trip_id: string) => {
   return rows;
 };
 
-export const upsertBudget = async (
-  trip_id: string, 
-  user_id: string, 
-  category: string, 
-  amount: number
-) => {
+export const upsertBudget = async (trip_id: string, user_id: string, category: string, amount: number) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -259,15 +346,7 @@ export const getLocationScores = async (trip_id: string) => {
 
 // ================= TRIP STATUS =================
 
-export const updateTripStatus = async (
-  trip_id: string, 
-  status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived'
-) => {
-  await pool.query(
-    'UPDATE trips SET status = ?, updated_at = NOW() WHERE trip_id = ?',
-    [status, trip_id]
-  );
-};
+
 
 export const closeAllVotings = async (trip_id: string) => {
   const connection = await pool.getConnection();
@@ -308,16 +387,21 @@ export const closeAllVotings = async (trip_id: string) => {
 };
 
 export default {
+  getConnection,
   addAvailability,
   clearUserAvailability,
   getTripAvailabilities,
-  insertDateVoting,
+  saveUserAvailability,
   getActiveDateVotingByTrip,
+  insertDateVoting,
+  clearActiveVotingByTrip,
+
+  closeAllVotings,
   getTripBudgets,
   getBudgetLogs,
   upsertBudget,
   submitLocationVotes,
   getLocationScores,
-  updateTripStatus,
-  closeAllVotings
+  insertRankingResults,
+  getRankingResults,
 };

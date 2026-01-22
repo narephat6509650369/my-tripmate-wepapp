@@ -1,23 +1,21 @@
 // src/pages/VotePage/components/StepVote.tsx
-import React, { useState, useEffect } from 'react';
-import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState } from 'react';
 import { voteAPI } from '../../../services/tripService';
 import type { TripDetail, DateRange } from '../../../types';
 
-// ============== TYPES ==============
+
 interface StepVoteProps {
   trip: TripDetail;
-  onSave: (ranges: DateRange[]) => void;
+  onSave?: (dates: string[]) => Promise<void>;
 }
 
-// ============== COMPONENT ==============
-export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave }) => {
-  // ============== STATE ==============
+export const StepVote: React.FC<StepVoteProps> = ({ trip }) => {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
-  const [showResults, setShowResults] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // ============== HANDLERS ==============
+  // ================= HANDLERS =================
+
   const toggleDate = (dateStr: string) => {
     setSelectedDates(prev =>
       prev.includes(dateStr)
@@ -26,45 +24,41 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave }) => {
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedDates.length === 0) {
       alert("กรุณาเลือกอย่างน้อย 1 วัน");
       return;
     }
 
-    // แปลง selected dates เป็น date ranges
-    const sortedDates = [...selectedDates].sort();
-    const ranges: DateRange[] = [];
-    
-    let rangeStart = sortedDates[0];
-    let rangeEnd = sortedDates[0];
-    
-    for (let i = 1; i < sortedDates.length; i++) {
-      const currentDate = new Date(sortedDates[i]);
-      const prevDate = new Date(sortedDates[i - 1]);
-      const daysDiff = Math.round((currentDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (daysDiff === 1) {
-        // ต่อเนื่องกัน
-        rangeEnd = sortedDates[i];
-      } else {
-        // ไม่ต่อเนื่อง - เก็บ range เก่า
-        ranges.push({
-          start_date: rangeStart,
-          end_date: rangeEnd
-        });
-        rangeStart = sortedDates[i];
-        rangeEnd = sortedDates[i];
-      }
-    }
-    
-    // เก็บ range สุดท้าย
-    ranges.push({
-      start_date: rangeStart,
-      end_date: rangeEnd
-    });
+    try {
+      setLoading(true);
 
-    onSave(ranges);
+      if (!trip.tripid) {
+        alert("ไม่พบข้อมูลทริป");
+        return;
+      }
+
+      if(!trip.ownerid){
+        alert("ไม่พบข้อมูลผู้ใช้");
+        return;
+      }
+//เรียก api ครั้งทำไม
+      await voteAPI.submitAvailability({
+        trip_id: trip.tripid,
+        user_id: trip.ownerid,
+        ranges: selectedDates.sort(),
+      });
+
+      console.log("Selected Dates:", selectedDates);
+
+      alert("บันทึกวันว่างเรียบร้อย ✅");
+
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.response?.data?.message || "บันทึกไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ============== RENDER CALENDAR ==============

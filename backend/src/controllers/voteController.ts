@@ -3,11 +3,13 @@ import * as voteService from '../services/voteService.js';
 import type { JwtPayload } from '../express.d.js';
 
 // ================= DATE VOTING =================
-
+// post user ส่งวันว่างที่ตัวเองว่างมา
 export const submitAvailabilityController = async (req: Request, res: Response) => {
   try {
     const { trip_id, ranges } = req.body;
     const userId = (req.user as JwtPayload)?.userId;
+
+    console.log('Received submitAvailability request:', { trip_id, ranges, userId });
 
     if (!trip_id) {
       return res.status(400).json({
@@ -18,28 +20,14 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
       });
     }
 
-    if (!Array.isArray(ranges) || ranges.length === 0) {
-      return res.status(400).json({
+    const result = await voteService.submitAvailability(trip_id, userId, ranges);
+    if (!result) {
+      return res.status(500).json({
         success: false,
-        code: "INVALID_FIELD",
-        message: "ranges must be a non-empty array",
-        error: { field: "ranges" }
+        code: "SUBMISSION_FAILED",
+        message: "Failed to submit availability",
       });
     }
-
-    for (const range of ranges) {
-      if (!range.start_date || !range.end_date) {
-        return res.status(400).json({
-          success: false,
-          code: "INVALID_FIELD",
-          message: "Each range must have start_date and end_date",
-          error: { field: "ranges" }
-        });
-      }
-    }
-
-    const result = await voteService.submitAvailability(trip_id, userId, ranges);
-
     return res.status(200).json({
       success: true,
       code: "AVAILABILITY_SUBMITTED",
@@ -59,6 +47,7 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
   }
 };
 
+// ดึงข้อมูล heatmap ของทริป
 export const getTripHeatmapController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
@@ -93,6 +82,7 @@ export const getTripHeatmapController = async (req: Request, res: Response) => {
   }
 };
 
+// เริ่มการโหวตเลือกวัน
 export const startVotingController = async (req: Request, res: Response) => {
   try {
     const { trip_id } = req.body;
@@ -143,6 +133,40 @@ export const startVotingController = async (req: Request, res: Response) => {
     });
   }
 };
+
+// ดึงผลการ intersection ของวันว่างทั้งหมด
+export const getDateMatchingResultController = async (req: Request, res: Response) => {
+  try {
+    const { tripId } = req.params;
+
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "Trip ID is required",
+        error: { field: "tripId" }
+      });
+    }
+
+    const result = await voteService.getTripDateMatchingResult(tripId);
+
+    return res.status(200).json({
+      success: true,
+      code: "DATE_MATCHING_RESULT",
+      message: "Matching result loaded",
+      data: result
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      code: "INTERNAL_ERROR",
+      message: "Failed to load date matching result",
+      error: { detail: err instanceof Error ? err.message : err }
+    });
+  }
+};
+
 
 // ================= BUDGET & LOCATION =================
 

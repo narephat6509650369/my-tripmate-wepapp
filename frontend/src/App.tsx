@@ -10,6 +10,7 @@ import HomePage from './pages/HomePage';
 import Dashboard from './pages/Dashboard';
 import VotePage from './pages/VotePage';
 import SummaryPage from './pages/SummaryPage';
+import JoinPage from './pages/JoinPage';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LoginPage />} />
+          <Route path="/join/:inviteCode" element={<JoinPage />} />
 
           {/* Protected Routes */}
           <Route path="/homepage" element={
@@ -25,7 +27,7 @@ function App() {
               <HomePage />
             </ProtectedRoute>
           } />
-          
+
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />

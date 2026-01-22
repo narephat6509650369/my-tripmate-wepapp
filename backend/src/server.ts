@@ -19,10 +19,12 @@ async function bootstrap() {
     // ⬇️ import routes หลัง dotenv + passport
     const authRoutes = (await import("./routes/user.js")).default;
     const tripRoutes = (await import("./routes/trip.js")).default;
+    const voteRoutes = (await import("./routes/vote.js")).default;
     const { setupSwagger } = await import("./config/swagger.js");
 
     app.use("/api/auth", authRoutes);
     app.use("/api/trips", tripRoutes);
+    app.use("/api/votes", voteRoutes);
 
     setupSwagger(app);
 

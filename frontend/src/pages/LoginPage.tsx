@@ -8,6 +8,8 @@ function LoginPage() {
   const { login } = useAuth();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const query = new URLSearchParams(location.search);
+  const redirect = query.get("redirect") || undefined;
 
   // ✅ ใช้ useAuth hook แทนการ call API โดยตรง
   const handleGoogleLogin = useGoogleLogin({
@@ -20,7 +22,9 @@ function LoginPage() {
         console.log('🔐 Attempting Google login...');
         
         // ✅ ใช้ login จาก AuthContext
-        await login(tokenResponse.access_token);
+        await login(tokenResponse.access_token, redirect);
+        
+
         
         // AuthContext จะจัดการ navigate ให้เอง
         console.log('✅ Login successful');

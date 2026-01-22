@@ -147,16 +147,20 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
     code: 'TRIP_DETAIL_FETCHED',
     message: 'Trip detail fetched successfully',
     data: {
-      trip_id: trip.trip_id,
-      owner_id: trip.owner_id,
-      trip_name: trip.trip_name,
+      tripid: trip.trip_id,
+      ownerid: trip.owner_id,
+      tripname: trip.trip_name,
       description: trip.description,
-      num_days: trip.num_days,
-      invite_code: trip.invite_code,
-      invite_link: trip.invite_link,
+      numdays: trip.num_days,
+      invitecode: trip.invite_code,
+      invitelink: trip.invite_link,
       status: trip.status,
-      created_at: trip.created_at,
-      member_count: 5
+      createdat: trip.created_at,
+      members: [],
+      dateRanges: [],
+      provinceVotes: [],
+      budgetOptions: [],
+      memberAvailabilitys: []
     }
   };
 };
@@ -285,8 +289,9 @@ export const getMockTripSummary = (tripId: string): ApiResponse => {
  * POST /api/votes/availability
  */
 export const getMockSubmitAvailability = (payload: {
-  trip_id: string;
-  ranges: DateRange[];
+  trip_id: string,
+  user_id: string,
+  ranges: string[];
 }): ApiResponse => {
   return {
     success: true,

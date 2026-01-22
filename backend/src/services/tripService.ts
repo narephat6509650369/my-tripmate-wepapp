@@ -5,19 +5,14 @@ import { getTripSummaryById, type Trip } from '../models/tripModel.js';
 /**
  * สร้างทริปใหม่ พร้อมเพิ่มผู้สร้างเป็นสมาชิกคนแรก (Owner)
  */
-export const addTrip = async (
-  owner_id: string,
-  trip_name: string,
-  description: string | null,
-  num_days: number
-) => {
+export const addTrip = async (owner_id: string,trip_name: string,description: string | null,num_days: number) => {
   // 1. สร้าง IDs
   const trip_id = uuidv4();
   const member_id = uuidv4();
   
   // 2. สร้างรหัสเชิญ
   const invite_code = await tripModel.generateInviteCode();
-  const invite_link = await tripModel.generateInviteLink(trip_id);
+  const invite_link = await tripModel.generateInviteLink(invite_code);
   
   // 3. สร้าง Trip Object
   const tripData: Trip = {
@@ -73,6 +68,7 @@ export const getUserTrips = async (user_id: string) => {
 export const getTripDetail = async (tripCode: string) => {
   
   const trip = await tripModel.getTripDetail(tripCode);
+  console.log("trip service:",trip);
 
   return trip;
 }

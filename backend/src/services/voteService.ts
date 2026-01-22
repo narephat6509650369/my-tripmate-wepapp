@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as voteModel from '../models/voteModel.js';
 import * as tripModel from '../models/tripModel.js';
-import { pool } from '../config/db.js';
+
+
 
 export interface DateRange {
     start_date: string;
@@ -12,39 +13,66 @@ export interface HeatmapData {
     [date: string]: string[];
 }
 
+type AvailabilitySet = {
+  user_id: string;
+  dates: string[]; // ["2025-12-01","2025-12-02",...]
+}
+
 // ===================== DATE VOTING =====================
+
+function buildDateRanges(dates: string[]): DateRange[] {
+  const sorted: string[] = [...new Set(dates)].sort();
+  const ranges: DateRange[] = [];
+
+  if (sorted.length === 0) return [];
+
+  let start = sorted[0]!;
+  let end = sorted[0]!;
+
+  for (let i = 1; i < sorted.length; i++) {
+    const prev: Date = new Date(sorted[i - 1]!);
+    const curr: Date = new Date(sorted[i]!);
+
+    const diff = (curr.getTime() - prev.getTime()) / 86400000;
+
+    if (diff === 1) {
+      end = sorted[i]!;
+    } else {
+      ranges.push({ start_date: start, end_date: end });
+      start = end = sorted[i]!;
+    }
+  }
+
+  ranges.push({ start_date: start, end_date: end });
+  return ranges;
+}
 
 /**
  * 1. บันทึกวันว่างของ User
  */
-export const submitAvailability = async (
-  trip_id: string, 
-  user_id: string, 
-  ranges: DateRange[]
-) => {
-  // Validate
-  if (!ranges || ranges.length === 0) {
-    throw new Error("ranges must not be empty");
-  }
+export const submitAvailability = async ( trip_id: string, user_id: string, dates?: string[] ) => {
+   // ยังไม่โหวต
+  if (dates === undefined) return;
 
-  // Validate date ranges
-  for (const range of ranges) {
-    if (new Date(range.start_date) > new Date(range.end_date)) {
-      throw new Error(`Invalid date range: ${range.start_date} to ${range.end_date}`);
-    }
-  }
-
-  // 1. ลบวันว่างเก่าทิ้ง
+  // clear ของเดิม
   await voteModel.clearUserAvailability(trip_id, user_id);
 
-  // 2. บันทึกวันว่างใหม่
-  const insertPromises = ranges.map(range => 
-    voteModel.addAvailability(trip_id, user_id, range.start_date, range.end_date)
-  );
-  
-  await Promise.all(insertPromises);
-  
-  return { success: true, message: "Availability saved" };
+  // ไม่มีวันว่าง
+  if (dates.length === 0) return;
+
+  for (const date of dates) {
+    await voteModel.addAvailability(
+      trip_id,
+      user_id,
+      new Date(date)
+    );
+  }
+
+  return {
+    success: true,
+    message: "Availability saved",
+    rangesInserted: dates.length
+  };
 };
 
 /**
@@ -81,6 +109,12 @@ export const getTripHeatmap = async (trip_id: string): Promise<HeatmapData> => {
  * 3. เปิดห้องโหวต + เปลี่ยนสถานะทริปเป็น 'voting'
  */
 export const startVotingSession = async (trip_id: string, user_id: string) => {
+  if (!trip_id) {
+    throw new Error("trip_id is required");
+  }
+  if (!user_id) {
+    throw new Error("user_id is required");
+  }
   // 1. เช็คว่ามีห้องโหวต active อยู่แล้วไหม
   const existingSession = await voteModel.getActiveDateVotingByTrip(trip_id);
   if (existingSession) {
@@ -97,21 +131,12 @@ export const startVotingSession = async (trip_id: string, user_id: string) => {
   const date_voting_id = uuidv4();
 
   // 3. Transaction: สร้างห้องโหวต + อัปเดตสถานะทริป
-  const connection = await pool.getConnection();
+  const connection = await voteModel.getConnection();
   try {
     await connection.beginTransaction();
 
-    await connection.query(
-      `INSERT INTO date_votings (date_voting_id, trip_id, status) 
-       VALUES (?, ?, 'active')`,
-      [date_voting_id, trip_id]
-    );
-
-    await connection.query(
-      `UPDATE trips SET status = 'voting', updated_at = NOW() 
-       WHERE trip_id = ?`,
-      [trip_id]
-    );
+    await voteModel.insertDateVoting(connection, date_voting_id, trip_id);
+    await tripModel.updateTripStatus(connection, trip_id, 'voting');
 
     await connection.commit();
     
@@ -128,6 +153,71 @@ export const startVotingSession = async (trip_id: string, user_id: string) => {
     connection.release();
   }
 };
+
+export const getTripDateMatchingResult = async (tripId: string) => {
+
+  const rows = await voteModel.getAvailabilitiesByTrip(tripId);
+  const totalMembers = await voteModel.getActiveMemberCount(tripId);
+
+  // ไม่มี member หรือไม่มี availability
+  if (!rows || rows.length === 0 || totalMembers === 0) {
+    return {
+      intersection: [],
+      weighted: [],
+      totalMembers: totalMembers ?? 0
+    };
+  }
+
+  const availabilitySets: { user_id: string; dates: string[] }[] = rows.map(r => ({
+    user_id: r.user_id,
+    dates: expandDateRange(r.start_date, r.end_date)
+  }));
+
+  // Intersection
+  let intersection = availabilitySets?.[0]?.dates ?? [];
+  for (let i = 1; i < availabilitySets.length; i++) {
+    const dates = availabilitySets?.[i]?.dates ?? [];
+    intersection = intersection.filter(d => dates.includes(d));
+  }
+
+  // Weighted Scoring
+  const scoreMap: Record<string, number> = {};
+  for (const set of availabilitySets) {
+    for (const d of set.dates) {
+      scoreMap[d] = (scoreMap[d] || 0) + 1;
+    }
+  }
+
+  const weighted = Object.entries(scoreMap)
+    .map(([day, count]) => ({
+      day,
+      freeMembers: count,
+      score: (count / totalMembers) * 100
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
+  return {
+    intersection,
+    weighted,
+    totalMembers
+  };
+};
+
+// helper
+function expandDateRange(start: string, end: string): string[] {
+  const s = new Date(start);
+  const e = new Date(end);
+  const dates: string[] = [];
+  
+  while (s <= e) {
+    dates.push(s.toISOString().slice(0, 10));
+    s.setDate(s.getDate() + 1);
+  }
+  return dates;
+}
+
+
 
 // ===================== BUDGET VOTING =====================
 
@@ -308,7 +398,7 @@ export const closeTrip = async (tripCode: string, user_id: string) => {
   }
 
   // 3. เปลี่ยนสถานะทริปเป็น 'confirmed'
-  const connection = await pool.getConnection();
+  const connection = await voteModel.getConnection();
   try {
     await connection.beginTransaction();
 

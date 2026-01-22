@@ -128,8 +128,7 @@ export interface TripDetail extends RowDataPacket {
         id: string;
         user_id: string;
         full_name: string;
-        start_date: string;
-        end_date: string;
+        available_date: string;
         created_at: Date;
     }[];
 }
@@ -246,10 +245,9 @@ export async function generateInviteCode(): Promise<string> {
     return code;
 }
 
-
-export async function generateInviteLink(tripId: string): Promise<string> {
-    const baseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';
-    return `${baseUrl}/join/${tripId}`;
+export async function generateInviteLink(inviteCode: string): Promise<string> {
+    const baseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:5173';
+    return `${baseUrl}/join/${inviteCode}`;
 }
 
 
@@ -355,8 +353,7 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
     SELECT
       availability_id AS id,
       user_id,
-      start_date,
-      end_date,
+      available_date,
       created_at
       FROM trip_user_availabilities
     WHERE trip_id = ?
@@ -393,8 +390,7 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
       tua.availability_id AS id,
       tua.user_id,
       u.full_name AS full_name,
-      tua.start_date,
-      tua.end_date,
+      tua.available_date,
       tua.created_at
     FROM trip_user_availabilities tua
     JOIN users u ON tua.user_id = u.user_id
@@ -649,6 +645,12 @@ export async function getTripSummaryById(tripId: string): Promise<TripSummaryRes
   };
 }
 
+export const updateTripStatus = async (connection: unknown, trip_id: string, status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived') => {
+  await pool.query(
+    'UPDATE trips SET status = ?, updated_at = NOW() WHERE trip_id = ?',
+    [status, trip_id]
+  );
+};
 
 export default {
     generateInviteCode,
@@ -668,7 +670,8 @@ export default {
     getTripMembers,
     findTripById,
     updateInviteInfo,
-    getTripSummaryById
+    getTripSummaryById,
+    updateTripStatus,
 };
 /*
     getTripById,

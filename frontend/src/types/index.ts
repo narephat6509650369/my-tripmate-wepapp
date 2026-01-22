@@ -130,8 +130,7 @@ export interface Member {
 }
 
 export interface DateRange {
-  startDate: string;
-  endDate: string;
+  availableDate: string;
 }
 
 export interface ProvinceVote {
@@ -247,7 +246,8 @@ export interface DateRange {
 
 export interface SubmitAvailabilityPayload {
   trip_id: string;
-  ranges: DateRange[];
+  user_id: string; // จะมีค่าเมื่อแอดมินส่งแทนผู้ใช้
+  ranges: string[]; // ["2025-12-25", "2025-12-26"]
 }
 
 export interface HeatmapData {

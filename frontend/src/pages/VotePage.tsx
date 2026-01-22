@@ -11,9 +11,10 @@ import StepBudget from './VotePage/components/StepBudget';
 import StepPlace from './VotePage/components/StepPlace';
 import StepSummary from './VotePage/components/StepSummary';
 
+
 // Hooks & Utils
 import { useAuth } from '../contexts/AuthContext';
-import { tripAPI, voteAPI } from '../services/tripService';
+import { tripAPI, voteAPI,} from '../services/tripService';
 import type { TripDetail, DateRange } from '../types';
 
 // ============== MAIN COMPONENT ==============
@@ -66,10 +67,32 @@ const VotePage: React.FC = () => {
         console.log('✅ Trip loaded:', tripData);
         
       } catch (error: any) {
-        console.error("Error loading trip:", error);
-        setError("ไม่สามารถโหลดข้อมูลทริปได้");
-        setLoading(false);
-        setTimeout(() => navigate("/homepage"), 3000);
+        const status = error.response?.status;
+        if (status === 401) {
+          navigate(`/login?redirect=/votepage/${tripCode}`);
+          return;
+        }
+        if (status === 403) {
+          console.log("User not in trip → auto join flow");
+
+        try {
+          const joinRes = await tripAPI.joinTrip(tripCode);
+
+            if (joinRes.success) {
+              console.log("Auto join success → reload trip");
+              // reload trip detail
+              const detail = await tripAPI.getTripDetail(tripCode);
+              setTrip(detail?.data || null);
+              setInviteCode(detail?.data?.invitecode ?? detail?.data?.invitecode ?? "");
+              setLoading(false);
+            return;
+            }
+        } catch (e) {
+          console.error("Join failed → fallback redirect");
+          navigate(`/join/${tripCode}`);
+          return;
+        }
+        }
       }
     };
     
@@ -88,13 +111,23 @@ const VotePage: React.FC = () => {
   };
 
   // ✅ Save Dates
-  const handleSaveDates = async (ranges: DateRange[]) => {
-    if (!trip) return;
+  const handleSaveDates = async (dates: string[]) => {
+    if (!trip){
+      console.log('No trip data available');
+      return;
+    };
+
+    if(!user){
+      console.log('No user data available');
+      return;
+    }
     
     try {
+      //เรียก api 2ครั้งทำไม
       const response = await voteAPI.submitAvailability({
         trip_id: trip.tripid,
-        ranges
+        user_id: user.user_id,
+        ranges: dates.sort(), 
       });
       
       if (response.success) {

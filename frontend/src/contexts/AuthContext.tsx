@@ -2,7 +2,7 @@
 // ✅ Authentication Context สำหรับจัดการ User State ทั้งระบบ
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { redirect, useNavigate } from 'react-router-dom';
 import type { ApiResponse } from '../types/index';
 
 // ============== TYPES ==============
@@ -29,7 +29,7 @@ export interface GoogleLoginResponse {
 }
 
 interface AuthContextType extends AuthState {
-  login: (accessToken: string) => Promise<void>;
+  login: (accessToken: string, redirectPath?: string) => Promise<void>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
   checkAuth: () => boolean;
@@ -41,6 +41,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // ============== PROVIDER ==============
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
+  const queryParams = new URLSearchParams(window.location.search);
+  const pathname = window.location.pathname;
+  let inviteCode = queryParams.get("inviteCode");
+
+  // Handle path param `/join/:inviteCode`
+  const match = pathname.match(/^\/join\/([^\/]+)/);
+  if (!inviteCode && match) {
+    inviteCode = match[1];
+  }
+
   
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
@@ -56,6 +66,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const token = localStorage.getItem('jwtToken');
         const userId = localStorage.getItem('userId');
         const userEmail = localStorage.getItem('userEmail');
+
+        if (!token) {
+          console.warn('⚠️ No token found, redirecting to login');
+          if (pathname !== '/login') {
+          if (inviteCode) navigate(`/login?redirect=/join/${inviteCode}`);
+            else navigate('/login');
+          }
+          return;
+        }
 
         if (token && userId && userEmail) {
           setAuthState({
@@ -92,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // ✅ Login with Google
-  const login = useCallback(async (accessToken: string) => {
+  const login = useCallback(async (accessToken: string, redirectPath?: string) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
 
@@ -133,7 +152,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       console.log('✅ Login successful:', user.email);
-      navigate('/homepage');
+      if (redirectPath) navigate(redirectPath);
+      else {
+        console.log('🔄 No redirect path, navigating to homepage');
+        navigate('/homepage');
+      }
 
     } catch (error: any) {
       console.error('❌ Login failed:', error);
@@ -147,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       throw error;
     }
-  }, []);
+  }, [navigate]);
 
   // ✅ Logout
   const logout = useCallback(() => {
