@@ -26,18 +26,21 @@ export const clearUserAvailability = async (trip_id: string, user_id: string) =>
   );
 };
 
-export const getTripAvailabilities = async (trip_id: string) => {
+export const getTripAvailabilities = async (trip_id: string, user_id: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT 
-      user_id, 
-      start_date, 
-      end_date 
-     FROM trip_user_availabilities 
-     WHERE trip_id = ?`,
-    [trip_id]
+        available_date
+     FROM trip_user_availabilities
+     WHERE trip_id = ? AND user_id = ?`,
+    [trip_id, user_id]
   );
-  return rows;
+
+  return {
+    dates: rows.map(r => r.available_date),
+    count: rows.length
+  };
 };
+
 
 export const saveUserAvailability = async (date_voting_id: string, trip_id: string) => {
   const [result] = await pool.query(
@@ -111,7 +114,9 @@ export const getRankingResults = async (trip_id: string) => {
 
 export const getAvailabilitiesByTrip = async (tripId: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT user_id, start_date, end_date
+    `SELECT 
+      user_id, 
+      available_date
      FROM trip_user_availabilities
      WHERE trip_id = ?`,
     [tripId]
@@ -165,6 +170,28 @@ export const getTripBudgets = async (trip_id: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(sql, [trip_id]);
   return rows;
 };
+
+export const getBudgetOptionByUserId = async (trip_id: string,user_id: string) => {
+  const sql = `
+    SELECT 
+      bo.category_name, 
+      bo.estimated_amount, 
+      bo.proposed_by AS user_id, 
+      bo.proposed_at AS last_updated
+    FROM budget_options bo
+    JOIN budget_votings bv 
+      ON bo.budget_voting_id = bv.budget_voting_id
+    WHERE bv.trip_id = ?
+      AND bo.proposed_by = ?
+  `;
+
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [
+    trip_id,
+    user_id
+  ]);
+  return rows; // ✅ array เสมอ
+};
+
 
 export const getBudgetLogs = async (trip_id: string) => {
   const sql = `
@@ -247,6 +274,36 @@ export const upsertBudget = async (trip_id: string, user_id: string, category: s
     connection.release();
   }
 };
+
+export const clearBudget = async (trip_id: string, user_id: string) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // หา Budget Voting ID
+    let [voting] = await connection.query<RowDataPacket[]>(
+      'SELECT budget_voting_id FROM budget_votings WHERE trip_id = ?', 
+      [trip_id]
+    );
+    let voting_id = voting[0]?.budget_voting_id;
+    
+    if (voting_id) {
+      // ลบ Budget Options ของ User คนนี้
+      await connection.query(
+        `DELETE FROM budget_options 
+         WHERE budget_voting_id = ? AND proposed_by = ?`,
+        [voting_id, user_id]
+      );
+    }
+
+    await connection.commit();
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
 
 // ================= LOCATION SECTION =================
 
@@ -395,7 +452,6 @@ export default {
   getActiveDateVotingByTrip,
   insertDateVoting,
   clearActiveVotingByTrip,
-
   closeAllVotings,
   getTripBudgets,
   getBudgetLogs,

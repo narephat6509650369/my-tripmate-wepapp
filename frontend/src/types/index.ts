@@ -294,6 +294,38 @@ export interface BudgetLog {
   avatar_url: string | null;
 }
 
+export interface BudgetVotingResponse {
+  success: boolean;
+  code: string;
+  message: string;
+  data: {
+    trip_id: string;
+    budget_voting: {
+      budget_voting_id: string;
+      total_budget: number;
+      status: 'active' | 'closed';
+      closed_at: string | null;
+    } | null;
+    budget_options: {
+      category_name: BudgetCategory;
+      estimated_amount: number;
+      priority: number;
+      is_backup: boolean;
+    }[];
+    user_budgets: {
+      category_name: BudgetCategory;
+      proposed_amount: number;
+    }[];
+  };
+} 
+
+export interface UserBudgetOption {
+      category_name: Budget;
+      estimated_amount: number;
+      user_id: string;
+      last_updated: string;
+}
+
 // ============================================================================
 // LOCATION VOTING TYPES
 // ============================================================================
@@ -399,4 +431,30 @@ export const tripSummaryToCard = (trip: TripSummary): TripCard => {
   };
 };
 
+
+// ============================================================================
+// Date Matching Result Types
+// ============================================================================
+// วันที่ที่มีคนว่างตรงกันทั้งหมด
+export interface DateIntersectionResult {
+  userAvailability: string[]; // วันที่ผู้ใช้คนนี้ว่าง
+  intersection: string[];
+  weighted: WeightedDateResult[];
+  totalMembers: number;
+}
+
+// คะแนนความนิยมของแต่ละวัน
+export interface WeightedDateResult {
+  day: string;          // "YYYY-MM-DD"
+  freeMembers: number;  // จำนวนคนว่าง
+  score: number;        // %
+}
+
+// response wrapper จาก backend
+export interface DateMatchingResponse {
+  success: boolean;
+  code: string;
+  message: string;
+  data: DateIntersectionResult;
+}
 

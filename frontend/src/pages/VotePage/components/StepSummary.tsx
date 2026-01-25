@@ -2,7 +2,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Edit3, ArrowRight } from 'lucide-react';
-import type { TripDetail } from '../../../types';
+import type { TripCard, TripDetail } from '../../../types';
 
 // ============== TYPES ==============
 interface StepSummaryProps {
@@ -19,7 +19,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
 
   // ============== HANDLERS ==============
   const handleViewFullSummary = () => {
-    navigate(`/summary/${trip.trip_id}`);
+    navigate(`/summary/${trip.tripid}`);
   };
 
   // ============== RENDER ==============
@@ -80,7 +80,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
               <span className="text-2xl">📝</span>
               <div>
                 <p className="text-sm text-gray-600">ชื่อทริป</p>
-                <p className="font-semibold text-gray-800">{trip.trip_name}</p>
+                <p className="font-semibold text-gray-800">{trip.tripname}</p>
               </div>
             </div>
 
@@ -98,7 +98,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
               <span className="text-2xl">📅</span>
               <div>
                 <p className="text-sm text-gray-600">จำนวนวัน</p>
-                <p className="font-semibold text-gray-800">{trip.num_days} วัน</p>
+                <p className="font-semibold text-gray-800">{trip.numdays} วัน</p>
               </div>
             </div>
 
@@ -106,7 +106,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
               <span className="text-2xl">👥</span>
               <div>
                 <p className="text-sm text-gray-600">จำนวนสมาชิก</p>
-                <p className="font-semibold text-gray-800">{trip.member_count} คน</p>
+                {/*<p className="font-semibold text-gray-800">{trip.membercount} คน</p>*/}
               </div>
             </div>
 
@@ -114,7 +114,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
               <span className="text-2xl">🔖</span>
               <div>
                 <p className="text-sm text-gray-600">รหัสทริป</p>
-                <p className="font-mono font-semibold text-blue-600">{trip.invite_code}</p>
+                <p className="font-mono font-semibold text-blue-600">{trip.invitecode}</p>
               </div>
             </div>
           </div>

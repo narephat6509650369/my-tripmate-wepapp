@@ -1,5 +1,5 @@
 // src/pages/VotePage/components/StepBudget.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { voteAPI } from '../../../services/tripService';
 import { formatCurrency } from '../../../utils';
@@ -37,10 +37,39 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave }) => {
   });
   const [isSaving, setIsSaving] = useState(false);
 
-  // ============== HANDLERS ==============
-  const handleBudgetChange = (key: keyof BudgetState, value: number) => {
-    setBudget(prev => ({ ...prev, [key]: value }));
-  };
+   useEffect(() => {
+  if (!trip?.tripid) {
+    console.log("Trip ID not ready yet");
+    return; // ⛔ หยุดตรงนี้
+  }
+
+  console.log("tripId:", trip.tripid);
+
+  voteAPI.getBudgetVoting(trip.tripid)
+    .then((res) => {
+      console.log('Budget Voting Response:', res);
+      const data = res.data?.data;
+      if (!data) return;
+
+      const initialBudget: BudgetState = {
+        accommodation: 0,
+        transport: 0,
+        food: 0,
+        other: 0
+      };
+
+      data.budget_options.forEach((budgetUserVotes) => {
+        initialBudget[budgetUserVotes.category_name] =
+          budgetUserVotes.estimated_amount;
+      });
+
+      setBudget(initialBudget);
+    })
+    .catch((err) => {
+      console.error('Load budget voting failed', err);
+    });
+}, [trip?.tripid]);
+
 
   const handleSaveCategory = async (category: keyof BudgetState) => {
     const amount = budget[category];
@@ -56,6 +85,11 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave }) => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // ============== HANDLERS ==============
+  const handleBudgetChange = (key: keyof BudgetState, value: number) => {
+    setBudget(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSaveAll = async () => {

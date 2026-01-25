@@ -1,18 +1,42 @@
 // src/pages/VotePage/components/StepVote.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { voteAPI } from '../../../services/tripService';
-import type { TripDetail, DateRange } from '../../../types';
-
+import type { TripDetail } from '../../../types';
 
 interface StepVoteProps {
   trip: TripDetail;
   onSave?: (dates: string[]) => Promise<void>;
 }
 
+
 export const StepVote: React.FC<StepVoteProps> = ({ trip }) => {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
+
+ useEffect(() => {
+  console.log("TripId changed:", trip.tripid);
+  if (!trip.tripid) return;
+
+  voteAPI.getDateMatchingResult(trip.tripid)
+    .then((res) => {
+      console.log("Date Matching Result Response:", res);
+      const matching = res.data?.data;
+      //const userAvailability = matching.userAvailability;
+      //console.log("User Availability:", userAvailability);
+      if (!matching) return;
+
+      // ถ้าจะใช้เฉพาะ intersection
+      setSelectedDates(matching.intersection);
+
+      // หรือถ้าอยากเอา weighted ไปแสดง top 3
+      console.log(matching.weighted);
+    })
+    .catch((err) => {
+      console.error("Load date matching failed", err);
+    });
+
+}, [trip.tripid]);
 
   // ================= HANDLERS =================
 

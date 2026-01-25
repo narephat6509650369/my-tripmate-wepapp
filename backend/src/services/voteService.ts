@@ -2,63 +2,30 @@ import { v4 as uuidv4 } from 'uuid';
 import * as voteModel from '../models/voteModel.js';
 import * as tripModel from '../models/tripModel.js';
 
-
-
 export interface DateRange {
-    start_date: string;
-    end_date: string;
+    available_date: string;
 }
 
 export interface HeatmapData {
     [date: string]: string[];
 }
 
-type AvailabilitySet = {
-  user_id: string;
-  dates: string[]; // ["2025-12-01","2025-12-02",...]
-}
-
 // ===================== DATE VOTING =====================
-
-function buildDateRanges(dates: string[]): DateRange[] {
-  const sorted: string[] = [...new Set(dates)].sort();
-  const ranges: DateRange[] = [];
-
-  if (sorted.length === 0) return [];
-
-  let start = sorted[0]!;
-  let end = sorted[0]!;
-
-  for (let i = 1; i < sorted.length; i++) {
-    const prev: Date = new Date(sorted[i - 1]!);
-    const curr: Date = new Date(sorted[i]!);
-
-    const diff = (curr.getTime() - prev.getTime()) / 86400000;
-
-    if (diff === 1) {
-      end = sorted[i]!;
-    } else {
-      ranges.push({ start_date: start, end_date: end });
-      start = end = sorted[i]!;
-    }
-  }
-
-  ranges.push({ start_date: start, end_date: end });
-  return ranges;
-}
-
 /**
  * 1. บันทึกวันว่างของ User
  */
 export const submitAvailability = async ( trip_id: string, user_id: string, dates?: string[] ) => {
    // ยังไม่โหวต
-  if (dates === undefined) return;
+  if (!dates || dates.length === 0) {
+    return {
+      success: false,
+      message: "No availability dates provided",
+      rangesInserted: 0
+    };
+  }
 
   // clear ของเดิม
   await voteModel.clearUserAvailability(trip_id, user_id);
-
-  // ไม่มีวันว่าง
-  if (dates.length === 0) return;
 
   for (const date of dates) {
     await voteModel.addAvailability(
@@ -78,36 +45,28 @@ export const submitAvailability = async ( trip_id: string, user_id: string, date
 /**
  * 2. ดึงข้อมูล Heatmap (วันไหนคนว่างเยอะสุด)
  */
-export const getTripHeatmap = async (trip_id: string): Promise<HeatmapData> => {
-  const rawData = await voteModel.getTripAvailabilities(trip_id);
+/*
+export const getTripHeatmap = async (trip_id: string, user_id: string): Promise<HeatmapData> => {
+  const rawData = await voteModel.getTripAvailabilities(trip_id, user_id);
   
   const heatmap: HeatmapData = {};
 
   rawData.forEach((entry: any) => {
-    let current = new Date(entry.start_date);
-    const end = new Date(entry.end_date);
-
-    while (current <= end) {
-      const dateStr = current.toISOString().slice(0, 10); // "2025-12-25"
-
-      if (!heatmap[dateStr]) {
-        heatmap[dateStr] = [];
-      }
-
-      if (!heatmap[dateStr].includes(entry.user_id)) {
-        heatmap[dateStr].push(entry.user_id);
-      }
-
-      current.setDate(current.getDate() + 1);
+    const dateStr = entry.available_date.toISOString().slice(0, 10);
+    if (!heatmap[dateStr]) {
+      heatmap[dateStr] = [];
     }
+    heatmap[dateStr].push(entry.user_id);
   });
 
   return heatmap;
 };
+*/
 
 /**
  * 3. เปิดห้องโหวต + เปลี่ยนสถานะทริปเป็น 'voting'
  */
+/*
 export const startVotingSession = async (trip_id: string, user_id: string) => {
   if (!trip_id) {
     throw new Error("trip_id is required");
@@ -153,53 +112,64 @@ export const startVotingSession = async (trip_id: string, user_id: string) => {
     connection.release();
   }
 };
-
-export const getTripDateMatchingResult = async (tripId: string) => {
-
-  const rows = await voteModel.getAvailabilitiesByTrip(tripId);
+*/
+export const getTripDateMatchingResult = async (tripId: string, userId: string) => {
+  const userAvailabilityRows = await voteModel.getTripAvailabilities(tripId, userId);
+  const availabilities = await voteModel.getAvailabilitiesByTrip(tripId);
   const totalMembers = await voteModel.getActiveMemberCount(tripId);
 
-  // ไม่มี member หรือไม่มี availability
-  if (!rows || rows.length === 0 || totalMembers === 0) {
+  if (!availabilities.length || totalMembers === 0) {
     return {
+      table: {},
       intersection: [],
       weighted: [],
-      totalMembers: totalMembers ?? 0
+      totalMembers
     };
   }
 
-  const availabilitySets: { user_id: string; dates: string[] }[] = rows.map(r => ({
-    user_id: r.user_id,
-    dates: expandDateRange(r.start_date, r.end_date)
-  }));
+  /**
+   * table structure:
+   * {
+   *   "2025-01-10": ["user1","user2"],
+   *   "2025-01-11": ["user2"]
+   * }
+   */
+  const table: Record<string, string[]> = {};
 
-  // Intersection
-  let intersection = availabilitySets?.[0]?.dates ?? [];
-  for (let i = 1; i < availabilitySets.length; i++) {
-    const dates = availabilitySets?.[i]?.dates ?? [];
-    intersection = intersection.filter(d => dates.includes(d));
-  }
-
-  // Weighted Scoring
-  const scoreMap: Record<string, number> = {};
-  for (const set of availabilitySets) {
-    for (const d of set.dates) {
-      scoreMap[d] = (scoreMap[d] || 0) + 1;
+  for (const row of availabilities) {
+    const day = row.available_date;
+    if (!table[day]) {
+      table[day] = [];
     }
+    table[day].push(row.user_id);
   }
 
-  const weighted = Object.entries(scoreMap)
-    .map(([day, count]) => ({
-      day,
-      freeMembers: count,
-      score: (count / totalMembers) * 100
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+  // วันที่ทุกคนว่างตรงกัน
+  const intersection = Object.entries(table)
+    .filter(([_, users]) => users.length === totalMembers)
+    .map(([day]) => day);
 
-  return {
+  // weighted score
+  const weighted = Object.entries(table)
+    .map(([day, users]) => ({
+      day,
+      freeMembers: users.length,
+      score: (users.length / totalMembers) * 100
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  console.log("Date Matching Result", {
+    table,
     intersection,
     weighted,
+    totalMembers
+  });
+
+  return {
+    userAvailabilityRows,
+    table,          // ใช้แสดงเป็นตาราง / heatmap
+    intersection,   // วันตรงกัน 100%
+    weighted,       // วันแนะนำ (เรียงตาม %)
     totalMembers
   };
 };
@@ -224,10 +194,15 @@ function expandDateRange(start: string, end: string): string[] {
 /**
  * 4. ดึงข้อมูลทริปทั้งหมด (สำหรับหน้า Vote)
  */
+/*
 export const getFullTripData = async (tripCode: string) => {
   // 1. หาทริปจาก invite_code
   const trip = await tripModel.getTripByInviteCode(tripCode);
   if (!trip) throw new Error("Trip not found");
+  if(!trip.user_id){
+    throw new Error("Trip owner ID not found");
+  }
+  const user_id = trip.user_id;
   
   const trip_id = trip.trip_id;
   
@@ -236,7 +211,7 @@ export const getFullTripData = async (tripCode: string) => {
     tripModel.getTripMembers(trip_id),
     voteModel.getTripBudgets(trip_id),
     voteModel.getLocationScores(trip_id),
-    voteModel.getTripAvailabilities(trip_id)
+    voteModel.getTripAvailabilities(trip_id, user_id)
   ]);
 
   // 3. Transform Data ให้ตรงกับ Frontend Format
@@ -300,16 +275,13 @@ export const getFullTripData = async (tripCode: string) => {
     }
   };
 };
+*/
+
 
 /**
  * 5. อัปเดตงบประมาณ
  */
-export const updateBudget = async (
-  tripCode: string,
-  user_id: string,
-  category: string,
-  amount: number
-) => {
+export const updateBudget = async (tripCode: string,user_id: string,category: string,amount: number) => {
   // 1. Validate
   const validCategories = ['accommodation', 'transport', 'food', 'other'];
   if (!validCategories.includes(category)) {
@@ -332,6 +304,7 @@ export const updateBudget = async (
     throw new Error("You are not a member of this trip");
   }
 
+  await voteModel.clearBudget(trip.trip_id, user_id);
   // 4. Update budget
   const result = await voteModel.upsertBudget(trip.trip_id, user_id, category, amount);
 
@@ -342,6 +315,49 @@ export const updateBudget = async (
     message: "Budget updated successfully"
   };
 };
+
+/*
+* ดึงข้อมูลสำหรับอัปเดตงบประมาณของตัวเอง
+*/
+export const getUserBudgetForTrip = async (tripid: string, user_id: string) => {
+  // 1. หาทริป
+  const trip = await tripModel.findTripById(tripid);
+  console.log("Trip found for budget retrieval", trip);
+  if (!trip) throw new Error("Trip not found");
+
+  // 2. เช็คว่าเป็นสมาชิกหรือไม่
+  const members = await tripModel.getTripMembers(trip.trip_id);
+  console.log("Trip members:", members);
+
+  const isMember = members.some(m => m.user_id === user_id && m.is_active);
+  console.log(`Is user ${user_id} a member?`, isMember);
+  
+  if (!isMember) {
+    throw new Error("You are not a member of this trip");
+  }
+ 
+  // 3. ดึงงบประมาณของ user
+  const budgets = await voteModel.getBudgetOptionByUserId(trip.trip_id, user_id);
+
+  if (!budgets || budgets.length === 0) {
+    console.log("No budget votes yet");
+    return null;
+  }
+
+  const budgetObj: any = {
+    accommodation: 0,
+    transport: 0,
+    food: 0,
+    other: 0
+  };
+
+  budgets.forEach((b: any) => {
+    budgetObj[b.category_name] = Number(b.estimated_amount);
+  });
+
+  console.log("User Budget for Trip", budgetObj);
+  return budgetObj;
+}
 
 // ===================== LOCATION VOTING =====================
 
@@ -449,11 +465,15 @@ export const closeTrip = async (tripCode: string, user_id: string) => {
 
 export default {
   submitAvailability,
-  getTripHeatmap,
-  startVotingSession,
-  getFullTripData,
+  //getTripHeatmap,
+  //startVotingSession,
+  //getFullTripData,
   updateBudget,
   voteLocation,
   closeTrip
 };
+
+export function getBudgetVoting(tripCode: string, userId: string) {
+  throw new Error('Function not implemented.');
+}
 

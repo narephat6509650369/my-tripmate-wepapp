@@ -385,6 +385,25 @@ export const getMockCloseTrip = (tripCode: string): ApiResponse => {
   };
 };
 
+/*
+* GET /api/votes/:tripcode/get-budget
+*/
+export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'Budget voting retrieved successfully',
+    data: {
+      trip_id: tripCode,
+      budgets: [
+        { category: 'ที่พัก', amount: 5000 },
+        { category: 'อาหาร', amount: 3000 },
+        { category: 'กิจกรรม', amount: 2000 }
+      ]
+    }
+  };
+};
+
 // ============================================================================
 // EXPORTS
 // ============================================================================

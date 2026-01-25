@@ -18,7 +18,9 @@ import type {
   UpdateBudgetPayload,
   UpdateBudgetResponse,
   SubmitLocationVotePayload,
-  LocationScores
+  LocationScores,
+  DateMatchingResponse,
+  BudgetVotingResponse
 } from '../types';
 
 // Import Mock Data
@@ -36,7 +38,8 @@ import {
   getMockUpdateBudget,
   getMockSubmitLocationVote,
   getMockCloseTrip,
-  mockDelay
+  mockDelay,
+  getMockGetBudgetVoting
 } from '../data/mockData';
 
 // ============================================================================
@@ -333,6 +336,9 @@ export const tripAPI = {
 // ============================================================================
 
 export const voteAPI = {
+  // ============================================================================
+  // DATE AVAILABILITY & VOTING
+  // ============================================================================
   /**
    * POST /api/votes/availability
    */
@@ -428,6 +434,46 @@ export const voteAPI = {
   },
 
   /**
+  * GET /:tripId/date-matching-result
+  */
+  getDateMatchingResult: async (tripId: string): Promise<ApiResponse<DateMatchingResponse>> => {
+    // ✅ Mock Mode
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      // Implement mock function if needed
+      return {
+        success: true,
+        code: 'MOCK_SUCCESS',
+        message: 'Mock date matching result',
+        //data: { intersection: [], weighted: [], totalMembers: 0 }
+      };
+    }
+
+    // ✅ Real API
+    try {
+      if (!checkAuth()) {
+        return {
+          success: false,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'กรุณาเข้าสู่ระบบใหม่'
+        };
+      }
+
+      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/date-matching-result`, {
+        headers: getAuthHeaders()
+      });
+      console.log("Get data:",response);
+
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+// ============================================================================
+// BUDGET VOTING
+// ============================================================================
+  /**
    * PUT /api/votes/:tripCode/budget
    */
   updateBudget: async (
@@ -462,6 +508,40 @@ export const voteAPI = {
     }
   },
 
+  /**
+   * GET /api/votes/:tripCode
+   */
+  getBudgetVoting: async (tripId: string): Promise<ApiResponse<BudgetVotingResponse>> => {
+    // ✅ Mock Mode
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      return getMockGetBudgetVoting(tripId);
+    }
+
+    // ✅ Real API
+    try {
+      if (!checkAuth()) {
+        return {
+          success: false,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'กรุณาเข้าสู่ระบบใหม่'
+        };
+      }
+
+      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/get-budget`, {
+        headers: getAuthHeaders()
+      });
+      console.log("Budget Voting Response Status:", response);
+
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+// ============================================================================
+// LOCATION VOTING
+// ============================================================================
   /**
    * POST /api/votes/:tripCode/vote-place
    */

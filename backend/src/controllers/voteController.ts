@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import * as voteService from '../services/voteService.js';
 import type { JwtPayload } from '../express.d.js';
+import voteModel from '../models/voteModel.js';
 
 // ================= DATE VOTING =================
 // post user ส่งวันว่างที่ตัวเองว่างมา
@@ -17,6 +18,15 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
         code: "MISSING_FIELD",
         message: "trip_id is required",
         error: { field: "trip_id" }
+      });
+    }
+    
+    if(!Array.isArray(ranges) || ranges.some(date => typeof date !== 'string')) {
+      return res.status(400).json({
+        success: false,
+        code: "INVALID_FIELD",
+        message: "ranges must be an array of date strings",
+        error: { field: "ranges" }
       });
     }
 
@@ -46,7 +56,7 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
     });
   }
 };
-
+/*
 // ดึงข้อมูล heatmap ของทริป
 export const getTripHeatmapController = async (req: Request, res: Response) => {
   try {
@@ -61,7 +71,7 @@ export const getTripHeatmapController = async (req: Request, res: Response) => {
       });
     }
 
-    const data = await voteService.getTripHeatmap(tripId);
+    const data = await voteService.getTripHeatmap(tripId, (req.user as JwtPayload)?.userId);
 
     return res.status(200).json({
       success: true,
@@ -81,7 +91,8 @@ export const getTripHeatmapController = async (req: Request, res: Response) => {
     });
   }
 };
-
+*/
+/*
 // เริ่มการโหวตเลือกวัน
 export const startVotingController = async (req: Request, res: Response) => {
   try {
@@ -133,12 +144,14 @@ export const startVotingController = async (req: Request, res: Response) => {
     });
   }
 };
+*/
 
 // ดึงผลการ intersection ของวันว่างทั้งหมด
 export const getDateMatchingResultController = async (req: Request, res: Response) => {
   try {
-    const { tripId } = req.params;
-
+    const { tripId} = req.params;
+    const userId = (req.user as JwtPayload).userId;
+    console.log("Fetching date matching result for tripId:", tripId, "and userId:", userId);
     if (!tripId) {
       return res.status(400).json({
         success: false,
@@ -147,8 +160,16 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
         error: { field: "tripId" }
       });
     }
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "User ID is required",
+        error: { field: "userId" }
+      });
+    }
 
-    const result = await voteService.getTripDateMatchingResult(tripId);
+    const result = await voteService.getTripDateMatchingResult(tripId, userId);
 
     return res.status(200).json({
       success: true,
@@ -169,7 +190,7 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
 
 
 // ================= BUDGET & LOCATION =================
-
+/*
 export const getTripDetailController = async (req: Request, res: Response) => {
   try {
     const { tripCode } = req.params;
@@ -211,7 +232,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
     });
   }
 };
-
+*/
 export const updateBudgetController = async (req: Request, res: Response) => {
   try {
     const { tripCode } = req.params;
@@ -261,6 +282,51 @@ export const updateBudgetController = async (req: Request, res: Response) => {
       success: false,
       code: "INTERNAL_ERROR",
       message: "Failed to update budget",
+      error: { detail: message }
+    });
+  }
+};
+
+export const getBudgetVotingController = async (req: Request, res: Response) => {
+  try {
+    const { tripId } = req.params;
+    const userId = (req.user as JwtPayload)?.userId;
+    console.log("BudgetVotingController ")
+    console.log("tripId:", tripId)
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "tripCode is required",
+        error: { field: "tripCode" }
+      });
+    }
+
+    const data = await voteService.getUserBudgetForTrip(tripId, userId);
+    console.log("Get budget information:",data);
+
+    return res.status(200).json({
+      success: true,
+      code: "BUDGET_VOTING_LOADED",
+      message: "Budget voting data loaded",
+      data
+    });
+
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+
+    if (message === "ไม่พบทริป") {
+      return res.status(404).json({
+        success: false,
+        code: "TRIP_NOT_FOUND",
+        message
+      }); 
+    }
+
+    return res.status(500).json({
+      success: false,
+      code: "INTERNAL_ERROR",
+      message: "Failed to load budget voting",
       error: { detail: message }
     });
   }
