@@ -1,15 +1,17 @@
 // src/pages/VotePage/components/StepPlace.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { voteAPI } from '../../../services/tripService';
 import { THAILAND_PROVINCES } from '../../../constants/provinces';
-import type { TripDetail } from '../../../types';
+import type { LocationVote, TripDetail } from '../../../types';
 
 // ============== TYPES ==============
 interface StepPlaceProps {
   trip: TripDetail;
-  onVote: (votes: [string, string, string]) => void;
+  onVote: (votes: LocationVote[]) => Promise<void>;
 }
+
+
 
 // ============== CONSTANTS ==============
 const WEIGHTS = [3, 2, 1];
@@ -21,6 +23,11 @@ export const StepPlace: React.FC<StepPlaceProps> = ({ trip, onVote }) => {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResults, setShowResults] = useState(false);
+
+  useEffect(() => {
+
+    
+  })
 
   // ============== HANDLERS ==============
   const handleSelect = (index: number, value: string) => {
@@ -36,31 +43,26 @@ export const StepPlace: React.FC<StepPlaceProps> = ({ trip, onVote }) => {
   };
 
   const handleSubmit = async () => {
-    // Validation
-    if (myVote.includes("")) {
-      setError("กรุณาเลือกครบ 3 อันดับก่อนส่งคะแนน");
-      return;
-    }
+  if (myVote.includes("")) {
+    setError("กรุณาเลือกครบ 3 อันดับก่อนส่งคะแนน");
+    return;
+  }
 
-    const uniqueVotes = new Set(myVote);
-    if (uniqueVotes.size !== 3) {
-      setError("กรุณาเลือกจังหวัดที่ต่างกัน 3 จังหวัด");
-      return;
-    }
+  const payload: LocationVote[] = myVote.map((province, index) => ({
+    place: province,
+    score: WEIGHTS[index]
+  }));
 
-    setError("");
-    setIsSubmitting(true);
-
-    try {
-      await onVote(myVote);
-      alert(`✅ โหวตสำเร็จ!\n\n🥇 ${myVote[0]}\n🥈 ${myVote[1]}\n🥉 ${myVote[2]}`);
-    } catch (error) {
-      console.error('Error submitting vote:', error);
-      setError('เกิดข้อผิดพลาดในการส่งคะแนน');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  setIsSubmitting(true);
+  try {
+    await onVote(payload);
+    alert(`✅ โหวตสำเร็จ`);
+  } catch (e: any) {
+    setError(e.message);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // ============== RENDER ==============
   return (
@@ -158,3 +160,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({ trip, onVote }) => {
 };
 
 export default StepPlace;
+
+function handleVotePlace(myVote: [string, string, string]) {
+  throw new Error('Function not implemented.');
+}

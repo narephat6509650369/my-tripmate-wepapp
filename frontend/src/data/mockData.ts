@@ -358,7 +358,7 @@ export const getMockUpdateBudget = (
  * POST /api/votes/:tripCode/vote-place
  */
 export const getMockSubmitLocationVote = (
-  tripCode: string,
+  tripId: string,
   votes: string[]
 ): ApiResponse => {
   const scores: Record<string, number> = {};

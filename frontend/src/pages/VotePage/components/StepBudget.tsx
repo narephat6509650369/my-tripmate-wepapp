@@ -37,7 +37,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave }) => {
   });
   const [isSaving, setIsSaving] = useState(false);
 
-   useEffect(() => {
+  useEffect(() => {
   if (!trip?.tripid) {
     console.log("Trip ID not ready yet");
     return; // ⛔ หยุดตรงนี้

@@ -18,9 +18,9 @@ import type {
   UpdateBudgetPayload,
   UpdateBudgetResponse,
   SubmitLocationVotePayload,
-  LocationScores,
   DateMatchingResponse,
-  BudgetVotingResponse
+  BudgetVotingResponse,
+  LocationScores
 } from '../types';
 
 // Import Mock Data
@@ -477,13 +477,13 @@ export const voteAPI = {
    * PUT /api/votes/:tripCode/budget
    */
   updateBudget: async (
-    tripCode: string,
+    tripId: string,
     payload: UpdateBudgetPayload
   ): Promise<ApiResponse<UpdateBudgetResponse>> => {
     // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
-      return getMockUpdateBudget(tripCode, payload.category, payload.amount);
+      return getMockUpdateBudget(tripId, payload.category, payload.amount);
     }
 
     // ✅ Real API
@@ -496,8 +496,8 @@ export const voteAPI = {
         };
       }
 
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripCode}/budget`, {
-        method: 'PUT',
+      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/budget`, {
+        method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload)
       });
@@ -531,6 +531,7 @@ export const voteAPI = {
       const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/get-budget`, {
         headers: getAuthHeaders()
       });
+
       console.log("Budget Voting Response Status:", response);
 
       return await response.json();
@@ -543,16 +544,16 @@ export const voteAPI = {
 // LOCATION VOTING
 // ============================================================================
   /**
-   * POST /api/votes/:tripCode/vote-place
+   * POST /api/votes/:tripid/vote-place
    */
   submitLocationVote: async (
-    tripCode: string,
+    tripid: string,
     payload: SubmitLocationVotePayload
   ): Promise<ApiResponse<{ scores: LocationScores }>> => {
     // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
-      return getMockSubmitLocationVote(tripCode, payload.votes);
+      return getMockSubmitLocationVote(tripid, payload.votes.map(v => v.place));
     }
 
     // ✅ Real API
@@ -564,12 +565,14 @@ export const voteAPI = {
           message: 'กรุณาเข้าสู่ระบบใหม่'
         };
       }
-
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripCode}/vote-place`, {
+      console.log("trip Id:",tripid)
+      const response = await fetchWithTimeout(`${API_URL}/votes/${tripid}/vote-place`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload)
       });
+
+      console.log("submitLocationVote", response)
 
       return await response.json();
     } catch (error) {

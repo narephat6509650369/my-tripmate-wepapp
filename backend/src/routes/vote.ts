@@ -35,15 +35,14 @@ router.get('/:tripId/date-matching-result', auth, getDateMatchingResultControlle
 
 //router.post('/start-voting', auth, requireTripOwner, startVotingController);
 
-//router.get('/:tripcode/get-budget', auth, getTripDetailController);
-router.get('/:tripId/get-budget', auth, getBudgetVotingController); // Temporarily disable trip detail fetching
-
-router.post('/:tripCode/vote-place', auth, submitLocationVoteController);
+router.post('/:tripid/vote-place', auth, submitLocationVoteController);
 
 // ============ BUDGET VOTING ============
 
-router.put('/:tripCode/budget', auth, updateBudgetController);
+router.post('/:tripId/budget', auth, updateBudgetController);
 
+//router.get('/:tripcode/get-budget', auth, getTripDetailController);
+router.get('/:tripId/get-budget', auth, getBudgetVotingController); // Temporarily disable trip detail fetching
 
 
 

@@ -15,7 +15,7 @@ import StepSummary from './VotePage/components/StepSummary';
 // Hooks & Utils
 import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, voteAPI,} from '../services/tripService';
-import type { TripDetail, DateRange } from '../types';
+import type { TripDetail, DateRange, LocationVote } from '../types';
 
 // ============== MAIN COMPONENT ==============
 const VotePage: React.FC = () => {
@@ -146,7 +146,8 @@ const VotePage: React.FC = () => {
     if (!trip) return;
     
     try {
-      const response = await voteAPI.updateBudget(trip.invitecode, {
+      const response = await voteAPI.updateBudget(
+        trip.tripid, {
         category: category as any,
         amount
       });
@@ -163,12 +164,12 @@ const VotePage: React.FC = () => {
   };
 
   // ✅ Vote Location
-  const handleVoteLocation = async (votes: [string, string, string]) => {
+  const handleVoteLocation = async (votes: LocationVote[]) => {
     if (!trip) return;
     
     try {
-      const response = await voteAPI.submitLocationVote(trip.invitecode, { votes });
-      
+      const response = await voteAPI.submitLocationVote(trip.tripid, { votes });
+      console.log("submitLocationVote",response);
       if (response.success) {
         setToast({ message: 'โหวตสำเร็จ', type: 'success' });
       } else {

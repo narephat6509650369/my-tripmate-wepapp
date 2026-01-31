@@ -1,5 +1,6 @@
 import { pool } from "../config/db.js";
-import type { RowDataPacket } from "mysql2";
+import type { RowDataPacket ,} from "mysql2";
+import type { PoolConnection } from "mysql2/promise";
 import { v4 as uuidv4 } from 'uuid';
 
 export const getConnection = async () => {
@@ -8,30 +9,102 @@ export const getConnection = async () => {
 
 // ================= DATE VOTING SECTION =================
 
-export const addAvailability = async ( trip_id: string, user_id: string, available_date: Date ) => {
-  const [result] = await pool.query(
-    `INSERT INTO trip_user_availabilities 
-     (availability_id, trip_id, user_id, available_date)
-     VALUES (UUID(), ?, ?, ?)`,
-    [trip_id, user_id, available_date]
-  );
-  return result;
+
+export const addAvailability = async (trip_id: string,user_id: string,available_date: Date) => {
+  const connection: PoolConnection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    /* 1. หา / สร้าง date_voting (1 ต่อ trip) */
+    const tempVotingId = uuidv4();
+
+    await connection.query(
+      `INSERT INTO date_votings
+       (date_voting_id, trip_id, status)
+       VALUES (?, ?, 'active')
+       ON DUPLICATE KEY UPDATE
+         date_voting_id = date_voting_id`,
+      [tempVotingId, trip_id]
+    );
+
+    const [votings] = await connection.query<any[]>(
+      `SELECT date_voting_id
+       FROM date_votings
+       WHERE trip_id = ?`,
+      [trip_id]
+    );
+
+    const dateVotingId = votings[0].date_voting_id;
+
+    /* 2. หา / สร้าง date_option */
+    const [options] = await connection.query<any[]>(
+      `SELECT date_option_id
+       FROM date_options
+       WHERE date_voting_id = ? AND available_date = ?`,
+      [dateVotingId, available_date]
+    );
+
+    let dateOptionId: string;
+
+    if (options.length > 0) {
+      dateOptionId = options[0].date_option_id;
+    } else {
+      dateOptionId = uuidv4();
+      await connection.query(
+        `INSERT INTO date_options
+         (date_option_id, date_voting_id, proposed_by, available_date)
+         VALUES (?, ?, ?, ?)`,
+        [dateOptionId, dateVotingId, user_id, available_date]
+      );
+    }
+
+    /* 3. user โหวตวัน */
+    await connection.query(
+      `INSERT INTO date_votes
+       (date_vote_id, date_option_id, user_id, is_available)
+       VALUES (UUID(), ?, ?, 1)
+       ON DUPLICATE KEY UPDATE
+         is_available = 1`,
+      [dateOptionId, user_id]
+    );
+
+    await connection.commit();
+    return { success: true };
+
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release(); 
+  }
 };
 
-export const clearUserAvailability = async (trip_id: string, user_id: string) => {
+export const clearUserAvailability = async (trip_id: string,user_id: string) => {
   await pool.query(
-    `DELETE FROM trip_user_availabilities 
-     WHERE trip_id = ? AND user_id = ?`,
+    `
+    DELETE dv
+    FROM date_votes dv
+    JOIN date_options do ON dv.date_option_id = do.date_option_id
+    JOIN date_votings dvt ON do.date_voting_id = dvt.date_voting_id
+    WHERE dvt.trip_id = ? AND dv.user_id = ?
+    `,
     [trip_id, user_id]
   );
 };
 
 export const getTripAvailabilities = async (trip_id: string, user_id: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT 
-        available_date
-     FROM trip_user_availabilities
-     WHERE trip_id = ? AND user_id = ?`,
+    `SELECT
+      do.available_date
+    FROM date_votes dv
+    JOIN date_options do
+      ON dv.date_option_id = do.date_option_id
+    JOIN date_votings dvt
+      ON do.date_voting_id = dvt.date_voting_id
+    WHERE dvt.trip_id = ?
+      AND dv.user_id = ?
+    ORDER BY do.available_date
+    `,
     [trip_id, user_id]
   );
 
@@ -41,7 +114,33 @@ export const getTripAvailabilities = async (trip_id: string, user_id: string) =>
   };
 };
 
+export const getActiveMemberCount = async (tripId: string): Promise<number> => {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) as total 
+     FROM trip_members 
+     WHERE trip_id = ? AND is_active = 1`,
+    [tripId]
+  );
+  return rows?.[0]?.total ?? 0;
+};
 
+export const getAvailabilitiesByTrip = async (tripId: string) => {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT
+      dv.user_id,
+      do.available_date
+    FROM date_votes dv
+    JOIN date_options do ON dv.date_option_id = do.date_option_id
+    JOIN date_votings dvt ON do.date_voting_id = dvt.date_voting_id
+    WHERE dvt.trip_id = ?
+      AND dv.is_available = 1
+    ORDER BY do.available_date`,
+    [tripId]
+  );
+  return rows;
+};
+
+/*
 export const saveUserAvailability = async (date_voting_id: string, trip_id: string) => {
   const [result] = await pool.query(
     `INSERT INTO date_votings (date_voting_id, trip_id, status)
@@ -112,28 +211,6 @@ export const getRankingResults = async (trip_id: string) => {
   return rows;
 };
 
-export const getAvailabilitiesByTrip = async (tripId: string) => {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT 
-      user_id, 
-      available_date
-     FROM trip_user_availabilities
-     WHERE trip_id = ?`,
-    [tripId]
-  );
-  return rows;
-};
-
-export const getActiveMemberCount = async (tripId: string): Promise<number> => {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT COUNT(*) as total 
-     FROM trip_members 
-     WHERE trip_id = ? AND is_active = 1`,
-    [tripId]
-  );
-  return rows?.[0]?.total ?? 0;
-};
-
 export const insertDateVoting  = async (connection: unknown, trip_id: string, date_voting_id: string) => {
   await pool.query(
     `INSERT INTO date_votings (date_voting_id, trip_id, status) 
@@ -152,7 +229,7 @@ export const clearActiveVotingByTrip = async (conn: any, trip_id: string) => {
     [trip_id]
   );
 };
-
+*/
 // ================= BUDGET SECTION =================
 
 export const getTripBudgets = async (trip_id: string) => {
@@ -192,81 +269,160 @@ export const getBudgetOptionByUserId = async (trip_id: string,user_id: string) =
   return rows; // ✅ array เสมอ
 };
 
-
-export const getBudgetLogs = async (trip_id: string) => {
-  const sql = `
-    SELECT 
-      bl.log_id,
-      bl.user_id,
-      bl.category_name,
-      bl.old_amount,
-      bl.new_amount,
-      bl.created_at,
-      u.full_name,
-      u.avatar_url
-    FROM budget_logs bl
-    LEFT JOIN users u ON bl.user_id = u.user_id
-    WHERE bl.trip_id = ?
-    ORDER BY bl.created_at DESC 
-    LIMIT 50
-  `;
-  const [rows] = await pool.query<RowDataPacket[]>(sql, [trip_id]);
-  return rows;
-};
-
-export const upsertBudget = async (trip_id: string, user_id: string, category: string, amount: number) => {
+export const updateBudget = async (trip_id: string,user_id: string,category: string,amount: number) => {
   const connection = await pool.getConnection();
+
   try {
     await connection.beginTransaction();
 
-    // 1. หา/สร้าง Budget Voting ID
-    let [voting] = await connection.query<RowDataPacket[]>(
-      'SELECT budget_voting_id FROM budget_votings WHERE trip_id = ?', 
+    // 1. หา / สร้าง budget_voting
+    const [votingRows] = await connection.query<RowDataPacket[]>(
+      `SELECT budget_voting_id 
+      FROM budget_votings 
+      WHERE trip_id = ?`,
       [trip_id]
     );
-    let voting_id = voting[0]?.budget_voting_id;
-    
-    if (!voting_id) {
-      voting_id = uuidv4();
+
+    let budget_voting_id = votingRows[0]?.budget_voting_id;
+
+    if (!budget_voting_id) {
+      budget_voting_id = uuidv4();
       await connection.query(
-        'INSERT INTO budget_votings (budget_voting_id, trip_id) VALUES (?, ?)', 
-        [voting_id, trip_id]
+        `INSERT INTO budget_votings (budget_voting_id, trip_id)
+         VALUES (?, ?)`,
+        [budget_voting_id, trip_id]
       );
     }
-
-    // 2. หาค่าเดิม (เพื่อทำ Log)
-    const [oldRow] = await connection.query<RowDataPacket[]>(
-      `SELECT estimated_amount 
-       FROM budget_options 
-       WHERE budget_voting_id = ? 
-         AND category_name = ? 
-         AND proposed_by = ?`,
-      [voting_id, category, user_id]
+    
+    // 2. หา amount เดิม (state เก่า)
+    const [oldRows] = await connection.query<RowDataPacket[]>(
+      `
+      SELECT estimated_amount
+      FROM budget_options
+      WHERE budget_voting_id = ?
+        AND category_name = ?
+        AND proposed_by = ?
+      `,
+      [budget_voting_id, category, user_id]
     );
-    const old_amount = oldRow[0]?.estimated_amount || 0;
+    
+    const old_amount = oldRows[0]?.estimated_amount ?? 0;
+    
 
-    // 3. บันทึกค่าใหม่ (Upsert)
+    // --- แก้ไขขั้นตอนที่ 3 ---
+    const new_budget_option_id = uuidv4(); // สร้าง ID เตรียมไว้เลย
+
+    await connection.query(
+    `
+    INSERT INTO budget_options
+      (budget_option_id, budget_voting_id, category_name,
+      estimated_amount, proposed_by, priority)
+    VALUES
+      (?, ?, ?, ?, ?, ?)
+    `,
+    [new_budget_option_id, budget_voting_id, category, amount, user_id, 1]
+  );
+
+
+    // 4. ดึง budget_option_id (state ปัจจุบัน)
+    const [optionRows] = await connection.query<RowDataPacket[]>(
+      `
+      SELECT budget_option_id
+      FROM budget_options
+      WHERE budget_voting_id = ?
+        AND category_name = ?
+        AND proposed_by = ?
+      `,
+      [budget_voting_id, category, user_id]
+    );
+
+    const option = optionRows[0];
+
+    if (!option) {
+      throw new Error('Budget option not found');
+    }
+
+    const budget_option_id = option.budget_option_id;
+
+
+    // 5. INSERT log (budget_votes) ❗ทุกครั้ง
+    await connection.query(
+      `
+      INSERT INTO budget_votes
+        (budget_vote_id, budget_option_id, user_id, category_name, estimated_amount)
+      VALUES
+        (UUID(), ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        budget_option_id = VALUES(budget_option_id),
+        estimated_amount = VALUES(estimated_amount),
+        voted_at = CURRENT_TIMESTAMP
+
+      `,
+      [budget_option_id, user_id, category, amount]
+    );
+
+    await connection.commit();
+
+    return {
+      old_amount,
+      new_amount: amount
+    };
+
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+};
+
+export const clearBudgetCategory = async (
+  trip_id: string,
+  user_id: string,
+  category: string
+) => {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. หา budget_voting_id
+    const [votingRows] = await connection.query<RowDataPacket[]>(
+      `SELECT budget_voting_id FROM budget_votings WHERE trip_id = ?`,
+      [trip_id]
+    );
+
+    const voting = votingRows[0];
+    if (!voting) throw new Error("Budget voting session not found.");
+    
+    const budget_voting_id = voting.budget_voting_id;
+    const new_option_id = crypto.randomUUID();
+
+    // 2. บันทึกประวัติการ Clear (History Log) ลง budget_options
     await connection.query(
       `INSERT INTO budget_options 
-       (budget_option_id, budget_voting_id, category_name, estimated_amount, proposed_by, priority)
-       VALUES (UUID(), ?, ?, ?, ?, 1)
-       ON DUPLICATE KEY UPDATE 
-         estimated_amount = VALUES(estimated_amount), 
-         proposed_at = NOW()`,
-      [voting_id, category, amount, user_id]
+        (budget_option_id, budget_voting_id, proposed_by, category_name, estimated_amount, priority)
+       VALUES (?, ?, ?, ?, 0, 1)`,
+      [new_option_id, budget_voting_id, user_id, category]
     );
 
-    // 4. บันทึก Log
+    // 3. อัปเดตสถานะล่าสุด (Current State) ลง budget_votes
+    // เปลี่ยนจาก budget_option_id เป็น new_option_id และใช้ค่า 0 สำหรับการ Clear
     await connection.query(
-      `INSERT INTO budget_logs 
-       (log_id, trip_id, user_id, category_name, old_amount, new_amount)
-       VALUES (UUID(), ?, ?, ?, ?, ?)`,
-      [trip_id, user_id, category, old_amount, amount]
-    );
+      `
+      INSERT INTO budget_votes
+        (budget_vote_id, budget_option_id, user_id, category_name, estimated_amount)
+      VALUES
+        (UUID(), ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        budget_option_id = VALUES(budget_option_id),
+        estimated_amount = VALUES(estimated_amount),
+        voted_at = CURRENT_TIMESTAMP
+      `,
+  [new_option_id, user_id, category, 0] // <- ต้องมี amount
+  );
 
     await connection.commit();
-    return { old_amount, new_amount: amount };
-    
   } catch (err) {
     await connection.rollback();
     throw err;
@@ -274,36 +430,6 @@ export const upsertBudget = async (trip_id: string, user_id: string, category: s
     connection.release();
   }
 };
-
-export const clearBudget = async (trip_id: string, user_id: string) => {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-
-    // หา Budget Voting ID
-    let [voting] = await connection.query<RowDataPacket[]>(
-      'SELECT budget_voting_id FROM budget_votings WHERE trip_id = ?', 
-      [trip_id]
-    );
-    let voting_id = voting[0]?.budget_voting_id;
-    
-    if (voting_id) {
-      // ลบ Budget Options ของ User คนนี้
-      await connection.query(
-        `DELETE FROM budget_options 
-         WHERE budget_voting_id = ? AND proposed_by = ?`,
-        [voting_id, user_id]
-      );
-    }
-
-    await connection.commit();
-  } catch (err) {
-    await connection.rollback();
-    throw err;
-  } finally {
-    connection.release();
-  }
-}
 
 // ================= LOCATION SECTION =================
 
@@ -401,6 +527,22 @@ export const getLocationScores = async (trip_id: string) => {
   return rows;
 };
 
+export const clearLocation = async (trip_id: string, user_id: string) => {
+  const sql = `
+    DELETE lv
+    FROM location_votes lv
+    JOIN location_options lo 
+      ON lv.location_option_id = lo.location_option_id
+    JOIN location_votings lvs 
+      ON lo.location_voting_id = lvs.location_voting_id
+    WHERE lvs.trip_id = ?
+      AND lv.user_id = ?
+  `;
+
+  await pool.query(sql, [trip_id, user_id]);
+};
+
+
 // ================= TRIP STATUS =================
 
 
@@ -446,18 +588,22 @@ export const closeAllVotings = async (trip_id: string) => {
 export default {
   getConnection,
   addAvailability,
-  clearUserAvailability,
   getTripAvailabilities,
-  saveUserAvailability,
+  closeAllVotings,
+  getTripBudgets,
+  updateBudget,
+  submitLocationVotes,
+  getLocationScores,
+  getActiveMemberCount,
+  getAvailabilitiesByTrip
+};
+
+/*
+saveUserAvailability,
   getActiveDateVotingByTrip,
   insertDateVoting,
   clearActiveVotingByTrip,
-  closeAllVotings,
-  getTripBudgets,
-  getBudgetLogs,
-  upsertBudget,
-  submitLocationVotes,
-  getLocationScores,
   insertRankingResults,
   getRankingResults,
-};
+  clearUserAvailability,
+*/

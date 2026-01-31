@@ -330,13 +330,19 @@ export interface UserBudgetOption {
 // LOCATION VOTING TYPES
 // ============================================================================
 
+export interface LocationVote {
+  place: string;
+  score: number;
+}
+
 export interface SubmitLocationVotePayload {
-  votes: [string, string, string]; // ต้องส่ง 3 จังหวัด
+  votes: LocationVote[];
 }
 
 export interface LocationScores {
-  [province: string]: number; // { "เชียงใหม่": 15, "ภูเก็ต": 10 }
+  [province: string]: number;
 }
+
 
 // ============================================================================
 // FRONTEND UI TYPES

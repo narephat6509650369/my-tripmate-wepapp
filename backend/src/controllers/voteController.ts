@@ -171,6 +171,8 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
 
     const result = await voteService.getTripDateMatchingResult(tripId, userId);
 
+    console.log("getTripDateMatchingResult",result)
+
     return res.status(200).json({
       success: true,
       code: "DATE_MATCHING_RESULT",
@@ -189,7 +191,7 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
 };
 
 
-// ================= BUDGET & LOCATION =================
+// ================= BUDGET  =================
 /*
 export const getTripDetailController = async (req: Request, res: Response) => {
   try {
@@ -235,19 +237,25 @@ export const getTripDetailController = async (req: Request, res: Response) => {
 */
 export const updateBudgetController = async (req: Request, res: Response) => {
   try {
-    const { tripCode } = req.params;
+    const { tripId } = req.params;
     const { category, amount } = req.body;
     const userId = (req.user as JwtPayload)?.userId;
 
-    if (!tripCode || !category || amount === undefined) {
+    console.log("JWT userId:",userId)
+    console.log("category",category)
+    console.log("amount",amount)
+    console.log("userId",userId)
+
+
+    if (!tripId || !category || amount === undefined) {
       return res.status(400).json({
         success: false,
         code: "MISSING_FIELD",
-        message: "tripCode, category and amount are required"
+        message: "tripId, category and amount are required"
       });
     }
 
-    const result = await voteService.updateBudget(tripCode, userId, category, amount);
+    const result = await voteService.updateBudget(tripId, userId, category, amount);
 
     return res.status(200).json({
       success: true,
@@ -261,7 +269,7 @@ export const updateBudgetController = async (req: Request, res: Response) => {
 
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
-
+    console.error("❌ updateBudget DB error:", err);
     if (message === "ไม่พบทริป") {
       return res.status(404).json({
         success: false,
@@ -332,9 +340,11 @@ export const getBudgetVotingController = async (req: Request, res: Response) => 
   }
 };
 
+//// ================= LOCATION =================
+
 export const submitLocationVoteController = async (req: Request, res: Response) => {
   try {
-    const { tripCode } = req.params;
+    const { tripid } = req.params;
     const { votes } = req.body;
     const userId = (req.user as JwtPayload)?.userId;
 
@@ -346,17 +356,18 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
         error: { field: "votes" }
       });
     }
-
-    if (!tripCode) {
+    console.log("trip id",tripid);
+    if (!tripid) {
       return res.status(400).json({
         success: false,
         code: "MISSING_FIELD",
-        message: "tripCode is required",
-        error: { field: "tripCode" }
+        message: "tripid is required",
+        error: { field: "tripid" }
       });
     }
 
-    const scores = await voteService.voteLocation(tripCode, userId, votes);
+    const scores = await voteService.voteLocation(tripid, userId, votes);
+    console.log("Score:",scores);
 
     const data: Record<string, number> = {};
     scores.forEach((s: any) => {
