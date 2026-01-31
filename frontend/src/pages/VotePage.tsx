@@ -123,7 +123,7 @@ const VotePage: React.FC = () => {
     }
     
     try {
-      //เรียก api 2ครั้งทำไม
+      //เรียก api 2ครั้ง?
       const response = await voteAPI.submitAvailability({
         trip_id: trip.tripid,
         user_id: user.user_id,
@@ -235,7 +235,8 @@ const VotePage: React.FC = () => {
       <Header onLogout={handleLogout} />
 
       {toast && (
-        <Toast 
+        <Toast
+          id="vote-page-toast"
           message={toast.message}
           type={toast.type}
           onClose={() => setToast(null)}
