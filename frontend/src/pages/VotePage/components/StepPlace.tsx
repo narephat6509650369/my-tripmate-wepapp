@@ -25,8 +25,8 @@ export const StepPlace: React.FC<StepPlaceProps> = ({ trip, onVote }) => {
   const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
-
-    
+    const getLocationvote= voteAPI.getLocationVote(trip.tripid);
+    console.log("getLocationvote:",getLocationvote);
   })
 
   // ============== HANDLERS ==============

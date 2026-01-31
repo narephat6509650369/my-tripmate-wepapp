@@ -542,6 +542,33 @@ export const clearLocation = async (trip_id: string, user_id: string) => {
   await pool.query(sql, [trip_id, user_id]);
 };
 
+export const getVoteLocation = async (tripId:string) => {
+  const connection = await pool.getConnection();
+  try{
+    const [rows] = await connection.query (
+      `
+      SELECT 
+        lv.location_vote_id,
+        lv.location_option_id,
+        lv.user_id,
+        lv.voted_at,
+        lv.score
+      FROM location_votes lv
+      JOIN location_options lo ON lv.location_option_id = lo.location_option_id
+      JOIN location_votings lvt ON lo.location_voting_id = lvt.location_voting_id
+      WHERE lvt.trip_id = ?
+      `,
+      [tripId]
+    );
+   
+    return rows ;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
 
 // ================= TRIP STATUS =================
 
@@ -595,6 +622,7 @@ export default {
   submitLocationVotes,
   getLocationScores,
   getActiveMemberCount,
+  getVoteLocation,
   getAvailabilitiesByTrip
 };
 

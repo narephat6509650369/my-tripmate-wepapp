@@ -1,7 +1,6 @@
 import type { Request, Response } from 'express';
 import * as voteService from '../services/voteService.js';
 import type { JwtPayload } from '../express.d.js';
-import voteModel from '../models/voteModel.js';
 
 // ================= DATE VOTING =================
 // post user ส่งวันว่างที่ตัวเองว่างมา
@@ -241,12 +240,6 @@ export const updateBudgetController = async (req: Request, res: Response) => {
     const { category, amount } = req.body;
     const userId = (req.user as JwtPayload)?.userId;
 
-    console.log("JWT userId:",userId)
-    console.log("category",category)
-    console.log("amount",amount)
-    console.log("userId",userId)
-
-
     if (!tripId || !category || amount === undefined) {
       return res.status(400).json({
         success: false,
@@ -367,7 +360,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
     }
 
     const scores = await voteService.voteLocation(tripid, userId, votes);
-    console.log("Score:",scores);
+    
 
     const data: Record<string, number> = {};
     scores.forEach((s: any) => {
@@ -401,6 +394,50 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
   }
 };
 
+export const getLocationVote = async (req: Request, res: Response) => {
+  try {
+    const { tripId } = req.params;
+
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "tripId is required",
+        error: { field: "tripId" }
+      });
+    }
+
+    const locationVotes = await voteService.getLocationVote(tripId);
+
+    return res.status(200).json({
+      success: true,
+      code: "LOCATION_VOTES_FETCHED",
+      message: "Location votes fetched successfully",
+      data: locationVotes
+    });
+
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+
+    if (message === "ไม่พบทริป") {
+      return res.status(404).json({
+        success: false,
+        code: "TRIP_NOT_FOUND",
+        message
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      code: "INTERNAL_ERROR",
+      message: "Failed to fetch location votes",
+      error: { detail: message }
+    });
+  }
+};
+
+
+/*
 export const closeTripController = async (req: Request, res: Response) => {
   try {
     const { tripCode } = req.params;
@@ -450,3 +487,4 @@ export const closeTripController = async (req: Request, res: Response) => {
     });
   }
 };
+*/

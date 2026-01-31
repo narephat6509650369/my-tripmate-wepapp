@@ -532,8 +532,6 @@ export const voteAPI = {
         headers: getAuthHeaders()
       });
 
-      console.log("Budget Voting Response Status:", response);
-
       return await response.json();
     } catch (error) {
       return handleApiError(error);
@@ -565,20 +563,56 @@ export const voteAPI = {
           message: 'กรุณาเข้าสู่ระบบใหม่'
         };
       }
-      console.log("trip Id:",tripid)
+
       const response = await fetchWithTimeout(`${API_URL}/votes/${tripid}/vote-place`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload)
       });
 
-      console.log("submitLocationVote", response)
-
       return await response.json();
     } catch (error) {
       return handleApiError(error);
     }
   },
+
+  getLocationVote: async (tripId: string) => {
+    // ✅ Mock Mode
+    if (CONFIG.USE_MOCK_DATA) {
+      return {
+        success: true,
+        code: 'LOCATION_VOTES_FETCHED',
+        message: 'Mock location votes',
+        data: []
+      };
+    }
+
+    try {
+      const response = await fetchWithTimeout(
+        `${API_URL}/votes/${tripId}/get-vote-place`,
+        {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          code: data.code || 'API_ERROR',
+          message: data.message || 'Failed to fetch location votes'
+        };
+      }
+
+      return data;
+
+    } catch (error) {
+      return handleApiError(error);
+    }
+},
+  //close ต้องแก้เพิ่ม
 
   /**
    * POST /api/votes/:tripCode/close

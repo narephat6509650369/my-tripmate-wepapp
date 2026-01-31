@@ -6,9 +6,10 @@ import {
   //getTripDetailController, 
   updateBudgetController, 
   submitLocationVoteController,
-  closeTripController, 
+  //closeTripController, 
   getDateMatchingResultController,
-  getBudgetVotingController
+  getBudgetVotingController,
+  getLocationVote
 } from '../controllers/voteController.js';
 import { auth } from '../middleware/auth.js';
 import { requireTripOwner } from '../middleware/role.js';
@@ -17,7 +18,7 @@ const router = express.Router();
 
 //============ TRIP =============
 
-router.post('/:tripCode/close', auth, requireTripOwner, closeTripController);
+//router.post('/:tripCode/close', auth, requireTripOwner, closeTripController);
 
 // ============ DATE VOTING ============
 
@@ -34,6 +35,7 @@ router.get('/:tripId/date-matching-result', auth, getDateMatchingResultControlle
 // ============ PLACE VOTING ============
 
 //router.post('/start-voting', auth, requireTripOwner, startVotingController);
+router.get('/:tripId/get-vote-place', auth, getLocationVote) 
 
 router.post('/:tripid/vote-place', auth, submitLocationVoteController);
 

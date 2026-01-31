@@ -100,6 +100,7 @@ export interface MyTripsResponse {
 }
 
 export interface TripDetail {
+  duration: number;
   tripid: string;
   ownerid: string;
   tripname: string;

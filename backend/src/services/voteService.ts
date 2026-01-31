@@ -272,7 +272,6 @@ export const getFullTripData = async (tripCode: string) => {
 };
 */
 
-
 /**
  * 5. อัปเดตงบประมาณ
  */
@@ -319,7 +318,6 @@ export const updateBudget = async ( tripid: string,user_id: string,category: str
     message: "Budget updated successfully"
   };
 };
-
 
 /*
 * ดึงข้อมูลสำหรับอัปเดตงบประมาณของตัวเอง
@@ -374,8 +372,6 @@ export const voteLocation = async ( tripid: string, user_id: string,votes: Locat
   if (!Array.isArray(votes) || votes.length !== 3) {
     throw new Error("Must vote for exactly 3 provinces");
   }
-  console.log("trip id votelocatio:",tripid)
-  console.log("user id votelocation",user_id)
   const uniqueVotes = new Set(votes);
   if (uniqueVotes.size !== 3) {
     throw new Error("Must vote for 3 different provinces");
@@ -383,12 +379,11 @@ export const voteLocation = async ( tripid: string, user_id: string,votes: Locat
 
   // 2. หาทริป
   const trip = await tripModel.findTripById(tripid);
-  console.log("trip:",trip)
   if (!trip) throw new Error("Trip not found");
 
   // 3. เช็คสมาชิก
   const members = await tripModel.getTripMembers(trip.trip_id);
-  console.log("member:",members)
+
   const isMember = members.some(m => m.user_id === user_id && m.is_active);
   
   if (!isMember) {
@@ -406,18 +401,17 @@ export const voteLocation = async ( tripid: string, user_id: string,votes: Locat
 
   // 5. ดึงคะแนนรวมล่าสุด
   const newScores = await voteModel.getLocationScores(tripid);
-  console.log("scores:",newScores)
 
   return newScores;
 };
 
 // get location vote
-export const getLocationVote = async ( tripid: string ) => {
-
+export const getLocationVote = async ( tripId: string ) => {
+  const location = await voteModel.getVoteLocation(tripId);
+  return location ;
 }
-/**
- * 7. ปิดการโหวต (Owner only)
- */
+
+/*ปิดทริป
 export const closeTrip = async (tripCode: string, user_id: string) => {
   // 1. หาทริป
   const trip = await tripModel.getTripByInviteCode(tripCode);
@@ -477,7 +471,7 @@ export const closeTrip = async (tripCode: string, user_id: string) => {
     connection.release();
   }
 };
-
+*/
 export default {
   submitAvailability,
   //getTripHeatmap,
@@ -485,7 +479,7 @@ export default {
   //getFullTripData,
   updateBudget,
   voteLocation,
-  closeTrip
+  //closeTrip
 };
 
 export function getBudgetVoting(tripCode: string, userId: string) {
