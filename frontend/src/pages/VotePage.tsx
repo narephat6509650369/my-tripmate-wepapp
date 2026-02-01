@@ -5,16 +5,14 @@ import { Loader2, AlertCircle, Copy, Clock } from "lucide-react";
 
 // Components
 import Header from "../components/Header";
-import { Toast } from "../components/Toast";
 import StepVote from "./VotePage/components/StepVote";
 import StepBudget from './VotePage/components/StepBudget';
 import StepPlace from './VotePage/components/StepPlace';
 import StepSummary from './VotePage/components/StepSummary';
 
-
 // Hooks & Utils
 import { useAuth } from '../contexts/AuthContext';
-import { tripAPI, voteAPI,} from '../services/tripService';
+import { tripAPI, voteAPI } from '../services/tripService';
 import type { TripDetail, DateRange, LocationVote } from '../types';
 
 // ============== MAIN COMPONENT ==============
@@ -23,11 +21,6 @@ const VotePage: React.FC = () => {
   const tripCode = urlCode || "UNKNOWN";
   const navigate = useNavigate();
   const { logout, user } = useAuth();
-
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
 
   // ============== STATE ==============
   const [trip, setTrip] = useState<TripDetail | null>(null);
@@ -110,20 +103,26 @@ const VotePage: React.FC = () => {
     logout();
   };
 
-  // ✅ Save Dates
+  // ✅ Manual Navigation (สำหรับ Smart Toast)
+  const handleManualNext = () => {
+    if (step < 5) {
+      setStep(step + 1);
+    }
+  };
+
+  // ✅ Save Dates (มี Auto-navigation)
   const handleSaveDates = async (dates: string[]) => {
-    if (!trip){
+    if (!trip) {
       console.log('No trip data available');
       return;
-    };
+    }
 
-    if(!user){
+    if (!user) {
       console.log('No user data available');
       return;
     }
     
     try {
-      //เรียก api 2ครั้ง?
       const response = await voteAPI.submitAvailability({
         trip_id: trip.tripid,
         user_id: user.user_id,
@@ -131,13 +130,13 @@ const VotePage: React.FC = () => {
       });
       
       if (response.success) {
-        setToast({ message: 'บันทึกวันที่สำเร็จ', type: 'success' });
+        console.log('✅ บันทึกวันที่สำเร็จ');
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
       console.error('Error saving dates:', error);
-      setToast({ message: 'เกิดข้อผิดพลาด', type: 'error' });
+      console.error('บันทึกวันที่ไม่สำเร็จ');
     }
   };
 
@@ -153,13 +152,13 @@ const VotePage: React.FC = () => {
       });
       
       if (response.success) {
-        setToast({ message: 'บันทึกงบประมาณสำเร็จ', type: 'success' });
+        console.log('บันทึกงบประมาณสำเร็จ');
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
       console.error('Error saving budget:', error);
-      setToast({ message: 'เกิดข้อผิดพลาด', type: 'error' });
+      console.error('บันทึกงบประมาณไม่สำเร็จ');
     }
   };
 
@@ -169,15 +168,15 @@ const VotePage: React.FC = () => {
     
     try {
       const response = await voteAPI.submitLocationVote(trip.tripid, { votes });
-      console.log("submitLocationVote",response);
+      console.log("submitLocationVote", response);
       if (response.success) {
-        setToast({ message: 'โหวตสำเร็จ', type: 'success' });
+        console.log('โหวตสำเร็จ');
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
       console.error('Error voting location:', error);
-      setToast({ message: 'เกิดข้อผิดพลาด', type: 'error' });
+      console.error('โหวตสถานที่ไม่สำเร็จ');
     }
   };
 
@@ -188,7 +187,7 @@ const VotePage: React.FC = () => {
       // Auto-save logic here if needed
       setStep(step + 1);
     } catch (error) {
-      setToast({ message: '❌ เกิดข้อผิดพลาด', type: 'error' });
+      console.error('Error moving to next step:', error);
     }
   };
 
@@ -233,15 +232,6 @@ const VotePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       <Header onLogout={handleLogout} />
-
-      {toast && (
-        <Toast
-          id="vote-page-toast"
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
       
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {/* Top Bar */}
@@ -250,7 +240,7 @@ const VotePage: React.FC = () => {
             onClick={() => navigate("/homepage")}
             className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-semibold transition-colors"
           >
-            ← กลับไปหน้าหลัก
+            ◄ กลับไปหน้าหลัก
           </button>
           
           <div className="flex items-center gap-3">
@@ -347,6 +337,7 @@ const VotePage: React.FC = () => {
             <StepVote 
               trip={trip}
               onSave={handleSaveDates}
+              onManualNext={handleManualNext}
             />
           )}
 
@@ -367,7 +358,6 @@ const VotePage: React.FC = () => {
           {step === 5 && (
             <StepSummary 
               trip={trip}
-              //onNavigateToSummary={() => navigate(`/summary/${tripCode}`)}
             />
           )}
         </div>

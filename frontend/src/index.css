@@ -197,7 +197,11 @@ code {
   }
 }
 
-/* ใน index.css หรือ tailwind.config.js */
+/* ============================================================================
+   Toast & Modal Animations
+   ============================================================================ */
+
+/* Slide in right (for regular toasts) */
 @keyframes slide-in-right {
   from {
     transform: translateX(100%);
@@ -211,4 +215,54 @@ code {
 
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out;
+}
+
+/* ============================================================================
+   Smart Toast Animations (กลางหน้าจอ)
+   ============================================================================ */
+
+/* Smart Toast Pop-Up Animation (กลางหน้าจอ) */
+@keyframes toast-pop-up {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.animate-toast-pop-up {
+  animation: toast-pop-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Modal Backdrop Animation */
+@keyframes backdrop-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-backdrop-fade-in {
+  animation: backdrop-fade-in 0.2s ease-out;
+}
+
+/* Modal Content Scale Animation */
+@keyframes modal-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-modal-scale-in {
+  animation: modal-scale-in 0.3s ease-out;
 }
