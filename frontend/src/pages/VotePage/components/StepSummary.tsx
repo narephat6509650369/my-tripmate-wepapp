@@ -5,15 +5,32 @@ import { Edit3, ArrowRight } from 'lucide-react';
 import type { TripCard, TripDetail } from '../../../types';
 
 // ============== TYPES ==============
+interface UserInputSummary {
+  dates: string[];
+  budget: {
+    accommodation: number;
+    transport: number;
+    food: number;
+    other: number;
+  };
+  locations: { place: string; score: number }[];
+}
+
 interface StepSummaryProps {
   trip: TripDetail;
   onNavigateToStep?: (step: number) => void;
+  userInput?: UserInputSummary;  
+  isOwner?: boolean;           
+  canViewSummary?: boolean;       // (owner หรือ ครบ 7 วัน)
 }
 
 // ============== COMPONENT ==============
 export const StepSummary: React.FC<StepSummaryProps> = ({ 
   trip, 
-  onNavigateToStep 
+  onNavigateToStep,
+  userInput,   
+  isOwner,         
+  canViewSummary 
 }) => {
   const navigate = useNavigate();
 
@@ -33,7 +50,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
         
         <p className="text-gray-600 mb-6">
           คุณได้กรอกข้อมูลเรียบร้อยแล้ว รอให้เพื่อนๆ กรอกข้อมูลให้ครบ 
-          แล้วเจ้าของทริปจะปิดการโหวตและดูผลสรุปได้
+          แล้วเจ้าของทริปจะปิดการโหวตหรือครบ7วันหลังสร้างห้องและดูผลสรุปได้
         </p>
 
         {/* Quick Edit Buttons */}
@@ -120,6 +137,71 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
           </div>
         </div>
 
+        {/* การกรอกของฉัน ← เพิ่มตรงนี้ */}
+        {userInput && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
+            <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2">
+              <span className="text-xl">📋</span> การกรอกของคุณ
+            </h3>
+
+            {/* วันที่ */}
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-600 mb-2">📅 วันที่เลือก</p>
+              {userInput.dates.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {userInput.dates.sort().map((date) => (
+                    <span key={date} className="px-3 py-1 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
+                      {new Date(date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-red-600">❌ ยังไม่ได้เลือกวันที่</p>
+              )}
+            </div>
+
+            {/* งบประมาณ */}
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-600 mb-2">💰 งบประมาณ</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: 'accommodation', label: 'ที่พัก' },
+                  { key: 'transport', label: 'เดินทาง' },
+                  { key: 'food', label: 'อาหาร' },
+                  { key: 'other', label: 'สำรอง' }
+                ].map(({ key, label }) => (
+                  <div key={key} className="flex justify-between bg-white rounded-lg px-3 py-1.5 border border-blue-100">
+                    <span className="text-sm text-gray-600">{label}</span>
+                    <span className="text-sm font-semibold text-blue-700">
+                      ฿{userInput.budget[key as keyof typeof userInput.budget].toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* จังหวัด */}
+            <div>
+              <p className="text-sm font-semibold text-gray-600 mb-2">📍 จังหวัดที่โหวต</p>
+              {userInput.locations.length > 0 ? (
+                <div className="space-y-1">
+                  {userInput.locations
+                    .sort((a, b) => b.score - a.score)
+                    .map((loc, idx) => (
+                      <div key={loc.place} className="flex items-center gap-2 bg-white rounded-lg px-3 py-1.5 border border-blue-100">
+                        <span>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
+                        <span className="text-sm text-gray-700">{loc.place}</span>
+                        <span className="ml-auto text-xs text-gray-500">({loc.score} คะแนน)</span>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-sm text-red-600">❌ ยังไม่ได้โหวตจังหวัด</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Status */}
         <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 rounded">
           <p className="font-semibold text-yellow-900 mb-2">⏳ รอเพื่อนๆ กรอกข้อมูล</p>
@@ -131,9 +213,14 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
         {/* Action Button */}
         <button
           onClick={handleViewFullSummary}
-          className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition shadow-lg flex items-center justify-center gap-2"
+          disabled={!canViewSummary}
+          className={`w-full px-6 py-4 font-bold rounded-xl transition shadow-lg flex items-center justify-center gap-2 ${
+            canViewSummary
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
         >
-          <span>ดูหน้าสรุปผล</span>
+          <span>{canViewSummary ? 'ดูหน้าสรุปผล' : '🔒 รอครบ 7 วันก่อน'}</span>
           <ArrowRight className="w-5 h-5" />
         </button>
 

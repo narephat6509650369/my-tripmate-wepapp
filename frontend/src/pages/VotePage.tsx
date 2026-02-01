@@ -30,7 +30,25 @@ const VotePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
+  const [userDates, setUserDates] = useState<string[]>([]);
+  const [userBudget, setUserBudget] = useState({ accommodation: 0, transport: 0, food: 0, other: 0 });
+  const [userLocations, setUserLocations] = useState<{ place: string; score: number }[]>([]);
+
   const displayCode = inviteCode || tripCode;
+
+  const isSummaryUnlocked = (tripData: TripDetail): boolean => {
+    if (!tripData.created_at) return false;
+    const createdAt = new Date(tripData.created_at);
+    const now = new Date();
+    const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+    return diffDays >= 7;
+  };
+
+  const getUserInput = () => ({
+    dates: userDates,
+    budget: userBudget,
+    locations: userLocations
+  });
 
   // ============== LOAD TRIP DATA ==============
   useEffect(() => {
@@ -55,6 +73,34 @@ const VotePage: React.FC = () => {
         
         setInviteCode(tripData.invitecode);
         setTrip(tripData);
+        try {
+          // วันที่
+          const dateRes = await voteAPI.getDateMatchingResult(tripData.tripid);
+          if (dateRes?.data?.data?.my_availability) {
+            setUserDates(dateRes.data.data.my_availability);
+          }
+
+          // งบ
+          const budgetRes = await voteAPI.getBudgetVoting(tripData.tripid);
+          if (budgetRes?.data?.data?.budget_options) {
+            const b = { accommodation: 0, transport: 0, food: 0, other: 0 };
+            budgetRes.data.data.budget_options.forEach((item: any) => {
+              if (item.category_name in b) {
+                b[item.category_name as keyof typeof b] = item.estimated_amount;
+              }
+            });
+            setUserBudget(b);
+          }
+
+          // จังหวัด
+          const locRes = await voteAPI.getLocationVote(tripData.tripid);
+          if (locRes?.data?.data?.my_votes) {
+            setUserLocations(locRes.data.data.my_votes);
+          }
+        } catch (e) {
+          console.error('Load user input failed:', e);
+        }
+
         setLoading(false);
         
         console.log('✅ Trip loaded:', tripData);
@@ -358,6 +404,10 @@ const VotePage: React.FC = () => {
           {step === 5 && (
             <StepSummary 
               trip={trip}
+              onNavigateToStep={setStep}
+              isOwner={trip.ownerid === user?.user_id}
+              canViewSummary={trip.ownerid === user?.user_id || isSummaryUnlocked(trip)}
+              userInput={getUserInput()} 
             />
           )}
         </div>
