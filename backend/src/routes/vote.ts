@@ -4,12 +4,12 @@ import {
   // getTripHeatmapController, 
   //startVotingController, 
   //getTripDetailController, 
-  updateBudgetController, 
+  submitBudgetVoteController, 
   submitLocationVoteController,
   //closeTripController, 
   getDateMatchingResultController,
-  getBudgetVotingController,
-  getLocationVote
+  getBudgetVoteController,
+  getLocationVoteController
 } from '../controllers/voteController.js';
 import { auth } from '../middleware/auth.js';
 import { requireTripOwner } from '../middleware/role.js';
@@ -35,16 +35,16 @@ router.get('/:tripId/date-matching-result', auth, getDateMatchingResultControlle
 // ============ PLACE VOTING ============
 
 //router.post('/start-voting', auth, requireTripOwner, startVotingController);
-router.get('/:tripId/get-vote-place', auth, getLocationVote) 
+router.get('/:tripId/get-vote-place', auth, getLocationVoteController) 
 
 router.post('/:tripid/vote-place', auth, submitLocationVoteController);
 
 // ============ BUDGET VOTING ============
 
-router.post('/:tripId/budget', auth, updateBudgetController);
+router.post('/:tripId/budget', auth, submitBudgetVoteController);
 
 //router.get('/:tripcode/get-budget', auth, getTripDetailController);
-router.get('/:tripId/get-budget', auth, getBudgetVotingController); // Temporarily disable trip detail fetching
+router.get('/:tripId/get-budget', auth, getBudgetVoteController); // Temporarily disable trip detail fetching
 
 
 

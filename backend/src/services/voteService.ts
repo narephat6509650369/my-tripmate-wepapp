@@ -164,14 +164,6 @@ export const getTripDateMatchingResult = async (tripId: string, userId: string) 
     }))
     .sort((a, b) => b.score - a.score);
 
-  //เพิ่ม algorithm คำนวณวันที่ใกล้กัน 3 อันดับแรก
-  console.log("Date Matching Result", {
-    table,
-    intersection,
-    weighted,
-    totalMembers
-  });
-
   return {
     userAvailabilityRows,
     table,          // ใช้แสดงเป็นตาราง / heatmap
@@ -313,8 +305,6 @@ export const updateBudget = async ( tripid: string,user_id: string,category: str
 
   return {
     success: true,
-    old_amount: result.old_amount,
-    new_amount: result.new_amount,
     message: "Budget updated successfully"
   };
 };
@@ -330,36 +320,21 @@ export const getUserBudgetForTrip = async (tripid: string, user_id: string) => {
 
   // 2. เช็คว่าเป็นสมาชิกหรือไม่
   const members = await tripModel.getTripMembers(trip.trip_id);
-  console.log("Trip members:", members);
 
   const isMember = members.some(m => m.user_id === user_id && m.is_active);
-  console.log(`Is user ${user_id} a member?`, isMember);
   
   if (!isMember) {
     throw new Error("You are not a member of this trip");
   }
  
   // 3. ดึงงบประมาณของ user
-  const budgets = await voteModel.getBudgetOptionByUserId(trip.trip_id, user_id);
+  const budgets = await voteModel.getBudgetVoting(trip.trip_id, user_id);
 
-  if (!budgets || budgets.length === 0) {
-    console.log("No budget votes yet");
-    return null;
-  }
+  //const rows = await voteModel.getTripBudgets(tripid,user_id);
 
-  const budgetObj: any = {
-    accommodation: 0,
-    transport: 0,
-    food: 0,
-    other: 0
-  };
-
-  budgets.forEach((b: any) => {
-    budgetObj[b.category_name] = Number(b.estimated_amount);
-  });
-
-  console.log("User Budget for Trip", budgetObj);
-  return budgetObj;
+return {
+  budgets
+};
 }
 
 // ===================== LOCATION VOTING =====================
@@ -367,43 +342,46 @@ export const getUserBudgetForTrip = async (tripid: string, user_id: string) => {
 /**
  * 6. โหวตจังหวัด (Ranked Voting: 3 อันดับ)
  */
-export const voteLocation = async ( tripid: string, user_id: string,votes: LocationVotePayload[] ) => {
-  // 1. Validate
+export const voteLocation = async (
+  tripid: string,
+  user_id: string,
+  votes: LocationVotePayload[]
+) => {
+  // 1. Validate จำนวน
   if (!Array.isArray(votes) || votes.length !== 3) {
     throw new Error("Must vote for exactly 3 provinces");
   }
-  const uniqueVotes = new Set(votes);
-  if (uniqueVotes.size !== 3) {
-    throw new Error("Must vote for 3 different provinces");
-  }
 
-  // 2. หาทริป
-  const trip = await tripModel.findTripById(tripid);
-  if (!trip) throw new Error("Trip not found");
-
-  // 3. เช็คสมาชิก
-  const members = await tripModel.getTripMembers(trip.trip_id);
-
-  const isMember = members.some(m => m.user_id === user_id && m.is_active);
-  
-  if (!isMember) {
-    throw new Error("You are not a member of this trip");
-  }
-  await voteModel.clearLocation(tripid,user_id);
-
+  // 2. Validate จังหวัดไม่ซ้ำ
   const provinces = votes.map(v => v.place);
   const unique = new Set(provinces);
   if (unique.size !== 3) {
     throw new Error("Must vote for 3 different provinces");
   }
-  // 4. บันทึกโหวต
-  await voteModel.submitLocationVotes(tripid,user_id,provinces);
 
-  // 5. ดึงคะแนนรวมล่าสุด
-  const newScores = await voteModel.getLocationScores(tripid);
+  // 3. หาทริป
+  const trip = await tripModel.findTripById(tripid);
+  if (!trip) {
+    throw new Error("Trip not found");
+  }
 
-  return newScores;
+  // 4. เช็คสมาชิก
+  const members = await tripModel.getTripMembers(trip.trip_id);
+  const isMember = members.some(
+    m => m.user_id === user_id && m.is_active
+  );
+
+  if (!isMember) {
+    throw new Error("You are not a member of this trip");
+  }
+
+  // 5. บันทึกโหวต (ส่ง payload เต็ม)
+  await voteModel.submitLocationVotes(tripid, user_id, votes);
+
+  // 6. ดึงคะแนนรวมล่าสุด
+  return await voteModel.getLocationScores(tripid);
 };
+
 
 // get location vote
 export const getLocationVote = async ( tripId: string ) => {

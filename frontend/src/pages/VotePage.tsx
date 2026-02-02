@@ -37,8 +37,8 @@ const VotePage: React.FC = () => {
   const displayCode = inviteCode || tripCode;
 
   const isSummaryUnlocked = (tripData: TripDetail): boolean => {
-    if (!tripData.created_at) return false;
-    const createdAt = new Date(tripData.created_at);
+    if (!tripData.createdat) return false;
+    const createdAt = new Date(tripData.createdat);
     const now = new Date();
     const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
     return diffDays >= 7;
@@ -76,8 +76,8 @@ const VotePage: React.FC = () => {
         try {
           // วันที่
           const dateRes = await voteAPI.getDateMatchingResult(tripData.tripid);
-          if (dateRes?.data?.data?.my_availability) {
-            setUserDates(dateRes.data.data.my_availability);
+          if (dateRes?.data?.data?.userAvailability) {
+            setUserDates(dateRes.data.data.userAvailability);
           }
 
           // งบ

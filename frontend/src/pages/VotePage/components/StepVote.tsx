@@ -53,7 +53,8 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
         });
         return;
       }
-
+      //change to call api 
+      /*
       const matchInfo = findAllMatches(matching.intersection, tripDuration, matching.weighted);
       
       // ✅ เพิ่มข้อมูล weighted เข้าไป
@@ -61,11 +62,12 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
         ...matchInfo,
         weighted: matching.weighted || {}
       });
-      
+
       displayMatchingResults(matchInfo, tripDuration);
 
       console.log("Matching Info:", matchInfo);
       console.log("Weighted:", matching.weighted);
+      */
     })
     .catch((err) => {
       console.error("Load date matching failed", err);

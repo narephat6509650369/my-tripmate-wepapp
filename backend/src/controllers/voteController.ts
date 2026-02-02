@@ -9,8 +9,6 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
     const { trip_id, ranges } = req.body;
     const userId = (req.user as JwtPayload)?.userId;
 
-    console.log('Received submitAvailability request:', { trip_id, ranges, userId });
-
     if (!trip_id) {
       return res.status(400).json({
         success: false,
@@ -30,6 +28,7 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
     }
 
     const result = await voteService.submitAvailability(trip_id, userId, ranges);
+
     if (!result) {
       return res.status(500).json({
         success: false,
@@ -150,7 +149,7 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
   try {
     const { tripId} = req.params;
     const userId = (req.user as JwtPayload).userId;
-    console.log("Fetching date matching result for tripId:", tripId, "and userId:", userId);
+    
     if (!tripId) {
       return res.status(400).json({
         success: false,
@@ -169,8 +168,6 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
     }
 
     const result = await voteService.getTripDateMatchingResult(tripId, userId);
-
-    console.log("getTripDateMatchingResult",result)
 
     return res.status(200).json({
       success: true,
@@ -234,7 +231,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
   }
 };
 */
-export const updateBudgetController = async (req: Request, res: Response) => {
+export const submitBudgetVoteController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
     const { category, amount } = req.body;
@@ -254,10 +251,6 @@ export const updateBudgetController = async (req: Request, res: Response) => {
       success: true,
       code: "BUDGET_UPDATED",
       message: result.message,
-      data: {
-        old_amount: result.old_amount,
-        new_amount: result.new_amount
-      }
     });
 
   } catch (err) {
@@ -288,7 +281,7 @@ export const updateBudgetController = async (req: Request, res: Response) => {
   }
 };
 
-export const getBudgetVotingController = async (req: Request, res: Response) => {
+export const getBudgetVoteController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
     const userId = (req.user as JwtPayload)?.userId;
@@ -304,7 +297,6 @@ export const getBudgetVotingController = async (req: Request, res: Response) => 
     }
 
     const data = await voteService.getUserBudgetForTrip(tripId, userId);
-    console.log("Get budget information:",data);
 
     return res.status(200).json({
       success: true,
@@ -349,7 +341,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
         error: { field: "votes" }
       });
     }
-    console.log("trip id",tripid);
+    
     if (!tripid) {
       return res.status(400).json({
         success: false,
@@ -358,7 +350,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
         error: { field: "tripid" }
       });
     }
-
+    
     const scores = await voteService.voteLocation(tripid, userId, votes);
     
 
@@ -394,7 +386,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
   }
 };
 
-export const getLocationVote = async (req: Request, res: Response) => {
+export const getLocationVoteController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
 
