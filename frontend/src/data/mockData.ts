@@ -159,8 +159,17 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       invitelink: trip.invite_link,
       status: trip.status,
       createdat: trip.created_at,
+<<<<<<< HEAD
       membercount: trip.membercount,
       members: [],
+=======
+      members: [
+        { user_id: 'user-001' },
+        { user_id: 'user-002' },
+        { user_id: 'user-003' },
+        { user_id: 'user-004' }
+      ],
+>>>>>>> 55291bcc (refactor(vote): improve budget step and voting state flow)
       dateRanges: [],
       provinceVotes: [],
       budgetOptions: [],
