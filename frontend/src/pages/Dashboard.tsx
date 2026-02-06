@@ -382,29 +382,6 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* สถานะของคุณ */}
-                <div className="bg-blue-100 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-blue-900 mb-3">📌 สถานะของคุณ</h3>
-                  <div className="space-y-3">
-                    <div className="bg-white rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-700">✅ กรอกครบแล้ว</span>
-                        <span className="text-lg font-bold text-green-600">
-                          {stats.joinedTrips.myStatus.completed}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-700">⏳ ยังไม่กรอก</span>
-                        <span className="text-lg font-bold text-orange-600">
-                          {stats.joinedTrips.myStatus.pending}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
           </div>
