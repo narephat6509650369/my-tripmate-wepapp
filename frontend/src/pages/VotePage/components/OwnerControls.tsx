@@ -21,7 +21,7 @@ export const OwnerControls: React.FC<OwnerControlsProps> = ({ trip }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   
   // ✅ เช็คว่าเป็น Owner หรือไม่
-  const isOwner = user?.user_id === trip.owner_id;
+  const isOwner = user?.user_id === trip.ownerid;
   
   if (!isOwner) return null;
 
@@ -44,7 +44,7 @@ export const OwnerControls: React.FC<OwnerControlsProps> = ({ trip }) => {
     try {
       setIsDeleting(true);
 
-      const response = await tripAPI.deleteTrip(trip.trip_id);
+      const response = await tripAPI.deleteTrip(trip.tripid);
 
       if (response.success) {
         alert("✅ ลบทริปเรียบร้อยแล้ว");
@@ -87,7 +87,7 @@ export const OwnerControls: React.FC<OwnerControlsProps> = ({ trip }) => {
     try {
       setDeletingMember(memberId);
 
-      const response = await tripAPI.removeMember(trip.trip_id, memberId);
+      const response = await tripAPI.removeMember(trip.tripid, memberId);
 
       if (response.success) {
         alert(`✅ ลบ "${memberName}" ออกจากทริปสำเร็จ`);
@@ -127,7 +127,7 @@ export const OwnerControls: React.FC<OwnerControlsProps> = ({ trip }) => {
           className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition"
         >
           <Users className="w-5 h-5" />
-          จัดการสมาชิก ({trip.member_count})
+          จัดการสมาชิก ({trip.membercount})
         </button>
 
         {/* ปุ่มลบทริป */}

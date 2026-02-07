@@ -374,6 +374,7 @@ export const voteAPI = {
   /**
    * GET /api/votes/heatmap/:tripId
    */
+  /*
   getTripHeatmap: async (tripId: string): Promise<ApiResponse<HeatmapData>> => {
     // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
@@ -400,7 +401,7 @@ export const voteAPI = {
       return handleApiError(error);
     }
   },
-
+*/
   /**
    * POST /api/votes/start-voting
    */

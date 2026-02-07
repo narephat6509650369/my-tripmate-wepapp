@@ -1,8 +1,8 @@
 import express from 'express';
-import { addTripController, getMyTripsController, deleteTripController,joinTripController, removeMemberController, getTripDetailController, updateTripStatusController, updateMemberBudgetController, getTripSummaryController} from "../controllers/TripController.js";
+import { addTripController, getMyTripsController, deleteTripController,joinTripController, removeMemberController, getTripDetailController, getTripSummaryController} from "../controllers/TripController.js";
 import { auth } from "../middleware/auth.js"
 import { requireTripOwner ,requireTripMember} from "../middleware/role.js"
-import { generateInviteCode, getTripDetail } from '../models/tripModel.js';
+
 
 const router = express.Router();
 
@@ -11,14 +11,9 @@ const router = express.Router();
 /* returns: { success: true, message: "เข้าร่วมทริปสำเร็จ", trip_id, trip_name } */
 router.post("/join", auth, joinTripController);
 
-/* สร้างโด้ดเชิญทำไมถ้าตอนเพิ่มทริปมีการสร้าง inviteCode อยู่แล้ว */
-// เจ้าของทริปสร้างโค้ดเชิญ
-router.post("/:tripId/invite", auth, generateInviteCode);
-
-
 //  ดึงสรุปผลทริป (สำหรับหน้า summary)
 /* returns: { trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status } */
-router.get("/:tripId/summary",auth,requireTripMember,getTripSummaryController);
+router.get("/:tripId/summary",auth,getTripSummaryController);
 
 // ดึงทริปทั้งหมดของผู้ใช้(เจ้าของ + เข้าร่วม)*  
 /* returns: { all, owned, joined } */
@@ -52,17 +47,17 @@ router.delete("/:tripId/members/:memberId", auth, requireTripOwner, removeMember
 
 // อัปเดตสถานะทริป
 /*return { success: true, message: "อัปเดตสถานะทริปสำเร็จ" } */
-router.patch("/:tripId/status",auth,requireTripOwner,updateTripStatusController);
+//router.patch("/:tripId/status",auth,requireTripOwner,updateTripStatusController);
 
 // อัปเดตงบประมาณสมาชิก
 /* returns: { success: true, message: "อัปเดตงบประมาณสมาชิกสำเร็จ" } */
-router.patch("/:tripId/budget",auth,updateMemberBudgetController);
+//router.patch("/:tripId/budget",auth,updateMemberBudgetController);
 
 
 
 
 // owner ปิดทริป
 /* returns: { success: true, message: "ปิดทริปสำเร็จ" } */
-router.patch("/:tripId/close",auth,requireTripOwner,updateTripStatusController);
+//router.patch("/:tripId/close",auth,requireTripOwner,updateTripStatusController);
 
 export default router;

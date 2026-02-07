@@ -60,6 +60,7 @@ export interface AuthResponse {
 // ============================================================================
 
 export interface Trip {
+  membercount: number;
   trip_id: string;
   owner_id: string;
   trip_name: string;
@@ -100,7 +101,6 @@ export interface MyTripsResponse {
 }
 
 export interface TripDetail {
-  duration: number;
   tripid: string;
   ownerid: string;
   tripname: string;
@@ -111,6 +111,7 @@ export interface TripDetail {
   status: string;
   createdat: string;
   updatedat?: string;
+  membercount: number,
   confirmedat?: string | null;
   isactive?: boolean;
   members: Member[];

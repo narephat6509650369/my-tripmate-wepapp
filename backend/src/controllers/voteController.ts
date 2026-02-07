@@ -168,6 +168,9 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
     }
 
     const result = await voteService.getTripDateMatchingResult(tripId, userId);
+    console.log("Date matching:",result);
+
+    //console.log("get tripmatching results:",result);
 
     return res.status(200).json({
       success: true,
@@ -255,7 +258,6 @@ export const submitBudgetVoteController = async (req: Request, res: Response) =>
 
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
-    console.error("❌ updateBudget DB error:", err);
     if (message === "ไม่พบทริป") {
       return res.status(404).json({
         success: false,
@@ -285,8 +287,8 @@ export const getBudgetVoteController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
     const userId = (req.user as JwtPayload)?.userId;
-    console.log("BudgetVotingController ")
-    console.log("tripId:", tripId)
+    //console.log("BudgetVotingController ")
+    //console.log("tripId:", tripId)
     if (!tripId) {
       return res.status(400).json({
         success: false,
@@ -353,7 +355,6 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
     
     const scores = await voteService.voteLocation(tripid, userId, votes);
     
-
     const data: Record<string, number> = {};
     scores.forEach((s: any) => {
       data[s.province_name] = Number(s.total_score);

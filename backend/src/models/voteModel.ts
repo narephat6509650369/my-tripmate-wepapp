@@ -25,8 +25,7 @@ export const addAvailability = async (trip_id: string,user_id: string,available_
       `INSERT INTO date_votings
        (date_voting_id, trip_id, status)
        VALUES (UUID(), ?, 'active')
-       ON DUPLICATE KEY UPDATE
-         date_voting_id = date_voting_id`,
+       ON DUPLICATE KEY UPDATE date_voting_id = date_voting_id`,
       [trip_id]
     );
 
@@ -147,6 +146,7 @@ export const getActiveMemberCount = async (tripId: string): Promise<number> => {
   return rows?.[0]?.total ?? 0;
 };
 
+//
 export const getAvailabilitiesByTrip = async (tripId: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT
@@ -296,7 +296,7 @@ export const getTripBudgets = async (trip_id: string, user_id: string) => {
   }
 };
 */
-export const getBudgetVoting = async (trip_id: string,user_id: string) => {
+export const getBudgetVoting = async (trip_id: string, user_id: string) => {
   const connection = await pool.getConnection();
   try{
 
@@ -411,11 +411,7 @@ export const updateBudget = async (trip_id: string, user_id: string, category: s
 };
 
 
-export const clearBudgetCategory = async (
-  trip_id: string,
-  user_id: string,
-  category: string
-) => {
+export const clearBudgetCategory = async (trip_id: string,user_id: string,category: string) => {
   const connection = await pool.getConnection();
 
   try {
@@ -468,11 +464,7 @@ export const clearBudgetCategory = async (
 
 // ================= LOCATION SECTION =================
 
-export const submitLocationVotes = async (
-  trip_id: string,
-  user_id: string,
-  votes: { place: string; score: number }[]
-) => {
+export const submitLocationVotes = async (trip_id: string,user_id: string,votes: { place: string; score: number }[]) => {
   const connection = await pool.getConnection();
 
   try {
@@ -487,12 +479,14 @@ export const submitLocationVotes = async (
     );
 
     let voting_id = votingRows[0]?.location_voting_id;
-
+    //check ถ้ามีก็ไม่มี insert แล้ว แต่ 2 อันบนใช่ duplicat
     if (!voting_id) {
       voting_id = uuidv4();
       await connection.query(
-        `INSERT INTO location_votings (location_voting_id, trip_id)
-         VALUES (?, ?)`,
+        `INSERT INTO location_votings (location_voting_id, trip_id, status)
+         VALUES (?, ?,'active')
+         ON DUPLICATE KEY UPDATE location_voting_id = location_voting_id
+         `,
         [voting_id, trip_id]
       );
     }

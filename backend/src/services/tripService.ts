@@ -68,7 +68,6 @@ export const getUserTrips = async (user_id: string) => {
 export const getTripDetail = async (tripCode: string) => {
   
   const trip = await tripModel.getTripDetail(tripCode);
-  console.log("trip service:",trip);
 
   return trip;
 }
@@ -135,11 +134,7 @@ export const joinTripByCode = async (invite_code: string, user_id: string) => {
 /**
  * ลบสมาชิกออกจากทริป (เฉพาะ Owner)
  */
-export const removeMemberService = async (params: {
-  trip_id: string;
-  member_id: string;
-  owner_id: string;
-}) => {
+export const removeMemberService = async (params: {trip_id: string;member_id: string;owner_id: string;}) => {
   const { trip_id, member_id, owner_id } = params;
   
   // 1. เช็คว่าผู้เรียกเป็น owner หรือไม่
@@ -182,10 +177,7 @@ export const findById = async (tripId: string) => {
   return trip;
 }
 
-export async function getTripSummaryService(
-  tripId: string,
-  userId: string
-) {
+export async function getTripSummaryService(tripId: string,userId: string) {
   const summary = await getTripSummaryById(tripId);
 
   if (!summary) {

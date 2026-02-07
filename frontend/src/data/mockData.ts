@@ -29,6 +29,7 @@ export const MOCK_TRIPS: Trip[] = [
     invite_code: 'A3K7-P9M2-X5Q8-R4W6',
     invite_link: 'http://localhost:3000/join/trip-001',
     status: 'voting',
+    membercount: 3,
     created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
     is_active: true
   },
@@ -40,6 +41,7 @@ export const MOCK_TRIPS: Trip[] = [
     num_days: 4,
     invite_code: 'B5H9-L2N4-Y7T3-W8K1',
     invite_link: 'http://localhost:3000/join/trip-002',
+    membercount: 3,
     status: 'completed',
     created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
     confirmed_at: new Date(Date.now() - 3 * 86400000).toISOString(),
@@ -54,6 +56,7 @@ export const MOCK_TRIPS: Trip[] = [
     invite_code: 'C8M3-Q6P9-Z2R5-V4D7',
     invite_link: 'http://localhost:3000/join/trip-003',
     status: 'planning',
+    membercount: 3,
     created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
     is_active: true
   }
@@ -156,6 +159,7 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       invitelink: trip.invite_link,
       status: trip.status,
       createdat: trip.created_at,
+      membercount: trip.membercount,
       members: [],
       dateRanges: [],
       provinceVotes: [],

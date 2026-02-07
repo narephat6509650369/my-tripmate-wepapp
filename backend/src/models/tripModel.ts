@@ -627,10 +627,13 @@ export async function getTripSummaryById(tripId: string): Promise<TripSummaryRes
   const [dateRows] = await pool.query<RowDataPacket[]>(
     `
     SELECT 
-      start_date,
-      end_date
-    FROM trip_user_availabilities
-    WHERE trip_id = ?
+      do.available_date
+    FROM date_votings dvt
+    JOIN date_options do ON do.date_voting_id = dvt.date_voting_id
+    JOIN date_votes dv ON dv.date_option_id = do.date_option_id
+    WHERE dvt.trip_id = ?
+    ORDER BY dv.voted_at DESC
+    LIMIT 1;
     `,
     [tripId]
   );

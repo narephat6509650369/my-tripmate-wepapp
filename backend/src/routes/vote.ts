@@ -36,13 +36,11 @@ router.get('/:tripId/date-matching-result', auth, getDateMatchingResultControlle
 
 //router.post('/start-voting', auth, requireTripOwner, startVotingController);
 router.get('/:tripId/get-vote-place', auth, getLocationVoteController) 
-
 router.post('/:tripid/vote-place', auth, submitLocationVoteController);
 
 // ============ BUDGET VOTING ============
 
 router.post('/:tripId/budget', auth, submitBudgetVoteController);
-
 //router.get('/:tripcode/get-budget', auth, getTripDetailController);
 router.get('/:tripId/get-budget', auth, getBudgetVoteController); // Temporarily disable trip detail fetching
 

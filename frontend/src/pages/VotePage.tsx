@@ -103,8 +103,6 @@ const VotePage: React.FC = () => {
 
         setLoading(false);
         
-        console.log('✅ Trip loaded:', tripData);
-        
       } catch (error: any) {
         const status = error.response?.status;
         if (status === 401) {
