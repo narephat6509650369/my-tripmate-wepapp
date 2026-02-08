@@ -392,6 +392,9 @@ export const getMockCloseTrip = (tripCode: string): ApiResponse => {
 /*
 * GET /api/votes/:tripcode/get-budget
 */
+/*
+* GET /api/votes/:tripcode/get-budget
+*/
 export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
   return {
     success: true,
@@ -399,10 +402,49 @@ export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
     message: 'Budget voting retrieved successfully',
     data: {
       trip_id: tripCode,
-      budgets: [
-        { category: 'ที่พัก', amount: 5000 },
-        { category: 'อาหาร', amount: 3000 },
-        { category: 'กิจกรรม', amount: 2000 }
+
+      // ✅ สำคัญ: budget_options พร้อม all_votes (หลายคน)
+      budget_options: [
+        {
+          category_name: 'ที่พัก',
+          estimated_amount: 5000, 
+          all_votes: [
+            { user_id: 'user-001', estimated_amount: 4000 }, // คนที่ 1
+            { user_id: 'user-002', estimated_amount: 5000 }, // คุณ
+            { user_id: 'user-003', estimated_amount: 7000 }, // คนที่ 3
+            { user_id: 'user-004', estimated_amount: 50000 }, // คนที่ 4
+          ]
+        },
+        {
+          category_name: 'เดินทาง',
+          estimated_amount: 3000,
+          all_votes: [
+            { user_id: 'user-001', estimated_amount: 2500 },
+            { user_id: 'user-002', estimated_amount: 3000 },
+            { user_id: 'user-003', estimated_amount: 4000 },
+            { user_id: 'user-004', estimated_amount: 3200 },
+          ]
+        },
+        {
+          category_name: 'อาหาร',
+          estimated_amount: 2000,
+          all_votes: [
+            { user_id: 'user-001', estimated_amount: 1800 },
+            { user_id: 'user-002', estimated_amount: 2000 },
+            { user_id: 'user-003', estimated_amount: 3000 },
+            { user_id: 'user-004', estimated_amount: 2300 },
+          ]
+        },
+        {
+          category_name: 'อื่นๆ',
+          estimated_amount: 1000,
+          all_votes: [
+            { user_id: 'user-001', estimated_amount: 500 },
+            { user_id: 'user-002', estimated_amount: 1000 },
+            { user_id: 'user-003', estimated_amount: 2000 },
+            { user_id: 'user-004', estimated_amount: 1200 },
+          ]
+        }
       ]
     }
   };
@@ -437,5 +479,6 @@ export default {
   getMockStartVoting,
   getMockUpdateBudget,
   getMockSubmitLocationVote,
-  getMockCloseTrip
-};
+  getMockCloseTrip,
+  getMockGetBudgetVoting
+};  

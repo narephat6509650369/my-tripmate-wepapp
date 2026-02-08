@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { voteAPI } from '../../../services/tripService';
 import { formatCurrency } from '../../../utils';
-import type { TripDetail, BudgetCategory } from '../../../types';
+import type { TripDetail, } from '../../../types';
 
 // ============== TYPES ==============
 interface StepBudgetProps {
