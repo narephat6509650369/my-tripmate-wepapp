@@ -63,11 +63,12 @@ export const addAvailability = async (trip_id: string,user_id: string,available_
     /* 3. user โหวตวัน */
     await connection.query(
       `INSERT INTO date_votes
-       (date_vote_id, date_option_id, user_id, is_available)
-       VALUES (UUID(), ?, ?, 1)
+       (date_vote_id, date_option_id, user_id, is_available, available_date)
+       VALUES (UUID(), ?, ?, 1, ?)
        ON DUPLICATE KEY UPDATE
-         is_available = 1`,
-      [dateOptionId, user_id]
+         is_available = 1,
+         available_date = VALUES(available_date)`,
+      [dateOptionId, user_id, available_date]
     );
 
     await connection.commit();
@@ -99,7 +100,7 @@ export const getTripAvailabilities = async (trip_id: string, user_id: string) =>
   try{
     const [rows] = await connection.query<RowDataPacket[]>(
     `SELECT
-      do.available_date
+      dv.available_date
     FROM date_votes dv
     JOIN date_options do ON dv.date_option_id = do.date_option_id
     JOIN date_votings dvt ON do.date_voting_id = dvt.date_voting_id
@@ -151,7 +152,7 @@ export const getAvailabilitiesByTrip = async (tripId: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT
       dv.user_id,
-      do.available_date
+      dv.available_date
     FROM date_votes dv
     JOIN date_options do ON dv.date_option_id = do.date_option_id
     JOIN date_votings dvt ON do.date_voting_id = dvt.date_voting_id
