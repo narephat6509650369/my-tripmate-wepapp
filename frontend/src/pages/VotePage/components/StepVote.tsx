@@ -32,10 +32,10 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
 
-  const tripDuration = trip.duration || 3;
+  const tripDuration = trip.numdays;
 
   useEffect(() => {
-    console.log("TripId changed:", trip.tripid);
+  
     if (!trip.tripid) return;
 
     voteAPI.getDateMatchingResult(trip.tripid)
@@ -53,7 +53,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
         });
         return;
       }
-      //change to call api 
+       //change to call api 
       /*
       const matchInfo = findAllMatches(matching.intersection, tripDuration, matching.weighted);
       
@@ -69,6 +69,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
       console.log("Weighted:", matching.weighted);
       */
     })
+  
     .catch((err) => {
       console.error("Load date matching failed", err);
       console.error("ไม่สามารถโหลดข้อมูลการแมทวันที่ได้");
@@ -83,7 +84,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
   }, [trip.tripid, tripDuration]);
 
   // ================= HELPER FUNCTIONS =================
-
+  //หา match วัน สมมติมี 3 วัน แต่วันที่matchมีน้อยกว่า 3วัน
   const findConsecutiveDays = (dates: string[], targetDays: number): string[][] => {
     if (!dates || dates.length === 0) return [];
     
@@ -117,11 +118,8 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
     
     return ranges;
   };
-
-  const findAllMatches = (
-    intersection: string[], 
-    maxDays: number,
-    weighted?: Record<string, number>
+//call from matchInfo from api getDateMatchingResult
+  const findAllMatches = (intersection: string[], maxDays: number,weighted?: Record<string, number>
   ) => {
     // 1. หาช่วงที่ตรงกันครบ N วัน (แบบเดิม)
     const fullMatches = findConsecutiveDays(intersection, maxDays);

@@ -7,7 +7,7 @@
  * ตั้งค่าแอปพลิเคชัน
  */
 export const CONFIG = {
-  USE_MOCK_DATA: false,              // เปลี่ยนเป็น false เมื่อต่อ API จริง
+  USE_MOCK_DATA: true,              // เปลี่ยนเป็น false เมื่อต่อ API จริง
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
   API_TIMEOUT: 10000,
   DEBUG_MODE: import.meta.env.DEV,

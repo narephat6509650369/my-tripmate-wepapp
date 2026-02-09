@@ -1,7 +1,7 @@
 // src/pages/VotePage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback} from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, AlertCircle, Copy } from "lucide-react";
+import { Loader2, AlertCircle, Copy, Clock } from "lucide-react";
 
 // Components
 import Header from "../components/Header";
@@ -13,19 +13,7 @@ import StepSummary from './VotePage/components/StepSummary';
 // Hooks & Utils
 import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, voteAPI } from '../services/tripService';
-import type { TripDetail, LocationVote } from '../types';
-
-// ============== TYPES ==============
-interface UserInput {
-  dates: string[];
-  budget: {
-    accommodation: number;
-    transport: number;
-    food: number;
-    other: number;
-  };
-  locations: { place: string; score: number }[];
-}
+import type { TripDetail, DateRange, LocationVote } from '../types';
 
 // ============== MAIN COMPONENT ==============
 const VotePage: React.FC = () => {
@@ -41,19 +29,10 @@ const VotePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  
-  // ✅ FIX #1: Central State Management
-  const [userInput, setUserInput] = useState<UserInput>({
-    dates: [],
-    budget: { accommodation: 0, transport: 0, food: 0, other: 0 },
-    locations: []
-  });
-  
-  // ✅ FIX #2: Track unsaved changes
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
-  // ✅ FIX #3: Loading state for each step
-  const [stepLoading, setStepLoading] = useState(false);
+
+  const [userDates, setUserDates] = useState<string[]>([]);
+  const [userBudget, setUserBudget] = useState({ accommodation: 0, transport: 0, food: 0, other: 0 });
+  const [userLocations, setUserLocations] = useState<{ place: string; score: number }[]>([]);
 
   const displayCode = inviteCode || tripCode;
 
@@ -64,6 +43,16 @@ const VotePage: React.FC = () => {
     const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
     return diffDays >= 7;
   };
+
+  const getUserInput = () => ({
+    dates: userDates,
+    budget: userBudget,
+    locations: userLocations
+  });
+
+  const budgetSaveTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+
+  
 
   // ============== LOAD TRIP DATA ==============
   useEffect(() => {
@@ -80,79 +69,71 @@ const VotePage: React.FC = () => {
         
         const response = await tripAPI.getTripDetail(tripCode);
         console.log("Trip detail response:", response);
-        
         if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
 
         const tripData = response.data;
+        
         setInviteCode(tripData.invitecode);
         setTrip(tripData);
-        
-        // ✅ FIX #4: Load user input in parallel (faster)
-        const [dateRes, budgetRes, locRes] = await Promise.allSettled([
-          voteAPI.getDateMatchingResult(tripData.tripid),
-          voteAPI.getBudgetVoting(tripData.tripid),
-          voteAPI.getLocationVote(tripData.tripid)
-        ]);
-        
-        // Process dates
-        if (dateRes.status === 'fulfilled' && dateRes.value?.data?.data?.userAvailability) {
-          setUserInput(prev => ({
-            ...prev,
-            dates: dateRes.value.data.data.userAvailability
-          }));
+        try {
+          // วันที่
+          const dateRes = await voteAPI.getDateMatchingResult(tripData.tripid);
+          if (dateRes?.data?.data?.userAvailability) {
+            setUserDates(dateRes.data.data.userAvailability);
+          }
+
+          // งบ
+          const budgetRes = await voteAPI.getBudgetVoting(tripData.tripid);
+          if (budgetRes?.data?.data?.budget_options) {
+            const b = { accommodation: 0, transport: 0, food: 0, other: 0 };
+            budgetRes.data.data.budget_options.forEach((item: any) => {
+              if (item.category_name in b) {
+                b[item.category_name as keyof typeof b] = item.estimated_amount;
+              }
+            });
+            setUserBudget(b);
+          }
+
+          // จังหวัด
+          const locRes = await voteAPI.getLocationVote(tripData.tripid);
+          if (locRes?.data?.data?.my_votes) {
+            setUserLocations(locRes.data.data.my_votes);
+          }
+        } catch (e) {
+          console.error('Load user input failed:', e);
         }
-        
-        // Process budget
-        if (budgetRes.status === 'fulfilled' && budgetRes.value?.data?.data?.budget_options) {
-          const b = { accommodation: 0, transport: 0, food: 0, other: 0 };
-          budgetRes.value.data.data.budget_options.forEach((item: any) => {
-            if (item.category_name in b) {
-              b[item.category_name as keyof typeof b] = item.estimated_amount;
-            }
-          });
-          setUserInput(prev => ({ ...prev, budget: b }));
-        }
-        
-        // Process locations
-        if (locRes.status === 'fulfilled' && locRes.value?.data?.data?.my_votes) {
-          setUserInput(prev => ({
-            ...prev,
-            locations: locRes.value.data.data.my_votes
-          }));
-        }
-        
-        console.log('✅ Trip loaded:', tripData);
+
+        setLoading(false);
         
       } catch (error: any) {
         const status = error.response?.status;
-        
         if (status === 401) {
           navigate(`/login?redirect=/votepage/${tripCode}`);
           return;
         }
-        
         if (status === 403) {
           console.log("User not in trip → auto join flow");
-          try {
-            const joinRes = await tripAPI.joinTrip(tripCode);
+
+        try {
+          const joinRes = await tripAPI.joinTrip(tripCode);
+
             if (joinRes.success) {
               console.log("Auto join success → reload trip");
+              // reload trip detail
               const detail = await tripAPI.getTripDetail(tripCode);
               setTrip(detail?.data || null);
-              setInviteCode(detail?.data?.invitecode ?? "");
-            }
-          } catch (e) {
-            console.error("Join failed → fallback redirect");
-            navigate(`/join/${tripCode}`);
+              setInviteCode(detail?.data?.invitecode ?? detail?.data?.invitecode ?? "");
+              setLoading(false);
             return;
-          }
+            }
+        } catch (e) {
+          console.error("Join failed → fallback redirect");
+          navigate(`/join/${tripCode}`);
+          return;
         }
-        
-        setError(error.message || 'เกิดข้อผิดพลาด');
-      } finally {
-        setLoading(false);
+        }
       }
     };
     
@@ -170,10 +151,22 @@ const VotePage: React.FC = () => {
     logout();
   };
 
-  // ✅ FIX #5: Save Dates with State Update
-  const handleSaveDates = useCallback(async (dates: string[]) => {
-    if (!trip || !user) {
-      console.log('No trip/user data available');
+  // ✅ Manual Navigation (สำหรับ Smart Toast)
+  const handleManualNext = () => {
+    if (step < 5) {
+      setStep(step + 1);
+    }
+  };
+
+  // ✅ Save Dates (มี Auto-navigation)
+  const handleSaveDates = async (dates: string[]) => {
+    if (!trip) {
+      console.log('No trip data available');
+      return;
+    }
+
+    if (!user) {
+      console.log('No user data available');
       return;
     }
     
@@ -185,165 +178,96 @@ const VotePage: React.FC = () => {
       });
       
       if (response.success) {
-        // ✅ Update local state
-        setUserInput(prev => ({ ...prev, dates }));
-        setHasUnsavedChanges(false);
         console.log('✅ บันทึกวันที่สำเร็จ');
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
       console.error('Error saving dates:', error);
-      throw error; // Re-throw for component to handle
+      console.error('บันทึกวันที่ไม่สำเร็จ');
     }
-  }, [trip, user]);
+  };
 
-  // ✅ FIX #6: Save Budget with State Update
+  // ✅ Save Budget
+  // ✅ Save Budget with Debounce
   const handleSaveBudget = useCallback(async (category: string, amount: number) => {
     if (!trip) return;
-    
-    try {
-      const response = await voteAPI.updateBudget(trip.tripid, {
-        category: category as any,
-        amount
-      });
-      
-      if (response.success) {
-        // ✅ Update local state
-        setUserInput(prev => ({
-          ...prev,
-          budget: { ...prev.budget, [category]: amount }
-        }));
-        setHasUnsavedChanges(false);
-        console.log('✅ บันทึกงบประมาณสำเร็จ');
-      } else {
-        throw new Error(response.message);
-      }
-    } catch (error) {
-      console.error('Error saving budget:', error);
-      throw error;
+
+    // Clear previous timeout for this category
+    if (budgetSaveTimeoutRef.current[category]) {
+      clearTimeout(budgetSaveTimeoutRef.current[category]);
     }
+
+    // Set new timeout
+    budgetSaveTimeoutRef.current[category] = setTimeout(async () => {
+      try {
+        const response = await voteAPI.updateBudget(trip.tripid, {
+          category: category as any,
+          amount
+        });
+
+        if (response.success) {
+          console.log(`✅ บันทึกงบประมาณ ${category}: ${amount} บาท`);
+        } else {
+          throw new Error(response.message);
+        }
+      } catch (error) {
+        console.error('❌ Error saving budget:', error);
+      }
+    }, 500); // 500ms debounce
+
   }, [trip]);
 
-  // ✅ FIX #7: Vote Location with State Update
+  // ✅ Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(budgetSaveTimeoutRef.current).forEach(timeout => {
+        clearTimeout(timeout);
+      });
+    };
+  }, []);
+
+  // ✅ Vote Location Handler
+   // ✅ Vote Location (แก้ไขตามที่แนะนำก่อนหน้า)
   const handleVoteLocation = useCallback(async (votes: LocationVote[]) => {
     if (!trip) return;
-    
+
     try {
       const response = await voteAPI.submitLocationVote(trip.tripid, { votes });
-      
+
+      console.log("✅ submitLocationVote response:", response);
+
       if (response.success) {
         // ✅ Update local state
-        setUserInput(prev => ({
-          ...prev,
-          locations: votes.map(v => ({ place: v.location_name, score: v.score }))
-        }));
-        setHasUnsavedChanges(false);
+        setUserLocations(votes.map(v => ({
+          place: v.location_name,
+          score: v.score
+        })));
+
         console.log('✅ โหวตสำเร็จ');
       } else {
-        throw new Error(response.message);
+        throw new Error(response.message || 'โหวตไม่สำเร็จ');
       }
     } catch (error) {
-      console.error('Error voting location:', error);
+      console.error('❌ Error voting location:', error);
       throw error;
     }
   }, [trip]);
 
-  // ✅ FIX #8: Smart Navigation with Validation
-  const validateStep = useCallback((currentStep: number): { valid: boolean; message?: string } => {
-    switch (currentStep) {
-      case 2: // Dates
-        if (userInput.dates.length === 0) {
-          return { valid: false, message: 'กรุณาเลือกวันที่ก่อนไปหน้าถัดไป' };
-        }
-        break;
-      
-      case 3: // Budget
-        const hasRequiredBudget = 
-          userInput.budget.accommodation > 0 &&
-          userInput.budget.transport > 0 &&
-          userInput.budget.food > 0;
-        
-        if (!hasRequiredBudget) {
-          return { 
-            valid: false, 
-            message: 'กรุณากรอกงบประมาณที่จำเป็น (ที่พัก, เดินทาง, อาหาร)' 
-          };
-        }
-        break;
-      
-      case 4: // Locations
-        if (userInput.locations.length === 0) {
-          return { valid: false, message: 'กรุณาโหวตสถานที่อย่างน้อย 1 แห่ง' };
-        }
-        break;
-    }
-    
-    return { valid: true };
-  }, [userInput]);
-
-  const next = useCallback(async () => {
+  const next = async () => {
     if (step >= 5) return;
     
-    // ✅ Validate before moving
-    const validation = validateStep(step);
-    if (!validation.valid) {
-      alert(validation.message);
-      return;
-    }
-    
-    // ✅ Check unsaved changes
-    if (hasUnsavedChanges) {
-      const confirm = window.confirm(
-        'คุณมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก ต้องการไปหน้าถัดไปโดยไม่บันทึกหรือไม่?'
-      );
-      if (!confirm) return;
-    }
-    
-    setStepLoading(true);
-    
     try {
-      // Optional: Pre-load next step data
-      if (step === 2) {
-        // Pre-load budget data
-        await voteAPI.getBudgetVoting(trip!.tripid);
-      } else if (step === 3) {
-        // Pre-load location data
-        await voteAPI.getLocationVote(trip!.tripid);
-      }
-      
+      // Auto-save logic here if needed
       setStep(step + 1);
     } catch (error) {
-      console.error('Error loading next step:', error);
-    } finally {
-      setStepLoading(false);
+      console.error('Error moving to next step:', error);
     }
-  }, [step, hasUnsavedChanges, validateStep, trip]);
+  };
 
-  const back = useCallback(() => { 
-    if (step <= 2) return;
-    
-    // ✅ Warn about unsaved changes
-    if (hasUnsavedChanges) {
-      const confirm = window.confirm(
-        'คุณมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก ต้องการย้อนกลับโดยไม่บันทึกหรือไม่?'
-      );
-      if (!confirm) return;
-    }
-    
-    setStep(step - 1); 
-  }, [step, hasUnsavedChanges]);
-
-  // ✅ FIX #9: Manual navigation (from Smart Toast)
-  const handleManualNext = useCallback(() => {
-    setHasUnsavedChanges(false);
-    setStep(prev => Math.min(5, prev + 1));
-  }, []);
-
-  // ✅ FIX #10: Track changes in child components
-  const handleInputChange = useCallback(() => {
-    setHasUnsavedChanges(true);
-  }, []);
+  const back = () => { 
+    if (step > 2) setStep(step - 1); 
+  };
 
   // ============== LOADING & ERROR STATES ==============
   if (loading) {
@@ -394,6 +318,7 @@ const VotePage: React.FC = () => {
           </button>
           
           <div className="flex items-center gap-3">
+            {/* ปุ่มคัดลอกรหัส */}
             <button 
               className={`px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 transition-all font-mono text-sm sm:text-base min-w-[44px] min-h-[44px] ${
                 copied === 'code' 
@@ -407,6 +332,7 @@ const VotePage: React.FC = () => {
               <Copy className="w-4 h-4" />
             </button>
 
+            {/* ปุ่มแชร์ลิงก์ */}
             <button 
               className={`px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 transition-all text-sm sm:text-base min-w-[44px] min-h-[44px] ${
                 copied === 'link' 
@@ -425,22 +351,10 @@ const VotePage: React.FC = () => {
       </div>
       
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* ✅ แสดง unsaved changes warning */}
-        {hasUnsavedChanges && (
-          <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg animate-pulse">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl">⚠️</span>
-              <div>
-                <p className="font-semibold text-yellow-800">มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก</p>
-                <p className="text-sm text-yellow-700">กรุณาบันทึกก่อนไปหน้าถัดไป</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Progress Steps */}
         <div className="mb-8 sm:mb-12">
           <div className="relative">
+            {/* Progress Bar */}
             <div className="absolute top-5 sm:top-6 left-0 right-0 h-0.5 sm:h-1 bg-gray-200 rounded-full" />
             <div 
               className="absolute top-5 sm:top-6 left-0 h-0.5 sm:h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
@@ -455,6 +369,7 @@ const VotePage: React.FC = () => {
                 
                 return (
                   <div key={idx} className="flex flex-col items-center">
+                    {/* Step Circle */}
                     <div className={`
                       w-10 h-10 sm:w-12 sm:h-12 
                       flex items-center justify-center 
@@ -471,6 +386,7 @@ const VotePage: React.FC = () => {
                       {isCompleted ? "✓" : stepNum}
                     </div>
                     
+                    {/* Step Label */}
                     <span className={`
                       text-[10px] sm:text-xs 
                       mt-2 sm:mt-3 
@@ -491,51 +407,36 @@ const VotePage: React.FC = () => {
 
         {/* Step Content */}
         <div className="mb-8">
-          {stepLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-            </div>
-          ) : (
-            <>
-              {step === 2 && (
-                <StepVote 
-                  trip={trip}
-                  initialDates={userInput.dates}
-                  onSave={handleSaveDates}
-                  onManualNext={handleManualNext}
-                  onInputChange={handleInputChange}
-                />
-              )}
+          {step === 2 && (
+            <StepVote 
+              trip={trip}
+              onSave={handleSaveDates}
+              onManualNext={handleManualNext}
+            />
+          )}
 
-              {step === 3 && (
-                <StepBudget 
-                  trip={trip}
-                  initialBudget={userInput.budget}
-                  onSave={handleSaveBudget}
-                  onManualNext={handleManualNext}
-                  onInputChange={handleInputChange}
-                />
-              )}
+          {step === 3 && (
+            <StepBudget 
+              trip={trip}
+              onSave={handleSaveBudget}
+            />
+          )}
 
-              {step === 4 && (
-                <StepPlace 
-                  trip={trip}
-                  initialVotes={userInput.locations}
-                  onVote={handleVoteLocation}
-                  onInputChange={handleInputChange}
-                />
-              )}
+          {step === 4 && (
+            <StepPlace 
+              trip={trip}
+              onVote={handleVoteLocation}
+            />
+          )}
 
-              {step === 5 && (
-                <StepSummary 
-                  trip={trip}
-                  onNavigateToStep={setStep}
-                  isOwner={trip.ownerid === user?.user_id}
-                  canViewSummary={trip.ownerid === user?.user_id || isSummaryUnlocked(trip)}
-                  userInput={userInput}
-                />
-              )}
-            </>
+          {step === 5 && (
+            <StepSummary 
+              trip={trip}
+              onNavigateToStep={setStep}
+              isOwner={trip.ownerid === user?.user_id}
+              canViewSummary={trip.ownerid === user?.user_id || isSummaryUnlocked(trip)}
+              userInput={getUserInput()} 
+            />
           )}
         </div>
 
@@ -543,7 +444,7 @@ const VotePage: React.FC = () => {
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <button 
             onClick={back}
-            disabled={step === 2 || stepLoading}
+            disabled={step === 2}
             className="bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-gray-700 font-semibold text-sm sm:text-base border-2 border-gray-200 hover:border-gray-300 transition-all shadow-sm min-h-[48px]"
           >
             <span className="hidden sm:inline">← ย้อนกลับ</span>
@@ -551,17 +452,11 @@ const VotePage: React.FC = () => {
           </button>
           <button 
             onClick={next}
-            disabled={step === stepLabels.length || stepLoading}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-white font-semibold text-sm sm:text-base transition-all shadow-lg hover:shadow-xl min-h-[48px] relative"
+            disabled={step === stepLabels.length}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-white font-semibold text-sm sm:text-base transition-all shadow-lg hover:shadow-xl min-h-[48px]"
           >
-            {stepLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-            ) : (
-              <>
-                <span className="hidden sm:inline">หน้าถัดไป →</span>
-                <span className="sm:hidden">ถัดไป →</span>
-              </>
-            )}
+            <span className="hidden sm:inline">หน้าถัดไป →</span>
+            <span className="sm:hidden">ถัดไป →</span>
           </button>
         </div>
       </main>
