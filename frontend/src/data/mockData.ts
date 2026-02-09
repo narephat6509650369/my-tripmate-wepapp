@@ -1,4 +1,8 @@
-// src/data/mockData.ts
+// ============================================================================
+// frontend/src/data/mockData.ts
+// ✅ Mock Data ครบทุก Step พร้อม Scenarios เพิ่มเติม
+// ============================================================================
+
 import type {
   Trip,
   TripSummary,
@@ -8,11 +12,12 @@ import type {
   JoinTripResponse,
   ApiResponse,
   HeatmapData,
-  DateRange
+  SubmitLocationVotePayload,
+  GetLocationVoteResponse
 } from '../types';
 
 // ============================================================================
-// MOCK DATA
+// CONSTANTS
 // ============================================================================
 
 export const MOCK_CURRENT_USER_ID = 'user-001';
@@ -31,6 +36,7 @@ export const MOCK_TRIPS: Trip[] = [
     status: 'voting',
     membercount: 3,
     created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+    membercount: 5,
     is_active: true
   },
   {
@@ -45,6 +51,7 @@ export const MOCK_TRIPS: Trip[] = [
     status: 'completed',
     created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
     confirmed_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    membercount: 4,
     is_active: true
   },
   {
@@ -58,12 +65,13 @@ export const MOCK_TRIPS: Trip[] = [
     status: 'planning',
     membercount: 3,
     created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
+    membercount: 6,
     is_active: true
   }
 ];
 
 // ============================================================================
-// MOCK API FUNCTIONS
+// HELPER FUNCTIONS
 // ============================================================================
 
 /**
@@ -90,6 +98,10 @@ export const generateMockInviteCode = (): string => {
 
   return segments.join('-');
 };
+
+// ============================================================================
+// TRIP APIs - ✅ คงเดิมทั้งหมด
+// ============================================================================
 
 /**
  * GET /api/trips/all-my-trips
@@ -159,7 +171,46 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       invitelink: trip.invite_link,
       status: trip.status,
       createdat: trip.created_at,
-      members: [],
+      membercount: trip.membercount,
+      current_user_id: MOCK_CURRENT_USER_ID,
+      members: [
+        { 
+          id: 'member-001',
+          userId: 'user-001',
+          role: 'owner',
+          fullName: 'สมชาย ใจดี',
+          avatarUrl: null,
+          joinedAt: Date.now() - 7 * 86400000,
+          isActive: true
+        },
+        { 
+          id: 'member-002',
+          userId: 'user-002',
+          role: 'member',
+          fullName: 'สมหญิง รักดี',
+          avatarUrl: null,
+          joinedAt: Date.now() - 6 * 86400000,
+          isActive: true
+        },
+        { 
+          id: 'member-003',
+          userId: 'user-003',
+          role: 'member',
+          fullName: 'สมศักดิ์ มีสุข',
+          avatarUrl: null,
+          joinedAt: Date.now() - 5 * 86400000,
+          isActive: true
+        },
+        { 
+          id: 'member-004',
+          userId: 'user-004',
+          role: 'member',
+          fullName: 'สมใจ ใจงาม',
+          avatarUrl: null,
+          joinedAt: Date.now() - 4 * 86400000,
+          isActive: true
+        }
+      ],
       dateRanges: [],
       provinceVotes: [],
       budgetOptions: [],
@@ -285,7 +336,7 @@ export const getMockTripSummary = (tripId: string): ApiResponse => {
 };
 
 // ============================================================================
-// VOTE APIs MOCK
+// STEP 1: DATE VOTING - ✅ คงเดิม + เพิ่ม Scenarios
 // ============================================================================
 
 /**
@@ -339,6 +390,137 @@ export const getMockStartVoting = (tripId: string): ApiResponse => {
 };
 
 /**
+ * ✅ GET /api/votes/:tripId/date-matching-result (Default - Full Match)
+ */
+export const getMockGetDateMatchingResult = (tripId: string): ApiResponse => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'Date matching result retrieved successfully',
+    data: {
+      trip_id: tripId,
+      
+      userAvailability: [
+        '2025-02-10', '2025-02-11', '2025-02-12', '2025-02-13',
+        '2025-02-14', '2025-02-15', '2025-02-16', '2025-02-17'
+      ],
+      
+      intersection: [
+        '2025-02-10', '2025-02-11', '2025-02-12', '2025-02-13', '2025-02-14'
+      ],
+      
+      weighted: {
+        '2025-02-10': 4,
+        '2025-02-11': 4,
+        '2025-02-12': 4,
+        '2025-02-13': 4,
+        '2025-02-14': 4,
+        '2025-02-15': 3,
+        '2025-02-16': 2,
+        '2025-02-17': 2,
+        '2025-02-18': 1
+      },
+      
+      totalMembers: 4
+    }
+  };
+};
+
+/**
+ * ✅ Partial Match - ไม่ครบ N วัน
+ */
+export const getMockGetDateMatchingResult_Partial = (tripId: string): ApiResponse => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'Date matching result with partial matches',
+    data: {
+      trip_id: tripId,
+      
+      userAvailability: [
+        '2025-02-10', '2025-02-11', '2025-02-13', '2025-02-14',
+        '2025-02-20', '2025-02-21'
+      ],
+      
+      intersection: [
+        '2025-02-10', '2025-02-11', '2025-02-13', '2025-02-14'
+      ],
+      
+      weighted: {
+        '2025-02-10': 3,
+        '2025-02-11': 3,
+        '2025-02-12': 1,
+        '2025-02-13': 3,
+        '2025-02-14': 3,
+        '2025-02-15': 2,
+        '2025-02-20': 2,
+        '2025-02-21': 2
+      },
+      
+      totalMembers: 4
+    }
+  };
+};
+
+/**
+ * ✅ No Match - ต้องใช้ Sliding Window
+ */
+export const getMockGetDateMatchingResult_NoMatch = (tripId: string): ApiResponse => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'No consecutive dates - using sliding window',
+    data: {
+      trip_id: tripId,
+      
+      userAvailability: [
+        '2025-02-10', '2025-02-12', '2025-02-15', '2025-02-18', '2025-02-20'
+      ],
+      
+      intersection: [],
+      
+      weighted: {
+        '2025-02-10': 3,
+        '2025-02-11': 2,
+        '2025-02-12': 3,
+        '2025-02-13': 1,
+        '2025-02-14': 2,
+        '2025-02-15': 3,
+        '2025-02-16': 1,
+        '2025-02-17': 2,
+        '2025-02-18': 3,
+        '2025-02-19': 2,
+        '2025-02-20': 3
+      },
+      
+      totalMembers: 4
+    }
+  };
+};
+
+/**
+ * ✅ Empty - ยังไม่มีข้อมูล
+ */
+export const getMockGetDateMatchingResult_Empty = (tripId: string): ApiResponse => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'No data yet',
+    data: {
+      trip_id: tripId,
+      userAvailability: [],
+      intersection: [],
+      weighted: {},
+      totalMembers: 4
+    }
+  };
+};
+
+// ============================================================================
+// STEP 2: BUDGET VOTING - ✅ ปรับปรุงเล็กน้อย
+// ============================================================================
+
+/**
  * PUT /api/votes/:tripCode/budget
  */
 export const getMockUpdateBudget = (
@@ -358,22 +540,378 @@ export const getMockUpdateBudget = (
 };
 
 /**
- * POST /api/votes/:tripCode/vote-place
+ * ✅ GET /api/votes/:tripcode/get-budget (เพิ่ม budgets field)
  */
-export const getMockSubmitLocationVote = (
-  tripId: string,
-  votes: string[]
-): ApiResponse => {
-  const scores: Record<string, number> = {};
-  votes.forEach((province, index) => {
-    scores[province] = 3 - index; // 3, 2, 1
-  });
-
+export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
   return {
     success: true,
     code: 'OK',
+    message: 'Budget voting retrieved successfully',
+    data: {
+      trip_id: tripCode,
+
+      // ✅ เพิ่ม budgets field
+      budgets: [
+        { category_name: 'ที่พัก', estimated_amount: 5000 },
+        { category_name: 'เดินทาง', estimated_amount: 3000 },
+        { category_name: 'อาหาร', estimated_amount: 2000 },
+        { category_name: 'อื่นๆ', estimated_amount: 1000 }
+      ],
+
+      // ✅ budget_options พร้อม all_votes
+      budget_options: [
+        {
+          category_name: 'ที่พัก',
+          estimated_amount: 5000,
+          all_votes: [
+            { user_id: 'user-001', estimated_amount: 4000 },
+            { user_id: 'user-002', estimated_amount: 5000 },
+            { user_id: 'user-003', estimated_amount: 7000 },
+            { user_id: 'user-004', estimated_amount: 50000 }
+          ]
+        },
+        {
+          category_name: 'เดินทาง',
+          estimated_amount: 3000,
+          all_votes: [
+            { user_id: 'user-001', estimated_amount: 2500 },
+            { user_id: 'user-002', estimated_amount: 3000 },
+            { user_id: 'user-003', estimated_amount: 4000 },
+            { user_id: 'user-004', estimated_amount: 3200 }
+          ]
+        },
+        {
+          category_name: 'อาหาร',
+          estimated_amount: 2000,
+          all_votes: [
+            { user_id: 'user-001', estimated_amount: 1800 },
+            { user_id: 'user-002', estimated_amount: 2000 },
+            { user_id: 'user-003', estimated_amount: 3000 },
+            { user_id: 'user-004', estimated_amount: 2300 }
+          ]
+        },
+        {
+          category_name: 'อื่นๆ',
+          estimated_amount: 1000,
+          all_votes: [
+            { user_id: 'user-001', estimated_amount: 500 },
+            { user_id: 'user-002', estimated_amount: 1000 },
+            { user_id: 'user-003', estimated_amount: 2000 },
+            { user_id: 'user-004', estimated_amount: 1200 }
+          ]
+        }
+      ]
+    }
+  };
+};
+
+// ============================================================================
+// STEP 3: LOCATION VOTING - ✅ ใหม่ทั้งหมด
+// ============================================================================
+
+/**
+ * POST /api/votes/:tripId/location
+ */
+export const getMockSubmitLocationVote = (
+  tripId: string,
+  payload: SubmitLocationVotePayload
+): ApiResponse => {
+  console.log('📤 Mock: Submit Location Vote', { tripId, payload });
+
+  // ✅ Validation 1: ต้องมี 3 อันดับ
+  if (!payload.votes || payload.votes.length !== 3) {
+    return {
+      success: false,
+      code: 'INVALID_VOTE',
+      message: 'ต้องโหวตครบ 3 อันดับ'
+    };
+  }
+
+  // ✅ Validation 2: ตรวจสอบ structure
+  for (const vote of payload.votes) {
+    if (!vote.location_name || typeof vote.score !== 'number') {
+      return {
+        success: false,
+        code: 'INVALID_VOTE_STRUCTURE',
+        message: 'แต่ละโหวตต้องมี location_name และ score'
+      };
+    }
+  }
+
+  // ✅ Validation 3: คะแนนต้องถูกต้อง (3, 2, 1)
+  const scores = payload.votes.map(v => v.score).sort((a, b) => b - a);
+  if (JSON.stringify(scores) !== JSON.stringify([3, 2, 1])) {
+    return {
+      success: false,
+      code: 'INVALID_SCORES',
+      message: 'คะแนนต้องเป็น 3, 2, 1 เท่านั้น'
+    };
+  }
+
+  // ✅ Validation 4: ห้ามซ้ำ
+  const locations = payload.votes.map(v => v.location_name);
+  if (new Set(locations).size !== 3) {
+    return {
+      success: false,
+      code: 'DUPLICATE_VOTE',
+      message: 'ต้องเลือกจังหวัดที่แตกต่างกัน'
+    };
+  }
+
+  // ✅ Success
+  return {
+    success: true,
+    code: 'VOTE_SUBMITTED',
     message: 'Vote submitted successfully',
-    data: { scores }
+    data: {
+      trip_id: tripId,
+      votes: payload.votes,
+      timestamp: new Date().toISOString()
+    }
+  };
+};
+
+/**
+ * ✅ GET /api/votes/:tripId/location (Default - Clear Winner)
+ */
+export const getMockGetLocationVote = (
+  tripId: string
+): ApiResponse<GetLocationVoteResponse> => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'Location voting retrieved successfully',
+    data: {
+      trip_id: tripId,
+      
+      my_votes: [
+        { place: 'เชียงใหม่', score: 3 },
+        { place: 'ภูเก็ต', score: 2 },
+        { place: 'กระบี่', score: 1 }
+      ],
+      
+      voting_results: [
+        {
+          place: 'เชียงใหม่',
+          total_score: 15,
+          vote_count: 6,
+          voters: ['user-001', 'user-002', 'user-003', 'user-004', 'user-005', 'user-006'],
+          rank_distribution: { rank_1: 3, rank_2: 3, rank_3: 0 }
+        },
+        {
+          place: 'ภูเก็ต',
+          total_score: 12,
+          vote_count: 6,
+          voters: ['user-001', 'user-002', 'user-003', 'user-004', 'user-005', 'user-006'],
+          rank_distribution: { rank_1: 1, rank_2: 4, rank_3: 1 }
+        },
+        {
+          place: 'กระบี่',
+          total_score: 8,
+          vote_count: 6,
+          voters: ['user-001', 'user-003', 'user-004', 'user-005', 'user-006', 'user-007'],
+          rank_distribution: { rank_1: 0, rank_2: 2, rank_3: 4 }
+        },
+        {
+          place: 'พังงา',
+          total_score: 6,
+          vote_count: 4,
+          voters: ['user-002', 'user-003', 'user-005', 'user-007'],
+          rank_distribution: { rank_1: 0, rank_2: 2, rank_3: 2 }
+        },
+        {
+          place: 'นครราชสีมา',
+          total_score: 5,
+          vote_count: 3,
+          voters: ['user-002', 'user-004', 'user-006'],
+          rank_distribution: { rank_1: 1, rank_2: 0, rank_3: 2 }
+        }
+      ]
+    }
+  };
+};
+
+/**
+ * ✅ Regional Winner
+ */
+export const getMockGetLocationVote_RegionalWinner = (
+  tripId: string
+): ApiResponse<GetLocationVoteResponse> => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'Location voting with regional winner',
+    data: {
+      trip_id: tripId,
+      
+      my_votes: [
+        { place: 'เชียงใหม่', score: 3 },
+        { place: 'ลำปาง', score: 2 },
+        { place: 'ภูเก็ต', score: 1 }
+      ],
+      
+      voting_results: [
+        {
+          place: 'เชียงใหม่',
+          total_score: 10,
+          vote_count: 4,
+          voters: ['user-001', 'user-002', 'user-003', 'user-004'],
+          rank_distribution: { rank_1: 2, rank_2: 2, rank_3: 0 }
+        },
+        {
+          place: 'ลำปาง',
+          total_score: 10,
+          vote_count: 4,
+          voters: ['user-001', 'user-002', 'user-005', 'user-006'],
+          rank_distribution: { rank_1: 2, rank_2: 2, rank_3: 0 }
+        },
+        {
+          place: 'ภูเก็ต',
+          total_score: 10,
+          vote_count: 4,
+          voters: ['user-003', 'user-004', 'user-005', 'user-006'],
+          rank_distribution: { rank_1: 2, rank_2: 2, rank_3: 0 }
+        },
+        {
+          place: 'กระบี่',
+          total_score: 6,
+          vote_count: 3,
+          voters: ['user-001', 'user-004', 'user-006'],
+          rank_distribution: { rank_1: 0, rank_2: 3, rank_3: 0 }
+        },
+        {
+          place: 'กรุงเทพมหานคร',
+          total_score: 5,
+          vote_count: 3,
+          voters: ['user-002', 'user-003', 'user-005'],
+          rank_distribution: { rank_1: 1, rank_2: 0, rank_3: 2 }
+        }
+      ]
+    }
+  };
+};
+
+/**
+ * ✅ Empty
+ */
+export const getMockGetLocationVote_Empty = (
+  tripId: string
+): ApiResponse<GetLocationVoteResponse> => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'No votes yet',
+    data: {
+      trip_id: tripId,
+      my_votes: [],
+      voting_results: []
+    }
+  };
+};
+
+/**
+ * ✅ All Tied
+ */
+export const getMockGetLocationVote_AllTied = (
+  tripId: string
+): ApiResponse<GetLocationVoteResponse> => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'All provinces have equal scores',
+    data: {
+      trip_id: tripId,
+      
+      my_votes: [
+        { place: 'เชียงใหม่', score: 3 },
+        { place: 'ภูเก็ต', score: 2 },
+        { place: 'กรุงเทพมหานคร', score: 1 }
+      ],
+      
+      voting_results: [
+        {
+          place: 'เชียงใหม่',
+          total_score: 10,
+          vote_count: 4,
+          voters: ['user-001', 'user-002', 'user-003', 'user-004'],
+          rank_distribution: { rank_1: 3, rank_2: 0, rank_3: 1 }
+        },
+        {
+          place: 'ลำปาง',
+          total_score: 10,
+          vote_count: 5,
+          voters: ['user-001', 'user-002', 'user-005', 'user-006', 'user-007'],
+          rank_distribution: { rank_1: 1, rank_2: 2, rank_3: 2 }
+        },
+        {
+          place: 'ภูเก็ต',
+          total_score: 10,
+          vote_count: 5,
+          voters: ['user-003', 'user-004', 'user-005', 'user-006', 'user-007'],
+          rank_distribution: { rank_1: 1, rank_2: 1, rank_3: 3 }
+        },
+        {
+          place: 'กระบี่',
+          total_score: 10,
+          vote_count: 4,
+          voters: ['user-003', 'user-005', 'user-006', 'user-008'],
+          rank_distribution: { rank_1: 0, rank_2: 5, rank_3: 0 }
+        },
+        {
+          place: 'กรุงเทพมหานคร',
+          total_score: 10,
+          vote_count: 4,
+          voters: ['user-002', 'user-004', 'user-006', 'user-008'],
+          rank_distribution: { rank_1: 0, rank_2: 5, rank_3: 0 }
+        }
+      ]
+    }
+  };
+};
+
+/**
+ * ✅ Single User
+ */
+export const getMockGetLocationVote_SingleUser = (
+  tripId: string
+): ApiResponse<GetLocationVoteResponse> => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'Single user voted',
+    data: {
+      trip_id: tripId,
+      
+      my_votes: [
+        { place: 'เชียงใหม่', score: 3 },
+        { place: 'ภูเก็ต', score: 2 },
+        { place: 'กระบี่', score: 1 }
+      ],
+      
+      voting_results: [
+        {
+          place: 'เชียงใหม่',
+          total_score: 3,
+          vote_count: 1,
+          voters: ['user-001'],
+          rank_distribution: { rank_1: 1, rank_2: 0, rank_3: 0 }
+        },
+        {
+          place: 'ภูเก็ต',
+          total_score: 2,
+          vote_count: 1,
+          voters: ['user-001'],
+          rank_distribution: { rank_1: 0, rank_2: 1, rank_3: 0 }
+        },
+        {
+          place: 'กระบี่',
+          total_score: 1,
+          vote_count: 1,
+          voters: ['user-001'],
+          rank_distribution: { rank_1: 0, rank_2: 0, rank_3: 1 }
+        }
+      ]
+    }
   };
 };
 
@@ -388,73 +926,12 @@ export const getMockCloseTrip = (tripCode: string): ApiResponse => {
   };
 };
 
-/*
-* GET /api/votes/:tripcode/get-budget
-*/
-/*
-* GET /api/votes/:tripcode/get-budget
-*/
-export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
-  return {
-    success: true,
-    code: 'OK',
-    message: 'Budget voting retrieved successfully',
-    data: {
-      trip_id: tripCode,
-
-      // ✅ สำคัญ: budget_options พร้อม all_votes (หลายคน)
-      budget_options: [
-        {
-          category_name: 'ที่พัก',
-          estimated_amount: 5000, 
-          all_votes: [
-            { user_id: 'user-001', estimated_amount: 4000 }, // คนที่ 1
-            { user_id: 'user-002', estimated_amount: 5000 }, // คุณ
-            { user_id: 'user-003', estimated_amount: 7000 }, // คนที่ 3
-            { user_id: 'user-004', estimated_amount: 50000 }, // คนที่ 4
-          ]
-        },
-        {
-          category_name: 'เดินทาง',
-          estimated_amount: 3000,
-          all_votes: [
-            { user_id: 'user-001', estimated_amount: 2500 },
-            { user_id: 'user-002', estimated_amount: 3000 },
-            { user_id: 'user-003', estimated_amount: 4000 },
-            { user_id: 'user-004', estimated_amount: 3200 },
-          ]
-        },
-        {
-          category_name: 'อาหาร',
-          estimated_amount: 2000,
-          all_votes: [
-            { user_id: 'user-001', estimated_amount: 1800 },
-            { user_id: 'user-002', estimated_amount: 2000 },
-            { user_id: 'user-003', estimated_amount: 3000 },
-            { user_id: 'user-004', estimated_amount: 2300 },
-          ]
-        },
-        {
-          category_name: 'อื่นๆ',
-          estimated_amount: 1000,
-          all_votes: [
-            { user_id: 'user-001', estimated_amount: 500 },
-            { user_id: 'user-002', estimated_amount: 1000 },
-            { user_id: 'user-003', estimated_amount: 2000 },
-            { user_id: 'user-004', estimated_amount: 1200 },
-          ]
-        }
-      ]
-    }
-  };
-};
-
 // ============================================================================
 // EXPORTS
 // ============================================================================
 
 export default {
-  // Data
+  // Constants
   MOCK_TRIPS,
   MOCK_CURRENT_USER_ID,
   MOCK_CURRENT_USER_EMAIL,
@@ -472,12 +949,27 @@ export default {
   getMockRemoveMember,
   getMockTripSummary,
 
-  // Vote APIs
+  // Date Voting
   getMockSubmitAvailability,
   getMockTripHeatmap,
+  getMockGetDateMatchingResult,
+  getMockGetDateMatchingResult_Partial,
+  getMockGetDateMatchingResult_NoMatch,
+  getMockGetDateMatchingResult_Empty,
   getMockStartVoting,
+
+  // Budget Voting
   getMockUpdateBudget,
+  getMockGetBudgetVoting,
+
+  // Location Voting
   getMockSubmitLocationVote,
-  getMockCloseTrip,
-  getMockGetBudgetVoting
-};  
+  getMockGetLocationVote,
+  getMockGetLocationVote_RegionalWinner,
+  getMockGetLocationVote_Empty,
+  getMockGetLocationVote_AllTied,
+  getMockGetLocationVote_SingleUser,
+
+  // Other
+  getMockCloseTrip
+};

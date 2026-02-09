@@ -1,6 +1,6 @@
 // ============================================================================
 // frontend/src/types/index.ts
-// ✅ Types ที่ตรงกับ Backend APIs เท่านั้น
+// ✅ Types ที่ตรงกับ Backend APIs
 // ============================================================================
 
 // ============================================================================
@@ -53,8 +53,6 @@ export interface AuthResponse {
   };
 }
 
-
-
 // ============================================================================
 // TRIP TYPES (ตรงกับ Backend Model)
 // ============================================================================
@@ -69,7 +67,7 @@ export interface Trip {
   invite_code: string;
   invite_link: string;
   status: 'planning' | 'voting' | 'confirmed' | 'completed' | 'archived';
-  created_at: string;           // ✅ Backend ส่งมาเป็น ISO string
+  created_at: string;
   updated_at?: string;
   confirmed_at?: string | null;
   is_active?: boolean;
@@ -111,9 +109,10 @@ export interface TripDetail {
   status: string;
   createdat: string;
   updatedat?: string;
-  membercount: number,
+  membercount: number;
   confirmedat?: string | null;
   isactive?: boolean;
+  current_user_id?: string; // ⭐ เพิ่มสำหรับ StepBudget
   members: Member[];
   dateRanges: DateRange[];
   provinceVotes: ProvinceVote[];
@@ -151,7 +150,7 @@ export interface MemberAvailability {
   userId: string;
   fullName: string;
   avatarUrl: string | null;
-  availableDates: string[]; // ["2025-12-25", "2025-12-26"]
+  availableDates: string[];
 }
 
 // ============================================================================
@@ -170,13 +169,6 @@ export interface BudgetVoting {
   total_budget: number;
   status: 'active' | 'closed';
   closed_at: string | null;
-}
-
-export interface BudgetOption {
-  category_name: string;
-  estimated_amount: number;
-  priority: number;
-  is_backup: boolean;
 }
 
 export interface LocationResult {
@@ -238,17 +230,12 @@ export interface JoinTripResponse {
 }
 
 // ============================================================================
-// VOTE TYPES
+// STEP 1: DATE VOTING TYPES
 // ============================================================================
-
-export interface DateRange {
-  start_date: string;
-  end_date: string;
-}
 
 export interface SubmitAvailabilityPayload {
   trip_id: string;
-  user_id: string; // จะมีค่าเมื่อแอดมินส่งแทนผู้ใช้
+  user_id: string;
   ranges: string[]; // ["2025-12-25", "2025-12-26"]
 }
 
@@ -262,12 +249,38 @@ export interface StartVotingResponse {
   message: string;
 }
 
+export interface DateIntersectionResult {
+  userAvailability: string[];
+  intersection: string[];
+  weighted: WeightedDateResult[];
+  totalMembers: number;
+}
+
+export interface WeightedDateResult {
+  day: string;
+  freeMembers: number;
+  score: number;
+}
+
+export interface DateMatchingResponse {
+  success: boolean;
+  code: string;
+  message: string;
+  data: DateIntersectionResult;
+}
+
 // ============================================================================
-// BUDGET TYPES
+// STEP 2: BUDGET VOTING TYPES
 // ============================================================================
 
+/**
+ * Budget category type
+ */
 export type BudgetCategory = 'accommodation' | 'transport' | 'food' | 'other';
 
+/**
+ * Budget state/data structure
+ */
 export interface Budget {
   accommodation: number;
   transport: number;
@@ -275,16 +288,114 @@ export interface Budget {
   other: number;
 }
 
+/**
+ * Vote ของแต่ละคนในแต่ละ category
+ * ใช้สำหรับคำนวณสถิติและแสดงผล
+ */
+export interface BudgetVote {
+  user_id: string;
+  category_name: string;
+  estimated_amount: number;
+  voted_at?: string | Date;
+}
+
+/**
+ * Budget category พร้อมข้อมูล votes ทั้งหมด
+ * Backend ต้องส่ง all_votes มาด้วยเพื่อให้ Frontend คำนวณสถิติได้
+ */
+export interface BudgetCategoryData {
+  category_name: string;
+  estimated_amount: number;
+  proposed_by?: string;
+  proposed_at?: string | Date;
+  priority?: number;
+  is_backup?: boolean;
+  all_votes?: BudgetVote[]; // ⭐ สำคัญ: สำหรับคำนวณสถิติ
+}
+
+/**
+ * Budget item จาก API (รูปแบบที่ Backend อาจส่งมา)
+ */
+export interface BudgetItem {
+  category?: string;
+  category_name?: string;
+  amount?: number;
+  estimated_amount?: number;
+  proposed_by?: string;
+  proposed_at?: string | Date;
+  user_id?: string;
+  last_updated?: string;
+}
+
+/**
+ * Log การเสนองบประมาณ (ประวัติ)
+ */
+export interface BudgetProposalLog {
+  proposed_by: string;
+  proposed_at: string | Date;
+  category_name: string;
+  estimated_amount: number;
+  priority?: number;
+  proposed_by_name: string;
+}
+
+/**
+ * Response จาก getBudgetVoting API
+ * ⚠️ Backend ต้องส่งตามโครงสร้างนี้
+ */
+export interface BudgetVotingDetailResponse {
+  success: boolean;
+  code?: string;
+  message?: string;
+  data: {
+    budgets?: BudgetItem[];
+    budget_options?: BudgetCategoryData[]; // ⭐ ต้องมี all_votes
+    rowlog?: BudgetProposalLog[];
+  };
+}
+
+/**
+ * สถิติงบประมาณสำหรับแต่ละ category
+ * (Frontend-only type สำหรับคำนวณและแสดงผล)
+ */
+export interface BudgetStats {
+  avg: number;
+  min: number;
+  max: number;
+  myValue: number;
+  median?: number;
+  outliersCount?: number;
+}
+
+/**
+ * Map ของสถิติทุก category
+ */
+export interface BudgetStatsMap {
+  accommodation: BudgetStats;
+  transport: BudgetStats;
+  food: BudgetStats;
+  other: BudgetStats;
+}
+
+/**
+ * Payload สำหรับ update budget
+ */
 export interface UpdateBudgetPayload {
   category: BudgetCategory;
   amount: number;
 }
 
+/**
+ * Response จาก update budget
+ */
 export interface UpdateBudgetResponse {
   old_amount: number;
   new_amount: number;
 }
 
+/**
+ * Budget log (สำหรับ history)
+ */
 export interface BudgetLog {
   log_id: string;
   user_id: string;
@@ -296,6 +407,9 @@ export interface BudgetLog {
   avatar_url: string | null;
 }
 
+/**
+ * Budget voting response (สำหรับ summary page)
+ */
 export interface BudgetVotingResponse {
   success: boolean;
   code: string;
@@ -319,32 +433,144 @@ export interface BudgetVotingResponse {
       proposed_amount: number;
     }[];
   };
-} 
+}
 
 export interface UserBudgetOption {
-      category_name: Budget;
-      estimated_amount: number;
-      user_id: string;
-      last_updated: string;
+  category_name: Budget;
+  estimated_amount: number;
+  user_id: string;
+  last_updated: string;
 }
 
 // ============================================================================
-// LOCATION VOTING TYPES
+// BUDGET CONSTANTS
+// ============================================================================
+
+/**
+ * Category mapping TH-EN
+ */
+export const CATEGORY_MAPPING: Record<string, keyof Budget> = {
+  'ที่พัก': 'accommodation',
+  'เดินทาง': 'transport',
+  'อาหาร': 'food',
+  'อื่นๆ': 'other',
+  'accommodation': 'accommodation',
+  'transport': 'transport',
+  'food': 'food',
+  'other': 'other',
+} as const;
+
+/**
+ * Budget validation constants
+ */
+export const BUDGET_LIMITS = {
+  MIN: 0,
+  MAX: 10_000_000, // 10 ล้านบาท
+  STEP: 100
+} as const;
+
+/**
+ * Budget categories configuration
+ */
+export interface BudgetCategoryItem {
+  key: keyof Budget;
+  label: string;
+  color: string;
+  required: boolean;
+}
+
+/**
+ * Budget categories configuration
+ */
+export const BUDGET_CATEGORIES = [
+  { key: 'accommodation' as const, label: 'ค่าที่พัก*', color: '#3b82f6', required: true },
+  { key: 'transport' as const, label: 'ค่าเดินทาง*', color: '#8b5cf6', required: true },
+  { key: 'food' as const, label: 'ค่าอาหาร*', color: '#10b981', required: true },
+  { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b', required: false }
+] as const;
+
+// ============================================================================
+// STEP 3: LOCATION VOTING TYPES
 // ============================================================================
 
 export interface LocationVote {
-  place: string;
+  location_name: string;
   score: number;
 }
 
-export interface SubmitLocationVotePayload {
-  votes: LocationVote[];
+// Location Vote Result (สำหรับแสดงผล)
+export interface LocationVoteResult {
+  place: string;           // ✅ ใช้ "place" สำหรับแสดงผล
+  total_score: number;
+  vote_count: number;
+  voters: string[];
+  rank_distribution: {
+    rank_1: number;
+    rank_2: number;
+    rank_3: number;
+  };
 }
+
+export interface SubmitLocationVotePayload {
+  votes: LocationVote[]; 
+}
+
+// Voting Result Item
+export interface VotingResult {
+  place: string;
+  total_score: number;
+  vote_count: number;
+  voters: string[];
+  rank_distribution: {
+    rank_1: number;
+    rank_2: number;
+    rank_3: number;
+  };
+  region?: string;
+}
+
+// Response จากการดึงผลโหวตจังหวัด
+export interface GetLocationVoteResponse {  
+  trip_id: string;
+  my_votes: Array<{
+    place: string;        // ✅ Backend ส่งกลับมาเป็น "place"
+    score: number;
+  }>;
+  voting_results: LocationVoteResult[];
+}
+
+// ✅ Type Guard
+export const isLocationVote = (obj: any): obj is LocationVote => {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.location_name === 'string' &&
+    typeof obj.score === 'number' &&
+    obj.score >= 1 &&
+    obj.score <= 3
+  );
+};
+
+// ✅ Helper: แปลง place → location_name
+export const placeToLocationVote = (
+  place: string,
+  score: number
+): LocationVote => ({
+  location_name: place,
+  score
+});
+
+// ✅ Helper: แปลง location_name → place
+export const locationVoteToPlace = (
+  vote: LocationVote
+): { place: string; score: number } => ({
+  place: vote.location_name,
+  score: vote.score
+});
 
 export interface LocationScores {
   [province: string]: number;
 }
-
 
 // ============================================================================
 // FRONTEND UI TYPES
@@ -438,31 +664,3 @@ export const tripSummaryToCard = (trip: TripSummary): TripCard => {
     isCompleted
   };
 };
-
-
-// ============================================================================
-// Date Matching Result Types
-// ============================================================================
-// วันที่ที่มีคนว่างตรงกันทั้งหมด
-export interface DateIntersectionResult {
-  userAvailability: string[]; // วันที่ผู้ใช้คนนี้ว่าง
-  intersection: string[];
-  weighted: WeightedDateResult[];
-  totalMembers: number;
-}
-
-// คะแนนความนิยมของแต่ละวัน
-export interface WeightedDateResult {
-  day: string;          // "YYYY-MM-DD"
-  freeMembers: number;  // จำนวนคนว่าง
-  score: number;        // %
-}
-
-// response wrapper จาก backend
-export interface DateMatchingResponse {
-  success: boolean;
-  code: string;
-  message: string;
-  data: DateIntersectionResult;
-}
-
