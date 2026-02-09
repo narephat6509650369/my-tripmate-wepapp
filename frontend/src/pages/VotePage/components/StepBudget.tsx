@@ -3,9 +3,22 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Loader2 } from 'lucide-react';
 import { voteAPI } from '../../../services/tripService';
 import { formatCurrency } from '../../../utils';
-import type { TripDetail, BudgetCategory } from '../../../types';
-import { CONFIG } from '../../../config/app.config'; 
+// Type imports
+import type { 
+  TripDetail, 
+  BudgetCategory,
+  Budget,  
+  BudgetVote,
+  BudgetCategoryData,
+  BudgetItem,
+  BudgetProposalLog,
+  BudgetVotingDetailResponse,
+  BudgetStats,
+  BudgetStatsMap,
+  BudgetCategoryItem, 
+} from '../../../types';
 
+<<<<<<< HEAD
 // ============== API RESPONSE TYPES ==============
 
 interface BudgetVote {
@@ -68,35 +81,26 @@ interface BudgetStatsMap {
   other: BudgetStats;
 }
 
+=======
+// Value imports (constants)
+import { 
+  CATEGORY_MAPPING,   
+  BUDGET_CATEGORIES,   
+  BUDGET_LIMITS   
+} from '../../../types';
+
+// ============== TYPES ==============
+>>>>>>> 28d51299 (Implement location algorithm)
 interface StepBudgetProps {
   trip: TripDetail;
-  onSave: (category: string, amount: number) => Promise<void>;
+  onSave: (category: keyof Budget, amount: number) => Promise<void>;
   onManualNext?: () => void;
 }
-
-interface BudgetState {
-  accommodation: number;
-  transport: number;
-  food: number;
-  other: number;
-}
-
-// ============== CONSTANTS ==============
-const BUDGET_CATEGORIES = [
-  { key: 'accommodation' as const, label: 'ค่าที่พัก*', color: '#3b82f6', required: true },
-  { key: 'transport' as const, label: 'ค่าเดินทาง*', color: '#8b5cf6', required: true },
-  { key: 'food' as const, label: 'ค่าอาหาร*', color: '#10b981', required: true },
-  { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b', required: false }
-] as const;
-
-// ✅ Validation Constants
-const MAX_BUDGET = 10_000_000; // 10 ล้านบาท
-const MIN_BUDGET = 0;
 
 // ============== COMPONENT ==============
 export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNext }) => {
   // ============== STATE ==============
-  const [budget, setBudget] = useState<BudgetState>({
+  const [budget, setBudget] = useState<Budget>({
     accommodation: 0,
     transport: 0,
     food: 0,
@@ -123,6 +127,13 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
   }, []);
 
   // ============== HELPER FUNCTIONS ==============
+
+  /**
+ * Type guard สำหรับตรวจสอบว่า key เป็น valid budget category
+ */
+  const isBudgetKey = (key: string): key is keyof Budget => {
+    return ['accommodation', 'transport', 'food', 'other'].includes(key);
+  };
 
   /**
    * ✅ ปรับปรุง: ใช้ memoization เพื่อลด re-calculation
@@ -240,12 +251,12 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
       return { valid: false, error: 'ตัวเลขไม่ถูกต้อง' };
     }
     
-    if (amount < MIN_BUDGET) {
+    if (amount < BUDGET_LIMITS.MIN) {
       return { valid: false, error: 'จำนวนเงินต้องมากกว่าหรือเท่ากับ 0' };
     }
-    
-    if (amount > MAX_BUDGET) {
-      return { valid: false, error: `งบประมาณสูงสุด ฿${formatCurrency(MAX_BUDGET)}` };
+
+    if (amount > BUDGET_LIMITS.MAX) {
+      return { valid: false, error: `งบประมาณสูงสุด ฿${formatCurrency(BUDGET_LIMITS.MAX)}` };
     }
     
     return { valid: true };
@@ -259,16 +270,19 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
       return;
     }
 
+    let isMounted = true;
+
     console.log("Loading budget for tripId:", trip.tripid);
     setIsLoading(true);
     setError(null);
 
     voteAPI.getBudgetVoting(trip.tripid)
       .then((res) => {
+        if (!isMounted) return; // ✅ หยุดถ้า unmounted แล้ว
         console.log('=== DEBUG BUDGET API ===');
         console.log('Full Response:', JSON.stringify(res, null, 2));
         
-        const apiData = res.data as BudgetVotingResponse['data'];
+        const apiData = res.data as BudgetVotingDetailResponse['data'];
         
         if (!apiData) {
           console.log('⚠️ No data returned from API');
@@ -278,34 +292,23 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
         const budgets = apiData.budgets || apiData.budget_options || [];
         setBudgetOptions(apiData.budget_options || []);
 
-        const categoryMapping: Record<string, keyof BudgetState> = {
-          'ที่พัก': 'accommodation',
-          'เดินทาง': 'transport',
-          'อาหาร': 'food',
-          'อื่นๆ': 'other',
-          'accommodation': 'accommodation',
-          'transport': 'transport',
-          'food': 'food',
-          'other': 'other',
-        };
-
-        const initialBudget: BudgetState = {
+        const initialBudget: Budget = {
           accommodation: 0,
           transport: 0,
           food: 0,
           other: 0
         };
 
-        budgets.forEach((item) => {
+        budgets.forEach((item: BudgetItem) => {  // ⭐ เพิ่ม type annotation
           if (!item) return;
           
           const categoryTH = item.category || item.category_name;
           if (!categoryTH) return;
           
-          const categoryEN = categoryMapping[categoryTH];
+          const categoryEN = CATEGORY_MAPPING[categoryTH] as keyof Budget | undefined;  // ⭐ เพิ่ม type assertion
           
-          if (categoryEN) {
-            const amount = item.amount || item.estimated_amount || 0;
+          if (categoryEN && (categoryEN in initialBudget)) {  // ⭐ เปลี่ยนเป็น type guard
+            const amount = Number(item.amount || item.estimated_amount || 0);
             initialBudget[categoryEN] += amount;
           }
         });
@@ -327,7 +330,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
 
         if (hasAllVotes) {
           (apiData.budget_options || []).forEach((category) => {
-            const categoryName = categoryMapping[category.category_name] as keyof BudgetStatsMap;
+            const categoryName = CATEGORY_MAPPING[category.category_name] as keyof BudgetStatsMap;
             if (!categoryName || !stats[categoryName]) return;
             
             const votes = category.all_votes || [];
@@ -364,9 +367,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
             }
             
             const myVote = votes.find(v => v.user_id === trip.current_user_id);
-            const savedValue = myVote?.estimated_amount ?? category.estimated_amount ?? 0;
-            const currentValue = budget[categoryName] || savedValue;
-            stats[categoryName].myValue = currentValue;
+            stats[categoryName].myValue = myVote?.estimated_amount ?? 0;
           });
         }
         
@@ -378,16 +379,20 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
         setError('ไม่สามารถโหลดข้อมูลงบประมาณได้ กรุณาลองใหม่อีกครั้ง');
       })
       .finally(() => {
+        if (!isMounted) return;
         setIsLoading(false);
       });
-  }, [trip?.tripid, filterOutliers]);
+    return () => {  
+      isMounted = false;
+    };
+  }, [trip?.tripid, trip?.current_user_id, filterOutliers]);
 
   // ============== HANDLERS ==============
   
   /**
    * ✅ ปรับปรุง: เพิ่ม validation และ error handling
    */
-  const handleSaveCategory = useCallback(async (category: keyof BudgetState) => {
+  const handleSaveCategory = useCallback(async (category: keyof Budget) => {
     const amount = budget[category];
     
     // Validate
@@ -423,7 +428,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
   /**
    * ✅ ปรับปรุง: เพิ่ม validation
    */
-  const handleBudgetChange = useCallback((key: keyof BudgetState, value: number) => {
+  const handleBudgetChange = useCallback((key: keyof Budget, value: number) => {
     const validation = validateBudget(value);
     
     if (!validation.valid) {
@@ -438,13 +443,18 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
    * ✅ ปรับปรุง: ใช้ useCallback และจัดการ timeout ให้ดีขึ้น
    */
   const handleSaveAll = useCallback(async () => {
+
+    if (isSaving) {
+      console.log('Already saving...');
+      return;
+    }
     const hasRequiredBudget = 
       budget.accommodation > 0 &&
       budget.transport > 0 &&
       budget.food > 0;
     
     if (!hasRequiredBudget) {
-      alert('กรุณากรอกงบประมาณที่จำเป็น (ที่พัก, เดินทาง, อาหาร)');
+      alert('กรุณากรอกและบันทึกงบประมาณที่จำเป็น (ที่พัก, เดินทาง, อาหาร)');
       return;
     }
 
@@ -490,7 +500,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
     } finally {
       setIsSaving(false);
     }
-  }, [budget, onSave]);
+  }, [budget, onSave, isSaving]); 
 
   // ============== ANALYSIS MODAL ==============
   const renderAnalysisModal = () => {
@@ -542,15 +552,23 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
           className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-y-auto animate-modal-scale-in"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 rounded-t-xl flex justify-between items-center z-10">
-            <h3 className="text-xl font-bold">💰 ผลการวิเคราะห์งบประมาณ</h3>
-            <button
-              onClick={() => setShowAnalysisModal(false)}
-              className="text-white hover:text-gray-200 text-2xl font-bold w-8 h-8 flex items-center justify-center transition"
-            >
-              ✕
-            </button>
+          {/* Header */}         
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold mb-1">💰 ผลโหวตปัจจุบันเปรียบเทียบงบประมาณ</h3>
+                <span className="inline-block text-xs bg-white/20 px-3 py-1 rounded-full">
+                  ⚡ อัปเดตแบบเรียลไทม์
+                </span>
+              </div>
+              <button
+                onClick={() => setShowAnalysisModal(false)}
+                className="text-white hover:text-gray-200 text-2xl font-bold w-10 h-10 flex items-center justify-center transition rounded-lg hover:bg-white/10"
+                aria-label="ปิด"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* Content */}
@@ -692,10 +710,10 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
                                   const isTooClose = avgPosition !== null && Math.abs(position - avgPosition) < 15;
                                   
                                   return (
-                                    <>
+                                    <>  
                                       {/* จุดของคุณ */}
                                       <div 
-                                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 group cursor-pointer"
+                                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group cursor-pointer"
                                         style={{ left: `${position}%` }}
                                       >
                                         <div 
@@ -912,9 +930,9 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
                       <input 
                         type="number" 
                         disabled={isSaving}
-                        min={MIN_BUDGET}
-                        max={MAX_BUDGET}
-                        step={100}
+                        min={BUDGET_LIMITS.MIN}
+                        max={BUDGET_LIMITS.MAX}
+                        step={BUDGET_LIMITS.STEP}
                         value={budget[key] || ''}
                         placeholder="0"
                         className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
