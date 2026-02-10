@@ -405,8 +405,8 @@ export const updateBudget = async ( tripid: string,user_id: string,category: str
     throw new Error("You are not a member of this trip");
   }
 
-  // ❌ ไม่ต้อง clear ก่อน
-  // await voteModel.clearBudgetCategory(...);
+  //clear ก่อน
+  await voteModel.clearBudgetCategory(tripid,user_id,category);
 
   // 4. Update budget (state + log)
   const result = await voteModel.updateBudget(
@@ -426,29 +426,160 @@ export const updateBudget = async ( tripid: string,user_id: string,category: str
 * ดึงข้อมูลสำหรับอัปเดตงบประมาณของตัวเอง
 */
 export const getUserBudgetForTrip = async (tripid: string, user_id: string) => {
-  // 1. หาทริป
-  const trip = await tripModel.findTripById(tripid);
 
+  const trip = await tripModel.findTripById(tripid);
   if (!trip) throw new Error("Trip not found");
 
-  // 2. เช็คว่าเป็นสมาชิกหรือไม่
   const members = await tripModel.getTripMembers(trip.trip_id);
 
-  const isMember = members.some(m => m.user_id === user_id && m.is_active);
-  
+  const isMember = members.some(
+    m => m.user_id === user_id && m.is_active
+  );
+
   if (!isMember) {
     throw new Error("You are not a member of this trip");
   }
- 
-  // 3. ดึงงบประมาณของ user
-  const budgets = await voteModel.getBudgetVoting(trip.trip_id, user_id);
 
-  //const rows = await voteModel.getTripBudgets(tripid,user_id);
+  const result = await voteModel.getBudgetVoting(trip.trip_id, user_id);
 
-return {
-  budgets
+  if (!result) {
+    return {
+        rows: [],
+        stats: {},
+        filledMembers: 0,
+        rowlog: []
+    };
+  }
+
+  const { rows, rowlog , budgetcount, budget} = result;
+  
+
+  // 1 จัดกลุ่ม vote ล่าสุด (จาก budget_votes)
+  const categoryMap: Record<string, number[]> = {};
+  const userSet = new Set<string>();
+
+  (budget as any[]).forEach((vote: any) => {
+    const category = vote.category_name;
+    const amount = Number(vote.estimated_amount);
+    console.log("vote:",vote);
+
+    if (!categoryMap[category]) {
+      categoryMap[category] = [];
+    }
+
+    categoryMap[category].push(amount);
+    userSet.add(vote.user_id);
+  });
+
+  // 2 Helper: Quartile + IQR 
+
+  const calculateQuartile = (sorted: number[], q: number): number => {
+    if (sorted.length === 0) return 0;
+
+    const pos = (sorted.length - 1) * q;
+    const base = Math.floor(pos);
+    const rest = pos - base;
+
+    const baseValue = sorted[base] ?? 0;
+    const nextValue = sorted[base + 1] ?? baseValue;
+
+    return baseValue + rest * (nextValue - baseValue);
+  };
+
+
+  const filterOutliers = (data: number[]) => {
+  if (data.length === 0) {
+    return {
+      filtered: [],
+      removed: [],
+      quartile: {
+        q1: 0,
+        q2: 0,
+        q3: 0,
+        iqr: 0,
+        lowerBound: 0,
+        upperBound: 0
+      }
+    };
+  }
+
+  const sorted = [...data].sort((a, b) => a - b);
+
+  const q1 = calculateQuartile(sorted, 0.25);
+  const q2 = calculateQuartile(sorted, 0.5);
+  const q3 = calculateQuartile(sorted, 0.75);
+  const iqr = q3 - q1;
+
+  const lowerBound = q1 - 1.5 * iqr;
+  const upperBound = q3 + 1.5 * iqr;
+
+  const filtered = sorted.filter(
+    x => x >= lowerBound && x <= upperBound
+  );
+
+  const removed = sorted.filter(
+    x => x < lowerBound || x > upperBound
+  );
+
+  return {
+    filtered,
+    removed,
+    quartile: { q1, q2, q3, iqr, lowerBound, upperBound }
+  };
 };
-}
+
+
+  // 3️ คำนวณสถิติ
+
+  const stats: any = {};
+  let budgetTotal = 0;
+  let minTotal = 0;
+  let maxTotal = 0;
+
+  for (const category in categoryMap) {
+
+    const amounts = categoryMap[category] ?? [];
+    const { filtered, removed, quartile } = filterOutliers(amounts);
+
+    if (quartile.q1 === 0 && quartile.q2 === 0 && quartile.q3 === 0) {
+      stats[category] = { q1: 0, q2: 0, q3: 0, iqr: 0, lowerBound: 0, upperBound: 0, filteredCount: 0, removedCount: 0, removedValues: [] };
+      continue;
+    }
+
+    stats[category] = {
+      q1: quartile.q1,
+      q2: quartile.q2,
+      q3: quartile.q3,
+      iqr: quartile.iqr,
+      lowerBound: quartile.lowerBound,
+      upperBound: quartile.upperBound,
+      filteredCount: filtered.length,
+      removedCount: removed.length,
+      removedValues: removed
+    };
+    // รวมงบประมาณทั้งหมด (ใช้ค่า Q2)
+    budgetTotal += quartile.q2;
+    minTotal += quartile.q1;
+    maxTotal += quartile.q3;
+   
+  };
+
+  //เผื่อปัดเศษ
+  budgetTotal = Math.round(budgetTotal);
+  minTotal = Math.round(minTotal);
+  maxTotal = Math.round(maxTotal);
+
+  return {
+      rows,
+      stats,
+      budgetTotal,
+      minTotal,
+      maxTotal,
+      filledMembers: userSet.size,
+      rowlog
+  };
+};
+
 
 // ===================== LOCATION VOTING =====================
 

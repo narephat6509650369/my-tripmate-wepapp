@@ -299,6 +299,7 @@ export const getBudgetVoteController = async (req: Request, res: Response) => {
     }
 
     const data = await voteService.getUserBudgetForTrip(tripId, userId);
+    console.log("budget vote:",data)
 
     return res.status(200).json({
       success: true,
@@ -326,7 +327,6 @@ export const getBudgetVoteController = async (req: Request, res: Response) => {
     });
   }
 };
-
 //// ================= LOCATION =================
 
 export const submitLocationVoteController = async (req: Request, res: Response) => {
