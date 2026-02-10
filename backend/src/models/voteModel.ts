@@ -125,12 +125,11 @@ export const getTripAvailabilities = async (trip_id: string, user_id: string) =>
       [trip_id]
   )
   return {
-    dates: rows.map(r => r.available_date),
-    count: rows.length,
-    log: rowlog
+    rows: rows.map(r => r.available_date),
+    countrows: rows.length,
+    rowlog: rowlog
   }
  } catch (err) {
-    await connection.rollback();
     throw err;
   } finally {
     connection.release();
@@ -147,7 +146,6 @@ export const getActiveMemberCount = async (tripId: string): Promise<number> => {
   return rows?.[0]?.total ?? 0;
 };
 
-//
 export const getAvailabilitiesByTrip = async (tripId: string) => {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT
