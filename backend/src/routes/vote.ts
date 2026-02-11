@@ -30,13 +30,11 @@ router.post('/availability', auth, submitAvailabilityController);
 
 router.get('/:tripId/date-matching-result', auth, getDateMatchingResultController);
 
-
-
 // ============ PLACE VOTING ============
 
 //router.post('/start-voting', auth, requireTripOwner, startVotingController);
-router.get('/:tripId/get-vote-place', auth, getLocationVoteController) 
-router.post('/:tripid/vote-place', auth, submitLocationVoteController);
+router.get('/:tripId/get-vote-place', auth, getLocationVoteController);
+router.post('/:tripId/vote-place', auth, submitLocationVoteController);
 
 // ============ BUDGET VOTING ============
 

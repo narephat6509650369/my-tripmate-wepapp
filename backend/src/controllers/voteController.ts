@@ -331,7 +331,7 @@ export const getBudgetVoteController = async (req: Request, res: Response) => {
 
 export const submitLocationVoteController = async (req: Request, res: Response) => {
   try {
-    const { tripid } = req.params;
+    const { tripId } = req.params;
     const { votes } = req.body;
     const userId = (req.user as JwtPayload)?.userId;
 
@@ -344,16 +344,18 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
       });
     }
     
-    if (!tripid) {
+    if (!tripId) {
       return res.status(400).json({
         success: false,
         code: "MISSING_FIELD",
-        message: "tripid is required",
-        error: { field: "tripid" }
+        message: "tripId is required",
+        error: { field: "tripId" }
       });
     }
+
+    console.log("submitLocationVoteController votes:", votes);
     
-    const scores = await voteService.voteLocation(tripid, userId, votes);
+    const scores = await voteService.voteLocation(tripId, userId, votes);
     
     const data: Record<string, number> = {};
     scores.forEach((s: any) => {
@@ -390,6 +392,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
 export const getLocationVoteController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
+    const user_id = (req.user as JwtPayload)?.userId;
 
     if (!tripId) {
       return res.status(400).json({
@@ -399,8 +402,17 @@ export const getLocationVoteController = async (req: Request, res: Response) => 
         error: { field: "tripId" }
       });
     }
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "userId is required",
+        error: { field: "userId" }
+      });
+    }
 
-    const locationVotes = await voteService.getLocationVote(tripId);
+    const locationVotes = await voteService.getLocationVote(tripId,user_id);
+    console.log("locationVotes:", locationVotes);
 
     return res.status(200).json({
       success: true,

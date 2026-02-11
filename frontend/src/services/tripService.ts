@@ -612,7 +612,7 @@ submitLocationVote: async (
     }
 
     const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripId}/location`,
+      `${API_URL}/votes/${tripId}/vote-place`,
       {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -659,7 +659,7 @@ getLocationVote: async (
     }
 
     const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripId}/location`,
+      `${API_URL}/votes/${tripId}/get-vote-place`,
       {
         method: 'GET',
         headers: getAuthHeaders()
