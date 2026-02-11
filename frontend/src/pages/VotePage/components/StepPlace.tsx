@@ -177,7 +177,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         setError('');
         const response = await voteAPI.getLocationVote(trip.tripid);
 
-        const votingData = response?.data?.data ?? response?.data ?? {};
+        const votingData = response?.data?.data;
 
         // ✅ Better validation
         if (!votingData.voting_results || !Array.isArray(votingData.voting_results)) {

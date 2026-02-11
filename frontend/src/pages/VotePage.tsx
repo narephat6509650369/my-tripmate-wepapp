@@ -98,9 +98,11 @@ const VotePage: React.FC = () => {
 
           // จังหวัด
           const locRes = await voteAPI.getLocationVote(tripData.tripid);
+          /*
           if (locRes?.data?.data?.my_votes) {
             setUserLocations(locRes.data.data.my_votes);
           }
+            */
         } catch (e) {
           console.error('Load user input failed:', e);
         }
