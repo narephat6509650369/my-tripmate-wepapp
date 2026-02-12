@@ -18,12 +18,12 @@ import type {
   UpdateBudgetPayload,
   UpdateBudgetResponse,
   SubmitLocationVotePayload,
-  GetLocationVoteResponse,
   DateMatchingResponse,
   BudgetVotingResponse,
   LocationScores
 } from '../types';
 
+// Import Mock Data
 import {
   getMockMyTrips,
   getMockTripDetail,
@@ -34,21 +34,12 @@ import {
   getMockTripSummary,
   getMockSubmitAvailability,
   getMockTripHeatmap,
-  getMockGetDateMatchingResult,
-  getMockGetDateMatchingResult_Partial,
-  getMockGetDateMatchingResult_NoMatch,
-  getMockGetDateMatchingResult_Empty,
   getMockStartVoting,
   getMockUpdateBudget,
-  getMockGetBudgetVoting,
   getMockSubmitLocationVote,
-  getMockGetLocationVote,
-  getMockGetLocationVote_RegionalWinner,
-  getMockGetLocationVote_Empty,
-  getMockGetLocationVote_AllTied,
-  getMockGetLocationVote_SingleUser,
   getMockCloseTrip,
-  mockDelay
+  mockDelay,
+  getMockGetBudgetVoting
 } from '../data/mockData';
 
 // ============================================================================
@@ -444,48 +435,41 @@ export const voteAPI = {
   },
 
   /**
- * GET /api/votes/:tripId/date-matching-result
- * ✅ ดึงผลการวิเคราะห์วันที่
- */
-getDateMatchingResult: async (tripId: string): Promise<ApiResponse<DateMatchingResponse>> => {
-  // ✅ Mock Mode
-  if (CONFIG.USE_MOCK_DATA) {
-    await mockDelay();
-    
-    // ✅ เลือกใช้ Mock Data แบบไหน
-    // ทดสอบกรณีไม่มีวันติดกัน (Sliding Window):
-    return getMockGetDateMatchingResult(tripId);
-    
-    // 💡 Uncomment เพื่อทดสอบ Scenarios อื่น:
-    // return getMockGetDateMatchingResult_Partial(tripId);    // Partial Match
-    // return getMockGetDateMatchingResult_NoMatch(tripId);    // Sliding Window
-    // return getMockGetDateMatchingResult_Empty(tripId);      // Empty
-  }
-
-  // ✅ Real API
-  try {
-    if (!checkAuth()) {
+  * GET /:tripId/date-matching-result
+  */
+  getDateMatchingResult: async (tripId: string): Promise<ApiResponse<DateMatchingResponse>> => {
+    // ✅ Mock Mode
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      // Implement mock function if needed
       return {
-        success: false,
-        code: 'AUTH_UNAUTHORIZED',
-        message: 'กรุณาเข้าสู่ระบบใหม่'
+        success: true,
+        code: 'MOCK_SUCCESS',
+        message: 'Mock date matching result',
+        //data: { intersection: [], weighted: [], totalMembers: 0 }
       };
     }
 
-    const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripId}/date-matching-result`, 
-      {
-        headers: getAuthHeaders()
+    // ✅ Real API
+    try {
+      if (!checkAuth()) {
+        return {
+          success: false,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'กรุณาเข้าสู่ระบบใหม่'
+        };
       }
-    );
-    
-    console.log("Date Matching API Response:", response);
 
-    return await response.json();
-  } catch (error) {
-    return handleApiError(error);
-  }
-},
+      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/date-matching-result`, {
+        headers: getAuthHeaders()
+      });
+      console.log("Get data:",response);
+
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 
 // ============================================================================
 // BUDGET VOTING
@@ -558,130 +542,78 @@ getDateMatchingResult: async (tripId: string): Promise<ApiResponse<DateMatchingR
 // ============================================================================
 // LOCATION VOTING
 // ============================================================================
-
-/**
- * POST /api/votes/:tripId/location
- * ✅ ส่งคะแนนโหวตสถานที่
- */
-submitLocationVote: async (
-  tripId: string,
-  payload: SubmitLocationVotePayload
-): Promise<ApiResponse> => {
-  // ✅ Validation
-  if (!payload.votes || !Array.isArray(payload.votes)) {
-    return {
-      success: false,
-      code: 'INVALID_PAYLOAD',
-      message: 'Invalid votes payload'
-    };
-  }
-
-  // ✅ Validate each vote
-  for (const vote of payload.votes) {
-    if (!vote.location_name || typeof vote.score !== 'number') {
-      return {
-        success: false,
-        code: 'INVALID_VOTE',
-        message: 'Each vote must have location_name and score'
-      };
-    }
-    
-    if (vote.score < 1 || vote.score > 3) {
-      return {
-        success: false,
-        code: 'INVALID_SCORE',
-        message: 'Score must be between 1 and 3'
-      };
-    }
-  }
-
+  /**
+   * POST /api/votes/:tripid/vote-place
+   */
+  submitLocationVote: async (
+    tripid: string,
+    payload: SubmitLocationVotePayload
+  ): Promise<ApiResponse<{ scores: LocationScores }>> => {
     // ✅ Mock Mode
-  if (CONFIG.USE_MOCK_DATA) {
-    await mockDelay();
-    return getMockSubmitLocationVote(tripId, payload);
-  }
-
-  // ✅ Real API
-  try {
-    if (!checkAuth()) {
-      return {
-        success: false,
-        code: 'AUTH_UNAUTHORIZED',
-        message: 'กรุณาเข้าสู่ระบบใหม่'
-      };
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      return getMockSubmitLocationVote(tripid, payload.votes.map(v => v.place));
     }
 
-    const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripId}/vote-place`,
-      {
+    // ✅ Real API
+    try {
+      if (!checkAuth()) {
+        return {
+          success: false,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'กรุณาเข้าสู่ระบบใหม่'
+        };
+      }
+
+      const response = await fetchWithTimeout(`${API_URL}/votes/${tripid}/vote-place`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload)
-      }
-    );
+      });
 
-    return await response.json();
-  } catch (error) {
-    return handleApiError(error);
-  }
-},
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 
-/**
- * GET /api/votes/:tripId/location
- * ✅ ดึงข้อมูลการโหวตสถานที่ + ผลรวม
- */
-getLocationVote: async (
-  tripId: string
-): Promise<ApiResponse<GetLocationVoteResponse>> => {
-  // ✅ Mock Mode - เลือก Scenario
-  if (CONFIG.USE_MOCK_DATA) {
-    await mockDelay();
-    
-    // ✅ สามารถสลับ Scenario ได้ที่นี่
-    return getMockGetLocationVote(tripId);  // Default: Clear Winner
-    
-    // Uncomment เพื่อทดสอบ Scenarios อื่น:
-    // return getMockGetLocationVote_RegionalWinner(tripId);
-    // return getMockGetLocationVote_Empty(tripId);
-    // return getMockGetLocationVote_AllTied(tripId);
-    // return getMockGetLocationVote_SingleUser(tripId);
-    // return getMockGetLocationVote_Complex(tripId);
-  }
-
-  // ✅ Real API
-  try {
-    if (!checkAuth()) {
+  getLocationVote: async (tripId: string) => {
+    // ✅ Mock Mode
+    if (CONFIG.USE_MOCK_DATA) {
       return {
-        success: false,
-        code: 'AUTH_UNAUTHORIZED',
-        message: 'กรุณาเข้าสู่ระบบใหม่'
+        success: true,
+        code: 'LOCATION_VOTES_FETCHED',
+        message: 'Mock location votes',
+        data: []
       };
     }
 
-    const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripId}/get-vote-place`,
-      {
-        method: 'GET',
-        headers: getAuthHeaders()
+    try {
+      const response = await fetchWithTimeout(
+        `${API_URL}/votes/${tripId}/get-vote-place`,
+        {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          code: data.code || 'API_ERROR',
+          message: data.message || 'Failed to fetch location votes'
+        };
       }
-    );
 
-    const data = await response.json();
+      return data;
 
-    if (!response.ok) {
-      return {
-        success: false,
-        code: data.code || 'API_ERROR',
-        message: data.message || 'Failed to fetch location votes'
-      };
+    } catch (error) {
+      return handleApiError(error);
     }
-
-    return data;
-
-  } catch (error) {
-    return handleApiError(error);
-  }
 },
+  //close ต้องแก้เพิ่ม
 
   /**
    * POST /api/votes/:tripCode/close
