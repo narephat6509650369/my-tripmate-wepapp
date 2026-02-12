@@ -53,8 +53,6 @@ export interface AuthResponse {
   };
 }
 
-
-
 // ============================================================================
 // TRIP TYPES (ตรงกับ Backend Model)
 // ============================================================================
@@ -345,6 +343,32 @@ export interface LocationScores {
   [province: string]: number;
 }
 
+export interface DateMatchingResponse {
+  rows: string[];
+  countrows: number;
+  summary: {
+    totalMembers: number;
+    totalAvailableDays: number;
+  };
+  availability: Array<{
+    date: string;
+    count: number;
+    percentage: number;
+  }>;
+  recommendation: {
+    dates: string[];
+    avgPeople: number;
+    percentage: number;
+    score: number;
+    isConsecutive: boolean;
+  } | null;
+  rowlog: Array<{
+    available_date: string;
+    proposed_at: string;
+    proposed_by: string;
+    proposed_by_name: string;
+  }>;
+}
 
 // ============================================================================
 // FRONTEND UI TYPES

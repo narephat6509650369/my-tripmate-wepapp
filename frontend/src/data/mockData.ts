@@ -159,8 +159,12 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       invitelink: trip.invite_link,
       status: trip.status,
       createdat: trip.created_at,
-      membercount: trip.membercount,
-      members: [],
+      members: [
+        { user_id: 'user-001' },
+        { user_id: 'user-002' },
+        { user_id: 'user-003' },
+        { user_id: 'user-004' }
+      ],
       dateRanges: [],
       provinceVotes: [],
       budgetOptions: [],
@@ -389,6 +393,53 @@ export const getMockCloseTrip = (tripCode: string): ApiResponse => {
   };
 };
 
+/**
+ * GET /api/votes/:tripId/date-matching-result
+ */
+export const getMockDateMatchingResult = (tripId: string): ApiResponse<DateMatchingResponse> => {
+  return {
+    success: true,
+    code: 'DATE_MATCHING_RESULT',
+    message: 'Matching result loaded',
+    data: {
+      rows: ['2025-01-20', '2025-01-21', '2025-01-22'],
+      countrows: 3,
+      summary: {
+        totalMembers: 4,
+        totalAvailableDays: 10
+      },
+      availability: [
+        { date: '2025-01-20', count: 4, percentage: 100 },
+        { date: '2025-01-21', count: 4, percentage: 100 },
+        { date: '2025-01-22', count: 3, percentage: 75 },
+        { date: '2025-01-23', count: 2, percentage: 50 },
+        { date: '2025-01-24', count: 3, percentage: 75 }
+      ],
+      recommendation: {
+        dates: ['2025-01-20', '2025-01-21', '2025-01-22'],
+        avgPeople: 3.7,
+        percentage: 93,
+        score: 895,
+        isConsecutive: true
+      },
+      rowlog: [
+        {
+          available_date: '2025-01-20',
+          proposed_at: new Date().toISOString(),
+          proposed_by: 'user-001',
+          proposed_by_name: 'สมชาย ใจดี'
+        },
+        {
+          available_date: '2025-01-21',
+          proposed_at: new Date().toISOString(),
+          proposed_by: 'user-002',
+          proposed_by_name: 'สมหญิง รักดี'
+        }
+      ]
+    }
+  };
+};
+
 /*
 * GET /api/votes/:tripcode/get-budget
 */
@@ -480,5 +531,6 @@ export default {
   getMockUpdateBudget,
   getMockSubmitLocationVote,
   getMockCloseTrip,
-  getMockGetBudgetVoting
+  getMockGetBudgetVoting,
+  getMockDateMatchingResult
 };  

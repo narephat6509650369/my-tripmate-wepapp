@@ -1,6 +1,6 @@
 // ============================================================================
 // frontend/src/services/tripService.ts
-// ✅ รองรับทั้ง Mock Data และ API จริง
+// ✅ รองรับทั้ง Mock Data และ API จริง - จัดเรียงตาม Step
 // ============================================================================
 
 import { CONFIG } from '../config/app.config';
@@ -39,7 +39,8 @@ import {
   getMockSubmitLocationVote,
   getMockCloseTrip,
   mockDelay,
-  getMockGetBudgetVoting
+  getMockGetBudgetVoting,
+  getMockDateMatchingResult 
 } from '../data/mockData';
 
 // ============================================================================
@@ -111,91 +112,25 @@ const handleApiError = (error: any): ApiResponse => {
 
 export const tripAPI = {
   /**
-   * POST /api/trips/AddTrip
-   */
-  createTrip: async (payload: CreateTripPayload): Promise<ApiResponse<CreateTripResponse>> => {
-    // ✅ Mock Mode
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockCreateTrip(payload);
-    }
-
-    // ✅ Real API
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่',
-          error: { reason: 'NO_AUTH_TOKEN' }
-        };
-      }
-
-      const response = await fetchWithTimeout(`${API_URL}/trips/AddTrip`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload)
-      });
-
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-  /**
    * GET /api/trips/all-my-trips
    */
   getMyTrips: async (): Promise<ApiResponse<MyTripsResponse>> => {
-  if (CONFIG.USE_MOCK_DATA) {
-    await mockDelay();
-    return getMockMyTrips();
-  }
-
-  try {
-    const response = await fetchWithTimeout(
-      `${API_URL}/trips/all-my-trips`,
-      {
-        method: "GET",
-        credentials: "include" // ✅ สำคัญมาก
-      }
-    );
-
-    return await response.json();
-
-  } catch (error) {
-    return handleApiError(error);
-  }
-},
-
-
-  /**
-   * POST /api/trips/join
-   */
-  joinTrip: async (inviteCode: string): Promise<ApiResponse<JoinTripResponse>> => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
-      return getMockJoinTrip(inviteCode);
+      return getMockMyTrips();
     }
 
-    // ✅ Real API
     try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
-
-      const response = await fetchWithTimeout(`${API_URL}/trips/join`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ invite_code: inviteCode })
-      });
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/all-my-trips`,
+        {
+          method: "GET",
+          credentials: "include"
+        }
+      );
 
       return await response.json();
+
     } catch (error) {
       return handleApiError(error);
     }
@@ -205,13 +140,11 @@ export const tripAPI = {
    * GET /api/trips/:tripId
    */
   getTripDetail: async (tripId: string): Promise<ApiResponse<TripDetail>> => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockTripDetail(tripId);
     }
 
-    // ✅ Real API
     try {
       if (!checkAuth()) {
         return {
@@ -235,13 +168,11 @@ export const tripAPI = {
    * GET /api/trips/:tripId/summary
    */
   getTripSummary: async (tripId: string): Promise<ApiResponse<TripSummaryResult>> => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockTripSummary(tripId);
     }
 
-    // ✅ Real API
     try {
       if (!checkAuth()) {
         return {
@@ -262,16 +193,75 @@ export const tripAPI = {
   },
 
   /**
+   * POST /api/trips/AddTrip
+   */
+  createTrip: async (payload: CreateTripPayload): Promise<ApiResponse<CreateTripResponse>> => {
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      return getMockCreateTrip(payload);
+    }
+
+    try {
+      if (!checkAuth()) {
+        return {
+          success: false,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'กรุณาเข้าสู่ระบบใหม่',
+          error: { reason: 'NO_AUTH_TOKEN' }
+        };
+      }
+
+      const response = await fetchWithTimeout(`${API_URL}/trips/AddTrip`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  /**
+   * POST /api/trips/join
+   */
+  joinTrip: async (inviteCode: string): Promise<ApiResponse<JoinTripResponse>> => {
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      return getMockJoinTrip(inviteCode);
+    }
+
+    try {
+      if (!checkAuth()) {
+        return {
+          success: false,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'กรุณาเข้าสู่ระบบใหม่'
+        };
+      }
+
+      const response = await fetchWithTimeout(`${API_URL}/trips/join`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ invite_code: inviteCode })
+      });
+
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  /**
    * DELETE /api/trips/:tripId
    */
   deleteTrip: async (tripId: string): Promise<ApiResponse> => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockDeleteTrip(tripId);
     }
 
-    // ✅ Real API
     try {
       if (!checkAuth()) {
         return {
@@ -296,13 +286,11 @@ export const tripAPI = {
    * DELETE /api/trips/:tripId/members/:memberId
    */
   removeMember: async (tripId: string, memberId: string): Promise<ApiResponse> => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockRemoveMember(tripId, memberId);
     }
 
-    // ✅ Real API
     try {
       if (!checkAuth()) {
         return {
@@ -328,24 +316,59 @@ export const tripAPI = {
 };
 
 // ============================================================================
-// VOTE APIs
+// VOTE APIs - จัดเรียงตาม Step
 // ============================================================================
 
 export const voteAPI = {
+  
   // ============================================================================
-  // DATE AVAILABILITY & VOTING
+  // STEP 1: VOTE (Date Availability & Voting)
   // ============================================================================
+  
+  /**
+   * GET /api/votes/:tripId/date-matching-result
+   */
+  getDateMatchingResult: async (tripId: string): Promise<ApiResponse<DateMatchingResponse>> => {
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      return getMockDateMatchingResult(tripId);
+    }
+
+    try {
+      if (!checkAuth()) {
+        return {
+          success: false,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'กรุณาเข้าสู่ระบบใหม่'
+        };
+      }
+
+      const response = await fetchWithTimeout(
+        `${API_URL}/votes/${tripId}/date-matching-result`, 
+        {
+          headers: getAuthHeaders()
+        }
+      );
+
+      const result = await response.json();
+      console.log("📊 Date Matching Result from API:", result);
+
+      return result;
+    } catch (error) {
+      console.error("❌ getDateMatchingResult error:", error);
+      return handleApiError(error);
+    }
+  },
+
   /**
    * POST /api/votes/availability
    */
   submitAvailability: async (payload: SubmitAvailabilityPayload): Promise<ApiResponse> => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockSubmitAvailability(payload);
     }
 
-    // ✅ Real API
     try {
       if (!checkAuth()) {
         return {
@@ -368,47 +391,14 @@ export const voteAPI = {
   },
 
   /**
-   * GET /api/votes/heatmap/:tripId
-   */
-  /*
-  getTripHeatmap: async (tripId: string): Promise<ApiResponse<HeatmapData>> => {
-    // ✅ Mock Mode
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockTripHeatmap(tripId);
-    }
-
-    // ✅ Real API
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
-
-      const response = await fetchWithTimeout(`${API_URL}/votes/heatmap/${tripId}`, {
-        headers: getAuthHeaders()
-      });
-
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-*/
-  /**
    * POST /api/votes/start-voting
    */
   startVoting: async (tripId: string): Promise<ApiResponse<StartVotingResponse>> => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockStartVoting(tripId);
     }
 
-    // ✅ Real API
     try {
       if (!checkAuth()) {
         return {
@@ -430,23 +420,19 @@ export const voteAPI = {
     }
   },
 
+  // ============================================================================
+  // STEP 2: BUDGET (Budget Voting)
+  // ============================================================================
+
   /**
-  * GET /:tripId/date-matching-result
-  */
-  getDateMatchingResult: async (tripId: string): Promise<ApiResponse<DateMatchingResponse>> => {
-    // ✅ Mock Mode
+   * GET /api/votes/:tripId/get-budget
+   */
+  getBudgetVoting: async (tripId: string): Promise<ApiResponse<BudgetVotingResponse>> => {
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
-      // Implement mock function if needed
-      return {
-        success: true,
-        code: 'MOCK_SUCCESS',
-        message: 'Mock date matching result',
-        //data: { intersection: [], weighted: [], totalMembers: 0 }
-      };
+      return getMockGetBudgetVoting(tripId);
     }
 
-    // ✅ Real API
     try {
       if (!checkAuth()) {
         return {
@@ -456,10 +442,9 @@ export const voteAPI = {
         };
       }
 
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/date-matching-result`, {
+      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/get-budget`, {
         headers: getAuthHeaders()
       });
-      console.log("Get data:",response);
 
       return await response.json();
     } catch (error) {
@@ -467,23 +452,18 @@ export const voteAPI = {
     }
   },
 
-// ============================================================================
-// BUDGET VOTING
-// ============================================================================
   /**
-   * PUT /api/votes/:tripCode/budget
+   * POST /api/votes/:tripId/budget
    */
   updateBudget: async (
     tripId: string,
     payload: UpdateBudgetPayload
   ): Promise<ApiResponse<UpdateBudgetResponse>> => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockUpdateBudget(tripId, payload.category, payload.amount);
     }
 
-    // ✅ Real API
     try {
       if (!checkAuth()) {
         return {
@@ -505,76 +485,14 @@ export const voteAPI = {
     }
   },
 
+  // ============================================================================
+  // STEP 3: PLACE (Location Voting)
+  // ============================================================================
+
   /**
-   * GET /api/votes/:tripCode
+   * GET /api/votes/:tripId/get-vote-place
    */
-  getBudgetVoting: async (tripId: string): Promise<ApiResponse<BudgetVotingResponse>> => {
-    // ✅ Mock Mode
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockGetBudgetVoting(tripId);
-    }
-
-    // ✅ Real API
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
-
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/get-budget`, {
-        headers: getAuthHeaders()
-      });
-
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
-// ============================================================================
-// LOCATION VOTING
-// ============================================================================
-  /**
-   * POST /api/votes/:tripid/vote-place
-   */
-  submitLocationVote: async (
-    tripid: string,
-    payload: SubmitLocationVotePayload
-  ): Promise<ApiResponse<{ scores: LocationScores }>> => {
-    // ✅ Mock Mode
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockSubmitLocationVote(tripid, payload.votes.map(v => v.place));
-    }
-
-    // ✅ Real API
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
-
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripid}/vote-place`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload)
-      });
-
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
-
   getLocationVote: async (tripId: string) => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       return {
         success: true,
@@ -608,20 +526,54 @@ export const voteAPI = {
     } catch (error) {
       return handleApiError(error);
     }
-},
-  //close ต้องแก้เพิ่ม
+  },
+
+  /**
+   * POST /api/votes/:tripid/vote-place
+   */
+  submitLocationVote: async (
+    tripid: string,
+    payload: SubmitLocationVotePayload
+  ): Promise<ApiResponse<{ scores: LocationScores }>> => {
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      return getMockSubmitLocationVote(tripid, payload.votes.map(v => v.place));
+    }
+
+    try {
+      if (!checkAuth()) {
+        return {
+          success: false,
+          code: 'AUTH_UNAUTHORIZED',
+          message: 'กรุณาเข้าสู่ระบบใหม่'
+        };
+      }
+
+      const response = await fetchWithTimeout(`${API_URL}/votes/${tripid}/vote-place`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  // ============================================================================
+  // STEP 4: SUMMARY (Trip Close & Summary)
+  // ============================================================================
 
   /**
    * POST /api/votes/:tripCode/close
    */
   closeTrip: async (tripCode: string): Promise<ApiResponse> => {
-    // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockCloseTrip(tripCode);
     }
 
-    // ✅ Real API
     try {
       if (!checkAuth()) {
         return {
