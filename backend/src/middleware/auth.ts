@@ -2,29 +2,37 @@ import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 import type { JwtPayload } from "../express.d.ts";
 
-export const auth = (req: Request, res: Response, next: NextFunction) => {
-  //console.log("Authorization header:", req.headers.authorization);
+export const auth = (req: Request,res: Response,next: NextFunction) => {
 
-  const token = req.headers.authorization?.split(" ")[1];
+  // อ่านจาก cookie แทน header
+  const token = req.cookies?.accessToken;
 
-  //console.log("Extracted token:", token);
 
   if (!token) {
-    return res.status(401).json({ error: "Unauthorized: No token provided" });
+    return res.status(401).json({
+      error: "Unauthorized: No access token"
+    });
   }
 
   try {
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET!
+      process.env.ACCESS_SECRET!
     ) as JwtPayload;
-
-    //console.log("Decoded JWT:", decoded);
 
     req.user = decoded;
     next();
+
+    console.log("COOKIE TOKEN:", token);
+
+    //console.log("VERIFY ACCESS_SECRET:", process.env.ACCESS_SECRET);
+
   } catch (err) {
-    console.error("JWT verify failed:", err);
-    return res.status(401).json({ error: "Invalid token" });
+    console.log("❌ JWT verify error:", err);
+    return res.status(401).json({
+      error: "Invalid or expired access token"
+    });
   }
 };
+
+

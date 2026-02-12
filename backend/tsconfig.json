@@ -10,7 +10,8 @@
     "module": "nodenext",
     "target": "esnext",
     "types": ["node", "express", "jest"],
-    "typeRoots": ["./node_modules/@types", "./src"],
+
+    //"typeRoots": ["./node_modules/@types", "./src"],
     // For nodejs:
     // "lib": ["esnext"],
     // "types": ["node"],
@@ -41,5 +42,6 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-  }
+  },
+  "include": ["src"]
 }

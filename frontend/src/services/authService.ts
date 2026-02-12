@@ -54,49 +54,52 @@ export const authService = {
    * Login with Google
    */
   googleLogin: async (accessToken: string): Promise<ApiResponse<GoogleLoginResponse>> => {
-    try {
-      const response = await fetch(`${API_URL}/auth/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          access_token: accessToken
-        })
-      });
+  try {
+    const response = await fetch(`${API_URL}/auth/google`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include', 
+      body: JSON.stringify({
+        access_token: accessToken
+      })
+    });
 
-      const result: ApiResponse<GoogleLoginResponse> = await response.json();
+    const result: ApiResponse<GoogleLoginResponse> = await response.json();
 
-      if (!result.success || !result.data) {
-        throw new Error(result.message || 'Login failed');
-      }
-
-      // Save to localStorage
-      localStorage.setItem('jwtToken', result.data.token);
-      localStorage.setItem('userId', result.data.user.user_id);
-      localStorage.setItem('userEmail', result.data.user.email);
-
-      console.log('✅ Login successful:', result.data.user.email);
-
-      return result;
-
-    } catch (error) {
-      return handleApiError(error);
+    if (!result.success || !result.data) {
+      throw new Error(result.message || 'Login failed');
     }
-  },
+
+    // ไม่ต้องเก็บ token แล้ว
+    // cookie จะถูก set อัตโนมัติ
+
+    console.log('✅ Login successful:', result.data.user.email);
+
+    return result;
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
 
   /**
    * Logout - Clear all authentication data
    */
-  logout: (): void => {
+  logout: async (): Promise<void> => {
     try {
-      localStorage.removeItem('jwtToken');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('userEmail');
-      localStorage.removeItem('userName');
-      localStorage.removeItem('userAvatar');
-
-      console.log('✅ Logout successful');
+      const result = await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!result.ok) {
+        throw new Error('Logout failed');
+      }
+      
+      console.log('✅ Logout successful:',result);
     } catch (error) {
       console.error('❌ Logout error:', error);
     }

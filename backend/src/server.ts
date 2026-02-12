@@ -2,6 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import passport from "passport";
+import cookieParser from "cookie-parser";
+
 
 async function bootstrap() {
   try {
@@ -13,9 +15,11 @@ async function bootstrap() {
       origin: "http://localhost:5173",
       credentials: true
     }));
+
+    app.use(cookieParser());
     app.use(express.json());
     app.use(passport.initialize());
-
+    
     // ⬇️ import routes หลัง dotenv + passport
     const authRoutes = (await import("./routes/user.js")).default;
     const tripRoutes = (await import("./routes/trip.js")).default;
@@ -32,6 +36,9 @@ async function bootstrap() {
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
+
+    console.log("JWT_SECRET:", process.env.JWT_SECRET);
+
 
   } catch (err) {
     console.error("🔥 Backend bootstrap failed:", err);

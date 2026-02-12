@@ -147,31 +147,27 @@ export const tripAPI = {
    * GET /api/trips/all-my-trips
    */
   getMyTrips: async (): Promise<ApiResponse<MyTripsResponse>> => {
-    // ✅ Mock Mode
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockMyTrips();
-    }
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockMyTrips();
+  }
 
-    // ✅ Real API
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/trips/all-my-trips`,
+      {
+        method: "GET",
+        credentials: "include" // ✅ สำคัญมาก
       }
+    );
 
-      const response = await fetchWithTimeout(`${API_URL}/trips/all-my-trips`, {
-        headers: getAuthHeaders()
-      });
+    return await response.json();
 
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
 
   /**
    * POST /api/trips/join
