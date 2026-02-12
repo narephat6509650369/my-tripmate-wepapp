@@ -389,61 +389,229 @@ export const getMockCloseTrip = (tripCode: string): ApiResponse => {
   };
 };
 
-/*
-* GET /api/votes/:tripcode/get-budget
-*/
-/*
-* GET /api/votes/:tripcode/get-budget
-*/
-export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
+/**
+ * GET /api/votes/:tripid/get-budget
+ */
+export const getMockGetBudgetVoting = (tripId: string): ApiResponse => {
+  // Simulate logged-in user
+  const currentUserId = 'user-002'; // คุณคือ user-002
+
   return {
     success: true,
-    code: 'OK',
-    message: 'Budget voting retrieved successfully',
+    code: 'BUDGET_VOTING_LOADED',
+    message: 'Budget voting data loaded',
     data: {
-      trip_id: tripCode,
-
-      // ✅ สำคัญ: budget_options พร้อม all_votes (หลายคน)
-      budget_options: [
-        {
-          category_name: 'ที่พัก',
-          estimated_amount: 5000, 
-          all_votes: [
-            { user_id: 'user-001', estimated_amount: 4000 }, // คนที่ 1
-            { user_id: 'user-002', estimated_amount: 5000 }, // คุณ
-            { user_id: 'user-003', estimated_amount: 7000 }, // คนที่ 3
-            { user_id: 'user-004', estimated_amount: 50000 }, // คนที่ 4
-          ]
+      // ✅ 1. งบของ User ปัจจุบัน (rows)
+      rows: [
+        { 
+          user_id: 'user-002',
+          category_name: 'accommodation',
+          estimated_amount: 5000,
+          voted_at: new Date(Date.now() - 3600000).toISOString()
         },
-        {
-          category_name: 'เดินทาง',
+        { 
+          user_id: 'user-002',
+          category_name: 'transport',
           estimated_amount: 3000,
-          all_votes: [
-            { user_id: 'user-001', estimated_amount: 2500 },
-            { user_id: 'user-002', estimated_amount: 3000 },
-            { user_id: 'user-003', estimated_amount: 4000 },
-            { user_id: 'user-004', estimated_amount: 3200 },
-          ]
+          voted_at: new Date(Date.now() - 3600000).toISOString()
         },
-        {
-          category_name: 'อาหาร',
+        { 
+          user_id: 'user-002',
+          category_name: 'food',
           estimated_amount: 2000,
-          all_votes: [
-            { user_id: 'user-001', estimated_amount: 1800 },
-            { user_id: 'user-002', estimated_amount: 2000 },
-            { user_id: 'user-003', estimated_amount: 3000 },
-            { user_id: 'user-004', estimated_amount: 2300 },
-          ]
+          voted_at: new Date(Date.now() - 3600000).toISOString()
+        },
+        { 
+          user_id: 'user-002',
+          category_name: 'other',
+          estimated_amount: 1000,
+          voted_at: new Date(Date.now() - 3600000).toISOString()
+        }
+      ],
+
+      // ✅ 2. สถิติจากทุกคน (stats)
+      stats: {
+        accommodation: {
+          q1: 4000,      // Q1 (25th percentile)
+          q2: 5000,      // Q2 (Median) = avg
+          q3: 7000,      // Q3 (75th percentile)
+          iqr: 3000,
+          lowerBound: 0,
+          upperBound: 11500,
+          filteredCount: 3,   // จำนวนข้อมูลที่ใช้คำนวณ
+          removedCount: 1,    // จำนวน outliers ที่ตัดทิ้ง
+          removedValues: [50000] // ค่า outliers
+        },
+        transport: {
+          q1: 2500,
+          q2: 3250,   // Median
+          q3: 4000,
+          iqr: 1500,
+          lowerBound: 0,
+          upperBound: 6250,
+          filteredCount: 4,
+          removedCount: 0,
+          removedValues: []
+        },
+        food: {
+          q1: 1800,
+          q2: 2250,   // Median
+          q3: 3000,
+          iqr: 1200,
+          lowerBound: 0,
+          upperBound: 4800,
+          filteredCount: 4,
+          removedCount: 0,
+          removedValues: []
+        },
+        other: {
+          q1: 500,
+          q2: 1250,   // Median
+          q3: 2000,
+          iqr: 1500,
+          lowerBound: 0,
+          upperBound: 4250,
+          filteredCount: 4,
+          removedCount: 0,
+          removedValues: []
+        }
+      },
+
+      // ✅ 3. ข้อมูลสรุป
+      budgetTotal: 11750,    // รวม Q2 ทุก category
+      minTotal: 8800,        // รวม Q1 ทุก category
+      maxTotal: 16000,       // รวม Q3 ทุก category
+      filledMembers: 4,      // จำนวนคนที่กรอบ
+
+      // ✅ 4. ประวัติการเสนอทั้งหมด (rowlog)
+      rowlog: [
+        {
+          proposed_by: 'user-001',
+          proposed_by_name: 'Alice',
+          proposed_at: new Date(Date.now() - 7200000).toISOString(),
+          category_name: 'accommodation',
+          estimated_amount: 4000,
+          priority: 1
         },
         {
-          category_name: 'อื่นๆ',
+          proposed_by: 'user-002',
+          proposed_by_name: 'Bob (คุณ)',
+          proposed_at: new Date(Date.now() - 3600000).toISOString(),
+          category_name: 'accommodation',
+          estimated_amount: 5000,
+          priority: 1
+        },
+        {
+          proposed_by: 'user-003',
+          proposed_by_name: 'Charlie',
+          proposed_at: new Date(Date.now() - 1800000).toISOString(),
+          category_name: 'accommodation',
+          estimated_amount: 7000,
+          priority: 1
+        },
+        {
+          proposed_by: 'user-004',
+          proposed_by_name: 'David',
+          proposed_at: new Date(Date.now() - 900000).toISOString(),
+          category_name: 'accommodation',
+          estimated_amount: 50000, // outlier
+          priority: 1
+        },
+        {
+          proposed_by: 'user-001',
+          proposed_by_name: 'Alice',
+          proposed_at: new Date(Date.now() - 7000000).toISOString(),
+          category_name: 'transport',
+          estimated_amount: 2500,
+          priority: 2
+        },
+        {
+          proposed_by: 'user-002',
+          proposed_by_name: 'Bob (คุณ)',
+          proposed_at: new Date(Date.now() - 3600000).toISOString(),
+          category_name: 'transport',
+          estimated_amount: 3000,
+          priority: 2
+        },
+        {
+          proposed_by: 'user-003',
+          proposed_by_name: 'Charlie',
+          proposed_at: new Date(Date.now() - 1800000).toISOString(),
+          category_name: 'transport',
+          estimated_amount: 4000,
+          priority: 2
+        },
+        {
+          proposed_by: 'user-004',
+          proposed_by_name: 'David',
+          proposed_at: new Date(Date.now() - 900000).toISOString(),
+          category_name: 'transport',
+          estimated_amount: 3500,
+          priority: 2
+        },
+        {
+          proposed_by: 'user-001',
+          proposed_by_name: 'Alice',
+          proposed_at: new Date(Date.now() - 6000000).toISOString(),
+          category_name: 'food',
+          estimated_amount: 1800,
+          priority: 3
+        },
+        {
+          proposed_by: 'user-002',
+          proposed_by_name: 'Bob (คุณ)',
+          proposed_at: new Date(Date.now() - 3600000).toISOString(),
+          category_name: 'food',
+          estimated_amount: 2000,
+          priority: 3
+        },
+        {
+          proposed_by: 'user-003',
+          proposed_by_name: 'Charlie',
+          proposed_at: new Date(Date.now() - 1800000).toISOString(),
+          category_name: 'food',
+          estimated_amount: 3000,
+          priority: 3
+        },
+        {
+          proposed_by: 'user-004',
+          proposed_by_name: 'David',
+          proposed_at: new Date(Date.now() - 900000).toISOString(),
+          category_name: 'food',
+          estimated_amount: 2500,
+          priority: 3
+        },
+        {
+          proposed_by: 'user-001',
+          proposed_by_name: 'Alice',
+          proposed_at: new Date(Date.now() - 5000000).toISOString(),
+          category_name: 'other',
+          estimated_amount: 500,
+          priority: 4
+        },
+        {
+          proposed_by: 'user-002',
+          proposed_by_name: 'Bob (คุณ)',
+          proposed_at: new Date(Date.now() - 3600000).toISOString(),
+          category_name: 'other',
           estimated_amount: 1000,
-          all_votes: [
-            { user_id: 'user-001', estimated_amount: 500 },
-            { user_id: 'user-002', estimated_amount: 1000 },
-            { user_id: 'user-003', estimated_amount: 2000 },
-            { user_id: 'user-004', estimated_amount: 1200 },
-          ]
+          priority: 4
+        },
+        {
+          proposed_by: 'user-003',
+          proposed_by_name: 'Charlie',
+          proposed_at: new Date(Date.now() - 1800000).toISOString(),
+          category_name: 'other',
+          estimated_amount: 2000,
+          priority: 4
+        },
+        {
+          proposed_by: 'user-004',
+          proposed_by_name: 'David',
+          proposed_at: new Date(Date.now() - 900000).toISOString(),
+          category_name: 'other',
+          estimated_amount: 1500,
+          priority: 4
         }
       ]
     }

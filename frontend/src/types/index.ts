@@ -275,6 +275,48 @@ export interface Budget {
   other: number;
 }
 
+export interface BudgetVotingResponse {
+  success: boolean;
+  code: string;
+  message: string;
+  data: {
+    rows: Array<{
+      user_id: string;
+      category_name: BudgetCategory;
+      estimated_amount: number;
+      voted_at: string;
+    }>;
+
+    stats: {
+      [K in BudgetCategory]: {
+        q1: number;
+        q2: number;
+        q3: number;
+        iqr: number;
+        lowerBound: number;
+        upperBound: number;
+        filteredCount: number;
+        removedCount: number;
+        removedValues: number[];
+      };
+    };
+
+    budgetTotal: number;
+    minTotal: number;
+    maxTotal: number;
+    filledMembers: number;
+
+    rowlog: Array<{
+      proposed_by: string;
+      proposed_by_name: string;
+      proposed_at: string;
+      category_name: BudgetCategory;
+      estimated_amount: number;
+      priority?: number;
+    }>;
+  };
+}
+
 export interface UpdateBudgetPayload {
   category: BudgetCategory;
   amount: number;
@@ -283,49 +325,6 @@ export interface UpdateBudgetPayload {
 export interface UpdateBudgetResponse {
   old_amount: number;
   new_amount: number;
-}
-
-export interface BudgetLog {
-  log_id: string;
-  user_id: string;
-  category_name: string;
-  old_amount: number;
-  new_amount: number;
-  created_at: string;
-  full_name: string;
-  avatar_url: string | null;
-}
-
-export interface BudgetVotingResponse {
-  success: boolean;
-  code: string;
-  message: string;
-  data: {
-    trip_id: string;
-    budget_voting: {
-      budget_voting_id: string;
-      total_budget: number;
-      status: 'active' | 'closed';
-      closed_at: string | null;
-    } | null;
-    budget_options: {
-      category_name: BudgetCategory;
-      estimated_amount: number;
-      priority: number;
-      is_backup: boolean;
-    }[];
-    user_budgets: {
-      category_name: BudgetCategory;
-      proposed_amount: number;
-    }[];
-  };
-} 
-
-export interface UserBudgetOption {
-      category_name: Budget;
-      estimated_amount: number;
-      user_id: string;
-      last_updated: string;
 }
 
 // ============================================================================
