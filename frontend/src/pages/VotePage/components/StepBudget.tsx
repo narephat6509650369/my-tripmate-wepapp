@@ -3,22 +3,9 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Loader2 } from 'lucide-react';
 import { voteAPI } from '../../../services/tripService';
 import { formatCurrency } from '../../../utils';
-// Type imports
-import type { 
-  TripDetail, 
-  BudgetCategory,
-  Budget,  
-  BudgetVote,
-  BudgetCategoryData,
-  BudgetItem,
-  BudgetProposalLog,
-  BudgetVotingDetailResponse,
-  BudgetStats,
-  BudgetStatsMap,
-  BudgetCategoryItem, 
-} from '../../../types';
+import type { TripDetail, BudgetCategory } from '../../../types';
+import { CONFIG } from '../../../config/app.config'; 
 
-<<<<<<< HEAD
 // ============== API RESPONSE TYPES ==============
 
 interface BudgetVote {
@@ -81,26 +68,37 @@ interface BudgetStatsMap {
   other: BudgetStats;
 }
 
-=======
-// Value imports (constants)
-import { 
-  CATEGORY_MAPPING,   
-  BUDGET_CATEGORIES,   
-  BUDGET_LIMITS   
-} from '../../../types';
+// ============== COMPONENT TYPES ==============
 
-// ============== TYPES ==============
->>>>>>> 28d51299 (Implement location algorithm)
 interface StepBudgetProps {
   trip: TripDetail;
-  onSave: (category: keyof Budget, amount: number) => Promise<void>;
+  onSave: (category: string, amount: number) => Promise<void>;
   onManualNext?: () => void;
 }
+
+interface BudgetState {
+  accommodation: number;
+  transport: number;
+  food: number;
+  other: number;
+}
+
+// ============== CONSTANTS ==============
+const BUDGET_CATEGORIES = [
+  { key: 'accommodation' as const, label: 'ค่าที่พัก*', color: '#3b82f6', required: true },
+  { key: 'transport' as const, label: 'ค่าเดินทาง*', color: '#8b5cf6', required: true },
+  { key: 'food' as const, label: 'ค่าอาหาร*', color: '#10b981', required: true },
+  { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b', required: false }
+] as const;
+
+// ✅ Validation Constants
+const MAX_BUDGET = 10_000_000; // 10 ล้านบาท
+const MIN_BUDGET = 0;
 
 // ============== COMPONENT ==============
 export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNext }) => {
   // ============== STATE ==============
-  const [budget, setBudget] = useState<Budget>({
+  const [budget, setBudget] = useState<BudgetState>({
     accommodation: 0,
     transport: 0,
     food: 0,
@@ -109,7 +107,12 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true); // ✅ เพิ่ม loading state
   const [budgetStats, setBudgetStats] = useState<BudgetStatsMap | null>(null);
-  const [budgetOptions, setBudgetOptions] = useState<BudgetCategoryData[]>([]);
+  const [totalBudgetInfo, setTotalBudgetInfo] = useState<{
+    budgetTotal: number;
+    minTotal: number;
+    maxTotal: number;
+    filledMembers: number;
+  } | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,122 +129,15 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
     };
   }, []);
 
-  // ============== HELPER FUNCTIONS ==============
-
-  /**
- * Type guard สำหรับตรวจสอบว่า key เป็น valid budget category
- */
-  const isBudgetKey = (key: string): key is keyof Budget => {
-    return ['accommodation', 'transport', 'food', 'other'].includes(key);
-  };
-
-  /**
-   * ✅ ปรับปรุง: ใช้ memoization เพื่อลด re-calculation
-   */
-  const calculateQuartile = useCallback((sortedData: number[], quartile: number): number => {
-    const pos = (sortedData.length - 1) * quartile;
-    const base = Math.floor(pos);
-    const rest = pos - base;
-    
-    if (sortedData[base + 1] !== undefined) {
-      return sortedData[base] + rest * (sortedData[base + 1] - sortedData[base]);
-    }
-    return sortedData[base];
-  }, []);
-
-  /**
-   * ✅ ปรับปรุง: เพิ่ม type safety และ edge case handling
-   */
-  const filterOutliers = useCallback((data: number[]): {
-    filtered: number[];
-    original: number[];
-    removed: number[];
-    stats: {
-      q1: number;
-      q2: number;
-      q3: number;
-      iqr: number;
-      lowerBound: number;
-      upperBound: number;
-    };
-  } => {
-    // Edge case: ข้อมูลน้อยกว่า 4 จุด
-    if (data.length < 4) {
-      const sorted = [...data].sort((a, b) => a - b);
-      const mid = Math.floor(sorted.length / 2);
-
-      const q2 =
-        sorted.length % 2 === 0
-          ? (sorted[mid - 1] + sorted[mid]) / 2
-          : sorted[mid];
-
-      return {
-        filtered: sorted,
-        original: sorted,
-        removed: [],
-        stats: {
-          q1: sorted[0] || 0,
-          q2,
-          q3: sorted[sorted.length - 1] || 0,
-          iqr: 0,
-          lowerBound: sorted[0] || 0,
-          upperBound: sorted[sorted.length - 1] || 0,
-        },
-      };
-    }
-
-    const sorted = [...data].sort((a, b) => a - b);
-    
-    const q1 = calculateQuartile(sorted, 0.25);
-    const q2 = calculateQuartile(sorted, 0.5);
-    const q3 = calculateQuartile(sorted, 0.75);
-    const iqr = q3 - q1;
-    
-    const lowerBound = q1 - 1.5 * iqr;
-    const upperBound = q3 + 1.5 * iqr;
-    
-    const filtered = sorted.filter(x => x >= lowerBound && x <= upperBound);
-    const removed = sorted.filter(x => x < lowerBound || x > upperBound);
-    
-    return {
-      filtered,
-      original: sorted,
-      removed,
-      stats: { q1, q2, q3, iqr, lowerBound, upperBound }
-    };
-  }, [calculateQuartile]);
-
   // ============== COMPUTED VALUES (useMemo) ==============
-  const totalBudget = useMemo(() => 
+  const totalBudget = useMemo(() =>
     Object.values(budget).reduce((sum, val) => sum + val, 0),
     [budget]
   );
 
-  /**
-   * ✅ ปรับปรุง: ใช้ useMemo และลดการ loop ซ้ำซ้อน
-   */
   const filledBudgetMembers = useMemo(() => {
-    try {
-      // ใช้ Map เพื่อเก็บข้อมูล user ที่กรอกแล้ว
-      const userVotesMap = new Map<string, boolean>();
-      
-      budgetOptions.forEach(cat => {
-        (cat.all_votes || []).forEach(vote => {
-          if (vote?.user_id && vote.estimated_amount > 0) {
-            userVotesMap.set(vote.user_id, true);
-          }
-        });
-      });
-      
-      const voterCount = userVotesMap.size;
-      
-      // ถ้าไม่มี vote จากคนอื่น แต่มี budget > 0 = user คนเดียว
-      return voterCount === 0 && totalBudget > 0 ? 1 : voterCount;
-    } catch (error) {
-      console.error('Error counting filled members:', error);
-      return totalBudget > 0 ? 1 : 0;
-    }
-  }, [budgetOptions, totalBudget]);
+    return totalBudgetInfo?.filledMembers || 0;
+  }, [totalBudgetInfo]);
 
   /**
    * ✅ เพิ่ม validation function
@@ -251,12 +147,12 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
       return { valid: false, error: 'ตัวเลขไม่ถูกต้อง' };
     }
     
-    if (amount < BUDGET_LIMITS.MIN) {
+    if (amount < MIN_BUDGET) {
       return { valid: false, error: 'จำนวนเงินต้องมากกว่าหรือเท่ากับ 0' };
     }
-
-    if (amount > BUDGET_LIMITS.MAX) {
-      return { valid: false, error: `งบประมาณสูงสุด ฿${formatCurrency(BUDGET_LIMITS.MAX)}` };
+    
+    if (amount > MAX_BUDGET) {
+      return { valid: false, error: `งบประมาณสูงสุด ฿${formatCurrency(MAX_BUDGET)}` };
     }
     
     return { valid: true };
@@ -265,134 +161,120 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
   // ============== LOAD BUDGET DATA ==============
   useEffect(() => {
     if (!trip?.tripid) {
-      console.log("Trip ID not ready yet");
       setIsLoading(false);
       return;
     }
 
-    let isMounted = true;
-
-    console.log("Loading budget for tripId:", trip.tripid);
     setIsLoading(true);
     setError(null);
 
     voteAPI.getBudgetVoting(trip.tripid)
       .then((res) => {
-        if (!isMounted) return; // ✅ หยุดถ้า unmounted แล้ว
-        console.log('=== DEBUG BUDGET API ===');
-        console.log('Full Response:', JSON.stringify(res, null, 2));
+        console.log('✅ Budget API Response:', res);
+        console.log('📊 Stats:', res.data?.data?.stats);
+        console.log('👥 Filled Members:', res.data?.data?.filledMembers);
+        console.log('🗒️ Rowlog:', res.data?.data?.rowlog);
         
-        const apiData = res.data as BudgetVotingDetailResponse['data'];
-        
-        if (!apiData) {
-          console.log('⚠️ No data returned from API');
+        const data = res.data?.data || res.data;
+
+        if (!data) {
+          console.log('No data returned');
           return;
         }
 
-        const budgets = apiData.budgets || apiData.budget_options || [];
-        setBudgetOptions(apiData.budget_options || []);
-
-        const initialBudget: Budget = {
+        // ✅ ประกาศ loadedBudget ข้างนอก if blocks
+        let loadedBudget: BudgetState = {
           accommodation: 0,
           transport: 0,
           food: 0,
           other: 0
         };
 
-        budgets.forEach((item: BudgetItem) => {  // ⭐ เพิ่ม type annotation
-          if (!item) return;
-          
-          const categoryTH = item.category || item.category_name;
-          if (!categoryTH) return;
-          
-          const categoryEN = CATEGORY_MAPPING[categoryTH] as keyof Budget | undefined;  // ⭐ เพิ่ม type assertion
-          
-          if (categoryEN && (categoryEN in initialBudget)) {  // ⭐ เปลี่ยนเป็น type guard
-            const amount = Number(item.amount || item.estimated_amount || 0);
-            initialBudget[categoryEN] += amount;
-          }
-        });
-
-        console.log('Initial Budget:', initialBudget);
-        setBudget(initialBudget);
-
-        // คำนวณสถิติ
-        const stats: BudgetStatsMap = {
-          accommodation: { avg: 0, min: 0, max: 0, myValue: 0 },
-          transport: { avg: 0, min: 0, max: 0, myValue: 0 },
-          food: { avg: 0, min: 0, max: 0, myValue: 0 },
-          other: { avg: 0, min: 0, max: 0, myValue: 0 }
-        };
-
-        const hasAllVotes = apiData.budget_options?.some(cat => 
-          cat.all_votes && cat.all_votes.length > 0
-        );
-
-        if (hasAllVotes) {
-          (apiData.budget_options || []).forEach((category) => {
-            const categoryName = CATEGORY_MAPPING[category.category_name] as keyof BudgetStatsMap;
-            if (!categoryName || !stats[categoryName]) return;
-            
-            const votes = category.all_votes || [];
-            
-            if (votes.length > 0) {
-              const amounts = votes
-                .filter((v): v is BudgetVote => 
-                  v != null && 
-                  typeof v.estimated_amount === 'number' && 
-                  v.estimated_amount > 0
-                )
-                .map(v => v.estimated_amount);
-              
-              if (amounts.length === 0) return;
-              
-              const { filtered, removed, stats: iqrStats } = filterOutliers(amounts);
-              
-              console.log(`📊 ${categoryName}:`, {
-                original: amounts,
-                filtered: filtered,
-                removed: removed.length > 0 ? removed : 'ไม่มี outliers',
-                iqrStats
-              });
-              
-              if (filtered.length > 0) {
-                stats[categoryName].avg = Math.round(
-                  filtered.reduce((a, b) => a + b, 0) / filtered.length
-                );
-                stats[categoryName].min = Math.min(...filtered);
-                stats[categoryName].max = Math.max(...filtered);
-                stats[categoryName].median = Math.round(iqrStats.q2);
-                stats[categoryName].outliersCount = removed.length;
-              }
+        // ✅ 1. โหลดงบประมาณที่ user กรอกไว้ (จาก rowlog)
+        if (data.rows && Array.isArray(data.rows)) {
+          data.rows.forEach((vote: any) => {
+            const category = vote.category_name as keyof BudgetState;
+            if (category in loadedBudget) {
+              loadedBudget[category] = Number(vote.estimated_amount) || 0;
+              console.log(`📝 Loaded ${category}: ฿${loadedBudget[category]}`);
             }
-            
-            const myVote = votes.find(v => v.user_id === trip.current_user_id);
-            stats[categoryName].myValue = myVote?.estimated_amount ?? 0;
+          });
+
+          setBudget(loadedBudget);
+          console.log('✅ Final loadedBudget:', loadedBudget);
+        }
+
+        // ✅ 2. ใช้สถิติจาก backend โดยตรง
+        if (data.stats) {
+          console.log('📈 Processing stats...');
+          const statsMap: BudgetStatsMap = {
+            accommodation: {
+              avg: Math.round(data.stats.accommodation?.q2 || 0),
+              min: Math.round(data.stats.accommodation?.q1 || 0),
+              max: Math.round(data.stats.accommodation?.q3 || 0),
+              myValue: 0,
+              median: Math.round(data.stats.accommodation?.q2 || 0)
+            },
+            transport: {
+              avg: Math.round(data.stats.transport?.q2 || 0),
+              min: Math.round(data.stats.transport?.q1 || 0),
+              max: Math.round(data.stats.transport?.q3 || 0),
+              myValue: 0,
+              median: Math.round(data.stats.transport?.q2 || 0)
+            },
+            food: {
+              avg: Math.round(data.stats.food?.q2 || 0),
+              min: Math.round(data.stats.food?.q1 || 0),
+              max: Math.round(data.stats.food?.q3 || 0),
+              myValue: 0,
+              median: Math.round(data.stats.food?.q2 || 0)
+            },
+            other: {
+              avg: Math.round(data.stats.other?.q2 || 0),
+              min: Math.round(data.stats.other?.q1 || 0),
+              max: Math.round(data.stats.other?.q3 || 0),
+              myValue: 0,
+              median: Math.round(data.stats.other?.q2 || 0)
+            }
+          };
+
+          console.log('📊 Final StatsMap:', statsMap);
+
+          // ✅ ใช้ loadedBudget แทน budget
+          Object.keys(statsMap).forEach((key) => {
+            const categoryKey = key as keyof BudgetState;
+            statsMap[categoryKey].myValue = loadedBudget[categoryKey] || 0;
+          });
+
+          setBudgetStats(statsMap);
+        }
+
+        // ✅ 3. เก็บข้อมูลรวม
+        if (data.budgetTotal !== undefined) {
+          setTotalBudgetInfo({
+            budgetTotal: data.budgetTotal || 0,
+            minTotal: data.minTotal || 0,
+            maxTotal: data.maxTotal || 0,
+            filledMembers: data.filledMembers || 0
           });
         }
-        
-        console.log('Calculated Stats:', stats);
-        setBudgetStats(stats);
+
       })
       .catch((err) => {
         console.error('Load budget voting failed', err);
-        setError('ไม่สามารถโหลดข้อมูลงบประมาณได้ กรุณาลองใหม่อีกครั้ง');
+        setError('ไม่สามารถโหลดข้อมูลงบประมาณได้');
       })
       .finally(() => {
-        if (!isMounted) return;
         setIsLoading(false);
       });
-    return () => {  
-      isMounted = false;
-    };
-  }, [trip?.tripid, trip?.current_user_id, filterOutliers]);
+  }, [trip?.tripid]);
 
   // ============== HANDLERS ==============
   
   /**
    * ✅ ปรับปรุง: เพิ่ม validation และ error handling
    */
-  const handleSaveCategory = useCallback(async (category: keyof Budget) => {
+  const handleSaveCategory = useCallback(async (category: keyof BudgetState) => {
     const amount = budget[category];
     
     // Validate
@@ -428,7 +310,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
   /**
    * ✅ ปรับปรุง: เพิ่ม validation
    */
-  const handleBudgetChange = useCallback((key: keyof Budget, value: number) => {
+  const handleBudgetChange = useCallback((key: keyof BudgetState, value: number) => {
     const validation = validateBudget(value);
     
     if (!validation.valid) {
@@ -443,18 +325,13 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
    * ✅ ปรับปรุง: ใช้ useCallback และจัดการ timeout ให้ดีขึ้น
    */
   const handleSaveAll = useCallback(async () => {
-
-    if (isSaving) {
-      console.log('Already saving...');
-      return;
-    }
     const hasRequiredBudget = 
       budget.accommodation > 0 &&
       budget.transport > 0 &&
       budget.food > 0;
     
     if (!hasRequiredBudget) {
-      alert('กรุณากรอกและบันทึกงบประมาณที่จำเป็น (ที่พัก, เดินทาง, อาหาร)');
+      alert('กรุณากรอกงบประมาณที่จำเป็น (ที่พัก, เดินทาง, อาหาร)');
       return;
     }
 
@@ -500,7 +377,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
     } finally {
       setIsSaving(false);
     }
-  }, [budget, onSave, isSaving]); 
+  }, [budget, onSave]);
 
   // ============== ANALYSIS MODAL ==============
   const renderAnalysisModal = () => {
@@ -514,32 +391,33 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
     };
 
     const hasRealStats = (() => {
-      const uniqueVoters = new Set(
-        budgetOptions
-          .flatMap((cat) => cat.all_votes || [])
-          .filter((v): v is BudgetVote => 
-            v != null && 
-            v.user_id != null && 
-            typeof v.estimated_amount === 'number' && 
-            v.estimated_amount > 0
-          )
-          .map((v) => v.user_id)
-      );
+      const voterCount = totalBudgetInfo?.filledMembers || 0;
       
-      const voterCount = uniqueVoters.size;
+      console.log('🔍 Checking real stats...');
+      console.log('  Voter count:', voterCount);
+      console.log('  Budget stats:', budgetStats);
       
-      if (voterCount < 2) return false;
+      if (voterCount < 2) {
+        console.log('  ❌ Not enough voters');
+        return false;
+      }
       
       const hasValidVariation = Object.values(budgetStats).some(s => {
-        if (s.avg === 0 && s.min === 0 && s.max === 0) return false;
-        
-        if (voterCount === 2) {
-          return s.min !== s.max;
+        if (s.avg === 0 && s.min === 0 && s.max === 0) {
+          console.log('  ❌ All zeros for a category');
+          return false;
         }
-        
-        return s.median !== undefined && s.median > 0;
+        if (voterCount === 2) {
+          const hasVariation = s.min !== s.max;
+          console.log(`  ✅ 2 voters - variation: ${hasVariation}`);
+          return hasVariation;
+        }
+        const hasMedian = s.median !== undefined && s.median > 0;
+        console.log(`  ✅ Has median: ${hasMedian}`);
+        return hasMedian;
       });
       
+      console.log('  Final result:', hasValidVariation);
       return hasValidVariation;
     })();
 
@@ -552,23 +430,15 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
           className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-y-auto animate-modal-scale-in"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}         
-          <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold mb-1">💰 ผลโหวตปัจจุบันเปรียบเทียบงบประมาณ</h3>
-                <span className="inline-block text-xs bg-white/20 px-3 py-1 rounded-full">
-                  ⚡ อัปเดตแบบเรียลไทม์
-                </span>
-              </div>
-              <button
-                onClick={() => setShowAnalysisModal(false)}
-                className="text-white hover:text-gray-200 text-2xl font-bold w-10 h-10 flex items-center justify-center transition rounded-lg hover:bg-white/10"
-                aria-label="ปิด"
-              >
-                ✕
-              </button>
-            </div>
+          {/* Header */}
+          <div className="sticky top-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 rounded-t-xl flex justify-between items-center z-10">
+            <h3 className="text-xl font-bold">💰 ผลการวิเคราะห์งบประมาณ</h3>
+            <button
+              onClick={() => setShowAnalysisModal(false)}
+              className="text-white hover:text-gray-200 text-2xl font-bold w-8 h-8 flex items-center justify-center transition"
+            >
+              ✕
+            </button>
           </div>
 
           {/* Content */}
@@ -710,10 +580,10 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
                                   const isTooClose = avgPosition !== null && Math.abs(position - avgPosition) < 15;
                                   
                                   return (
-                                    <>  
+                                    <>
                                       {/* จุดของคุณ */}
                                       <div 
-                                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group cursor-pointer"
+                                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 group cursor-pointer"
                                         style={{ left: `${position}%` }}
                                       >
                                         <div 
@@ -930,9 +800,9 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
                       <input 
                         type="number" 
                         disabled={isSaving}
-                        min={BUDGET_LIMITS.MIN}
-                        max={BUDGET_LIMITS.MAX}
-                        step={BUDGET_LIMITS.STEP}
+                        min={MIN_BUDGET}
+                        max={MAX_BUDGET}
+                        step={100}
                         value={budget[key] || ''}
                         placeholder="0"
                         className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
