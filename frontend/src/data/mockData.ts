@@ -637,11 +637,11 @@ export const getMockSubmitLocationVote = (
 
   // ✅ Validation 2: ตรวจสอบ structure
   for (const vote of payload.votes) {
-    if (!vote.location_name || typeof vote.score !== 'number') {
+    if (!vote.place || typeof vote.score !== 'number') {
       return {
         success: false,
         code: 'INVALID_VOTE_STRUCTURE',
-        message: 'แต่ละโหวตต้องมี location_name และ score'
+        message: 'แต่ละโหวตต้องมี place และ score'
       };
     }
   }
@@ -657,7 +657,7 @@ export const getMockSubmitLocationVote = (
   }
 
   // ✅ Validation 4: ห้ามซ้ำ
-  const locations = payload.votes.map(v => v.location_name);
+  const locations = payload.votes.map(v => v.place);
   if (new Set(locations).size !== 3) {
     return {
       success: false,
