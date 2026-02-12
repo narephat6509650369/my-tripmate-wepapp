@@ -242,7 +242,7 @@ const VotePage: React.FC = () => {
       if (response.success) {
         // ✅ Update local state
         setUserLocations(votes.map(v => ({
-          place: v.location_name,
+          place: v.place,
           score: v.score
         })));
 
@@ -421,6 +421,7 @@ const VotePage: React.FC = () => {
             <StepBudget 
               trip={trip}
               onSave={handleSaveBudget}
+              onManualNext={handleManualNext}
             />
           )}
 
@@ -428,6 +429,8 @@ const VotePage: React.FC = () => {
             <StepPlace 
               trip={trip}
               onVote={handleVoteLocation}
+              onManualNext={handleManualNext}
+              initialVotes={userLocations}
             />
           )}
 

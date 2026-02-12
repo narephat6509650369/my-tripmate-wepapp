@@ -5,6 +5,9 @@ import { voteAPI } from '../../../services/tripService';
 import { THAILAND_PROVINCES } from '../../../constants/provinces';
 import type { LocationVote, TripDetail } from '../../../types';
 
+// ============== CONSTANTS ==============
+const WEIGHTS = [3, 2, 1] as const;
+
 // ============== TYPES ==============
 interface StepPlaceProps {
   trip: TripDetail;
@@ -51,56 +54,46 @@ interface AnalysisResult {
   };
 }
 
-// ============== CONSTANTS ==============
-const WEIGHTS = [3, 2, 1] as const;
-
-const PROVINCE_REGIONS: Record<string, string[]> = {
-  'ภาคเหนือ': [
-    'เชียงใหม่', 'เชียงราย', 'ลำปาง', 'ลำพูน', 'แม่ฮ่องสอน',
-    'น่าน', 'พะเยา', 'แพร่', 'อุตรดิตถ์'
-  ],
-  'ภาคตะวันออกเหนือ': [
-    'นครราชสีมา', 'บุรีรัมย์', 'สุรินทร์', 'ศรีสะเกษ', 'อุบลราชธานี',
-    'ยโสธร', 'ชัยภูมิ', 'อำนาจเจริญ', 'หนองบัวลำภู', 'ขอนแก่น',
-    'อุดรธานี', 'เลย', 'หนองคาย', 'มหาสารคาม', 'ร้อยเอ็ด',
-    'กาฬสินธุ์', 'สกลนคร', 'นครพนม', 'มุกดาหาร', 'บึงกาฬ'
-  ],
-  'ภาคกลาง': [
-    'กรุงเทพมหานคร', 'นนทบุรี', 'ปทุมธานี', 'สมุทรปราการ',
-    'นครปฐม', 'สมุทรสาคร', 'สมุทรสงคราม', 'พระนครศรีอยุธยา',
-    'อ่างทอง', 'ลพบุรี', 'สิงห์บุรี', 'ชัยนาท', 'สระบุรี',
-    'ฉะเชิงเทรา', 'ปราจีนบุรี', 'นครนายก', 'สุพรรณบุรี',
-    'กาญจนบุรี', 'ราชบุรี', 'เพชรบุรี', 'ประจวบคีรีขันธ์'
-  ],
-  'ภาคตะวันออก': [
-    'ชลบุรี', 'ระยอง', 'จันทบุรี', 'ตราด', 'สระแก้ว'
-  ],
-  'ภาคใต้': [
-    'นครศรีธรรมราช', 'กระบี่', 'พังงา', 'ภูเก็ต', 'สุราษฎร์ธานี',
-    'ระนอง', 'ชุมพร', 'สงขลา', 'สตูล', 'ตรัง', 'พัทลุง',
-    'ปัตตานี', 'ยะลา', 'นราธิวาส'
-  ],
-  'ภาคตะวันตก': [
-    'ตาก', 'กำแพงเพชร', 'พิษณุโลก', 'สุโขทัย', 'พิจิตร',
-    'เพชรบูรณ์', 'นครสวรรค์', 'อุทัยธานี'
-  ]
-};
-
 // ============== HELPER FUNCTIONS ==============
-const getRegion = (province: string): string => {
-  for (const [region, provinces] of Object.entries(PROVINCE_REGIONS)) {
-    if (provinces.includes(province)) {
-      return region;
+const calculateUniqueVoters = (results: VotingResult[]): number => {
+  const votersSet = new Set<string>();
+  results.forEach(r => {
+    if (r.voters && Array.isArray(r.voters)) {
+      r.voters.forEach(v => votersSet.add(v));
     }
-  }
-  return 'ไม่ระบุภูมิภาค';
+  });
+  return votersSet.size;
 };
 
-const calculateUniqueVoters = (results: VotingResult[]): number => {
-  return results.reduce((acc, r) => {
-    r.voters.forEach(v => acc.add(v));
-    return acc;
-  }, new Set<string>()).size;
+// Simple fallback analysis - ลบทิ้งเมื่อ backend พร้อม
+const calculateSimpleAnalysis = (results: VotingResult[]): AnalysisResult | null => {
+  if (results.length === 0) return null;
+
+  // เรียงตามคะแนนรวม
+  const sorted = [...results].sort((a, b) => {
+    if (b.total_score !== a.total_score) return b.total_score - a.total_score;
+    if (b.rank_distribution.rank_1 !== a.rank_distribution.rank_1) {
+      return b.rank_distribution.rank_1 - a.rank_distribution.rank_1;
+    }
+    return b.vote_count - a.vote_count;
+  });
+
+  // Check if there's a clear winner
+  const hasWinner = sorted.length === 1 || (
+    sorted[0].total_score > sorted[1].total_score ||
+    (sorted[0].total_score === sorted[1].total_score && 
+     sorted[0].rank_distribution.rank_1 > sorted[1].rank_distribution.rank_1)
+  );
+
+  return {
+    hasWinner,
+    topProvinces: sorted.slice(0, 3).map(p => ({
+      name: p.place,
+      score: p.total_score,
+      rank1: p.rank_distribution.rank_1,
+      region: p.region || 'ไม่ระบุภูมิภาค'
+    }))
+  };
 };
 
 // ============== MAIN COMPONENT ==============
@@ -117,10 +110,13 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [votingResults, setVotingResults] = useState<VotingResult[]>([]);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
 
-  // ✅ FIX: Auto-dismiss toast after 5 seconds
+  // ============== EFFECTS ==============
+  
+  // Auto-dismiss toast after 5 seconds
   useEffect(() => {
     if (justSaved) {
       const timer = setTimeout(() => setJustSaved(false), 5000);
@@ -128,7 +124,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     }
   }, [justSaved]);
 
-  // ✅ FIX: Keyboard accessibility (ESC to close modals)
+  // Keyboard accessibility (ESC to close modals)
   useEffect(() => {
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -144,7 +140,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     return () => window.removeEventListener('keydown', handleEscapeKey);
   }, [showAnalysisModal, justSaved]);
 
-  // ✅ FIX: Load initial votes (separated from dev auto-fill)
+  // Load initial votes
   useEffect(() => {
     if (initialVotes.length > 0) {
       const sorted = [...initialVotes].sort((a, b) => b.score - a.score);
@@ -156,7 +152,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     }
   }, [initialVotes]);
 
-  // ✅ FIX: Dev auto-fill - separate effect, runs once on mount
+  // Dev auto-fill
   useEffect(() => {
     if (import.meta.env.DEV && initialVotes.length === 0) {
       const timer = setTimeout(() => {
@@ -167,7 +163,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ FIX: Load voting results with better validation
+  // Load voting results
   useEffect(() => {
     const loadVotingResults = async () => {
       if (!trip?.tripid) return;
@@ -179,27 +175,25 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
 
         const votingData = response?.data?.data;
 
-        // ✅ Better validation
+        // Validate structure
         if (!votingData.voting_results || !Array.isArray(votingData.voting_results)) {
           console.warn('Invalid voting results structure:', votingData);
           setVotingResults([]);
+          setAnalysisResult(null);
           return;
         }
 
-        // ✅ Stricter validation
+        // Validate each result
         const validResults = votingData.voting_results.filter((r: any) => {
-          // Basic type checks
           if (!r.place || typeof r.total_score !== 'number' || typeof r.vote_count !== 'number') {
             return false;
           }
           
-          // Negative values check
           if (r.total_score < 0 || r.vote_count < 0) {
             console.warn(`Invalid negative values for ${r.place}`);
             return false;
           }
           
-          // Rank distribution validation
           if (!r.rank_distribution || 
               typeof r.rank_distribution.rank_1 !== 'number' ||
               typeof r.rank_distribution.rank_2 !== 'number' ||
@@ -207,30 +201,24 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
             return false;
           }
           
-          // Consistency check
-          const rankSum = r.rank_distribution.rank_1 + 
-                          r.rank_distribution.rank_2 + 
-                          r.rank_distribution.rank_3;
-          
-          if (rankSum !== r.vote_count) {
-            console.warn(`Inconsistent data for ${r.place}: rank_sum=${rankSum}, vote_count=${r.vote_count}`);
-            // ยังคง return true เพราะอาจเป็น rounding issue
-          }
-          
           if (!Array.isArray(r.voters)) return false;
           
           return true;
         });
 
-        const results = validResults.map((r: any) => ({
-          ...r,
-          region: getRegion(r.place)
-        }));
+        setVotingResults(validResults);
+
+        // Use analysis from backend if available, otherwise calculate simple fallback
+        if (votingData.analysis) {
+          setAnalysisResult(votingData.analysis);
+        } else {
+          setAnalysisResult(calculateSimpleAnalysis(validResults));
+        }
         
-        setVotingResults(results);
       } catch (err) {
         console.error("Failed to load voting results:", err);
         setVotingResults([]);
+        setAnalysisResult(null);
         setError('ไม่สามารถโหลดผลการโหวตได้');
       } finally {
         setIsLoading(false);
@@ -239,135 +227,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
 
     loadVotingResults();
   }, [trip?.tripid]);
-
-  // ============== VOTING ANALYSIS ALGORITHM ==============
-  const analyzeVotingResults = useCallback((): AnalysisResult | null => {
-    if (votingResults.length === 0) return null;
-
-    // Calculate weighted scores for each province
-    const provinceScores = votingResults.map(result => ({
-      place: result.place,
-      region: result.region || getRegion(result.place),
-      total_score: result.total_score,
-      weightedScore:
-        (result.rank_distribution.rank_1 * 3) +
-        (result.rank_distribution.rank_2 * 2) +
-        (result.rank_distribution.rank_3 * 1),
-      rank1Count: result.rank_distribution.rank_1,
-      voteCount: result.vote_count
-    })).sort((a, b) => {
-      if (b.weightedScore !== a.weightedScore) return b.weightedScore - a.weightedScore;
-      if (b.rank1Count !== a.rank1Count) return b.rank1Count - a.rank1Count;
-      return b.total_score - a.total_score;
-    });
-
-    // Check if there's a distinct winner
-    const hasDistinctWinner = provinceScores.length === 1 || (
-      provinceScores[0].weightedScore > provinceScores[1].weightedScore ||
-      (
-        provinceScores[0].weightedScore === provinceScores[1].weightedScore &&
-        provinceScores[0].rank1Count > provinceScores[1].rank1Count
-      ) ||
-      (
-        provinceScores[0].weightedScore === provinceScores[1].weightedScore &&
-        provinceScores[0].rank1Count === provinceScores[1].rank1Count &&
-        provinceScores[0].total_score > provinceScores[1].total_score
-      )
-    );
-
-    // CASE 1: Clear provincial winner
-    if (hasDistinctWinner) {
-      return {
-        hasWinner: true,
-        topProvinces: provinceScores.slice(0, 3).map(p => ({
-          name: p.place,
-          score: p.total_score,
-          rank1: p.rank1Count,
-          region: p.region
-        }))
-      };
-    }
-
-    // CASE 2: No clear winner - analyze by region
-    const regionScores: Record<string, {
-      weightedScore: number;
-      rawScore: number;
-      provinces: Set<string>;
-      rank1Count: number;
-    }> = {};
-
-    votingResults.forEach(result => {
-      const region = result.region || getRegion(result.place);
-
-      if (!regionScores[region]) {
-        regionScores[region] = {
-          weightedScore: 0,
-          rawScore: 0,
-          provinces: new Set(),
-          rank1Count: 0
-        };
-      }
-
-      const weighted =
-        (result.rank_distribution.rank_1 * 3) +
-        (result.rank_distribution.rank_2 * 2) +
-        (result.rank_distribution.rank_3 * 1);
-
-      regionScores[region].weightedScore += weighted;
-      regionScores[region].rawScore += result.total_score;
-      regionScores[region].provinces.add(result.place);
-      regionScores[region].rank1Count += result.rank_distribution.rank_1;
-    });
-
-    const sortedRegions = Object.entries(regionScores).sort(([regionA, a], [regionB, b]) => {
-      if (b.weightedScore !== a.weightedScore) return b.weightedScore - a.weightedScore;
-      if (b.rank1Count !== a.rank1Count) return b.rank1Count - a.rank1Count;
-      if (b.rawScore !== a.rawScore) return b.rawScore - a.rawScore;
-      if (b.provinces.size !== a.provinces.size) return b.provinces.size - a.provinces.size;
-      return regionA.localeCompare(regionB, 'th');
-    });
-
-    if (sortedRegions.length === 0) return null;
-
-    const [bestRegion, data] = sortedRegions[0];
-
-    // Find top 3 provinces in winning region
-    const provincesInRegion = votingResults
-      .filter(r => (r.region || getRegion(r.place)) === bestRegion)
-      .map(r => ({
-        place: r.place,
-        weightedScore:
-          (r.rank_distribution.rank_1 * 3) +
-          (r.rank_distribution.rank_2 * 2) +
-          (r.rank_distribution.rank_3 * 1),
-        total_score: r.total_score,
-        rank1Count: r.rank_distribution.rank_1
-      }))
-      .sort((a, b) => {
-        if (b.weightedScore !== a.weightedScore) return b.weightedScore - a.weightedScore;
-        if (b.rank1Count !== a.rank1Count) return b.rank1Count - a.rank1Count;
-        return b.total_score - a.total_score;
-      })
-      .slice(0, 3);
-
-    return {
-      hasWinner: false,
-      bestRegion: {
-        region: bestRegion,
-        topProvinces: provincesInRegion.map(p => ({
-          name: p.place,
-          score: p.total_score,
-          rank1: p.rank1Count
-        })),
-        provinces: Array.from(data.provinces),
-        totalScore: data.rawScore,
-        weightedScore: data.weightedScore,
-        rank1Count: data.rank1Count,
-        diversity: data.provinces.size,
-        explanation: `${bestRegion} มีจังหวัดยอดนิยม: ${provincesInRegion.map(p => p.place).join(', ')}`
-      }
-    };
-  }, [votingResults]);
 
   // ============== HANDLERS ==============
   const handleSelect = useCallback((index: number, value: string) => {
@@ -389,8 +248,8 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
       return;
     }
 
-     const payload: LocationVote[] = myVote.map((province, index) => ({
-      location_name: province,
+    const payload: LocationVote[] = myVote.map((province, index) => ({
+      place: province,
       score: WEIGHTS[index]
     }));
 
@@ -400,23 +259,20 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     try {
       const startTime = Date.now();
       
-      // ✅ ส่ง vote
       await onVote(payload);
       
       const elapsed = Date.now() - startTime;
       
-      // ✅ ถ้า API ตอบเร็วมาก (<100ms) ให้รอเพิ่ม
-      // เพราะ backend อาจยังประมวลผลไม่เสร็จ
+      // Wait for backend to process if response was too fast
       if (elapsed < 100) {
         await new Promise(resolve => setTimeout(resolve, 200));
       } else if (elapsed < 300) {
-        // ถ้า API ตอบระหว่าง 100-300ms รอนิดหน่อย
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      // ถ้า API ตอบช้า (>300ms) ไม่ต้องรอเพิ่ม
       
       setJustSaved(true);
 
+      // Retry to get updated results
       let retries = 0;
       const maxRetries = 3;
       let hasMyVote = false;
@@ -425,19 +281,22 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         await new Promise(resolve => setTimeout(resolve, 300));
         
         const response = await voteAPI.getLocationVote(trip.tripid);
-        const newResults = response?.data?.data?.voting_results || [];
+        const votingData = response?.data?.data ?? response?.data ?? {};
+        const newResults = votingData.voting_results || [];
         
-        // เช็คว่า vote ของเราอยู่ในผลลัพธ์แล้วหรือยัง
         hasMyVote = newResults.some((r: any) => 
           myVote.some(place => r.place === place)
         );
         
         if (hasMyVote && newResults.length > 0) {
-          const results = newResults.map((r: any) => ({
-            ...r,
-            region: getRegion(r.place)
-          }));
-          setVotingResults(results);
+          setVotingResults(newResults);
+          
+          // Update analysis
+          if (votingData.analysis) {
+            setAnalysisResult(votingData.analysis);
+          } else {
+            setAnalysisResult(calculateSimpleAnalysis(newResults));
+          }
           break;
         }
         
@@ -447,7 +306,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
       console.error("Failed to submit vote:", e);
       setError('ไม่สามารถส่งคะแนนโหวตได้ กรุณาลองใหม่อีกครั้ง');
     } finally {
-      setIsSubmitting(false);  // ⭐ CRITICAL: ต้องมี!
+      setIsSubmitting(false);
     }
   };
 
@@ -455,7 +314,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   const renderAnalysisModal = () => {
     if (!showAnalysisModal) return null;
 
-    const analysis = analyzeVotingResults();
+    const analysis = analysisResult;
 
     if (!analysis) {
       return (
@@ -762,34 +621,21 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
               <p className="text-gray-600">เรียงลำดับตามความชอบ 3 อันดับ</p>
             </div>
             
-            {/* ✅ แก้ไข: ย้ายปุ่มออกมาและแก้ structure */}
+            {/* Action Buttons */}
             <div className="flex gap-2">
-            {votingResults.length > 0 && (
-              <>
-                {/* ดูผลโหวต - ปุ่มเล็กบน mobile */}
-                <button
-                  onClick={() => setShowAnalysisModal(true)}
-                  className="px-3 sm:px-4 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm font-semibold hover:bg-purple-200 transition flex items-center gap-2 min-w-[44px] justify-center"
-                  title="ดูผลการโหวต"
-                >
-                  <span>📊</span>
-                  <span className="hidden sm:inline">ดูผลโหวต</span>
-                </button>
-                
-                {/* ไปหน้าถัดไป - แสดงเฉพาะเมื่อมี callback */}
-                {onManualNext && (
+              {votingResults.length > 0 && (
+                <>
                   <button
-                    onClick={() => onManualNext()}
-                    className="px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition flex items-center gap-2 shadow-lg hover:shadow-xl min-w-[44px] justify-center"
-                    title="ไปหน้าถัดไป"
+                    onClick={() => setShowAnalysisModal(true)}
+                    className="px-3 sm:px-4 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm font-semibold hover:bg-purple-200 transition flex items-center gap-2 min-w-[44px] justify-center"
+                    title="ดูผลการโหวต"
                   >
-                    <span className="hidden sm:inline">หน้าถัดไป</span>
-                    <span>→</span>
+                    <span>📊</span>
+                    <span className="hidden sm:inline">ดูผลโหวต</span>
                   </button>
-                )}
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Borda Count Explanation */}

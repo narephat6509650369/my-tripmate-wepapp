@@ -494,8 +494,12 @@ export const BUDGET_CATEGORIES = [
 // ============================================================================
 
 export interface LocationVote {
-  location_name: string;
+  place: string; 
   score: number;
+}
+
+export interface SubmitLocationVotePayload {
+  votes: LocationVote[];
 }
 
 // Location Vote Result (สำหรับแสดงผล)
@@ -511,8 +515,8 @@ export interface LocationVoteResult {
   };
 }
 
-export interface SubmitLocationVotePayload {
-  votes: LocationVote[]; 
+export interface SubmitLocationVoteResponse {
+  [province: string]: number;  // { "เชียงใหม่": 15, "ภูเก็ต": 12 }
 }
 
 // Voting Result Item
@@ -531,12 +535,20 @@ export interface VotingResult {
 
 // Response จากการดึงผลโหวตจังหวัด
 export interface GetLocationVoteResponse {  
-  trip_id: string;
-  my_votes: Array<{
-    place: string;        // ✅ Backend ส่งกลับมาเป็น "place"
+  rows: Array<{
+    location_vote_id: string;
+    location_option_id: string;
+    user_id: string;
+    voted_at: string;
     score: number;
   }>;
-  voting_results: LocationVoteResult[];
+  rowlog: Array<{
+    proposed_by: string;
+    province_name: string;
+    score: number;
+    proposed_at: string;
+    proposed_by_name: string;
+  }>;
 }
 
 // ✅ Type Guard
@@ -544,29 +556,12 @@ export const isLocationVote = (obj: any): obj is LocationVote => {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    typeof obj.location_name === 'string' &&
+    typeof obj.place === 'string' &&
     typeof obj.score === 'number' &&
     obj.score >= 1 &&
     obj.score <= 3
   );
 };
-
-// ✅ Helper: แปลง place → location_name
-export const placeToLocationVote = (
-  place: string,
-  score: number
-): LocationVote => ({
-  location_name: place,
-  score
-});
-
-// ✅ Helper: แปลง location_name → place
-export const locationVoteToPlace = (
-  vote: LocationVote
-): { place: string; score: number } => ({
-  place: vote.location_name,
-  score: vote.score
-});
 
 export interface LocationScores {
   [province: string]: number;
