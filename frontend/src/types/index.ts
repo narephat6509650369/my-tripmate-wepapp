@@ -174,6 +174,7 @@ export interface BudgetVoting {
 export interface LocationResult {
   province_name: string;
   vote_count: number;
+  voter_count?: number;
 }
 
 export interface DateOption {
@@ -190,12 +191,27 @@ export interface TripSummaryResult {
     status: string;
     confirmed_at: string | null;
     created_at: string;
+    owner_id: string;        // ← เพิ่มนี้
   };
   members: TripSummaryMember[];
   budgetVoting: BudgetVoting | null;
   budgetOptions: BudgetOption[];
-  locationResult: LocationResult | null;
+  locationResult: LocationResult[] | LocationResult | null;  // ← เปลี่ยนเป็น array ได้
   dateOptions: DateOption[];
+
+  // ← เพิ่ม 2 fields นี้
+  dateResult?: {
+    weighted: Record<string, number>;
+    fullMatches: string[][];
+    tripDuration: number;
+  };
+
+  budgetResult?: {
+    accommodation: { min: number; max: number; mean: number; median: number };
+    transport:     { min: number; max: number; mean: number; median: number };
+    food:          { min: number; max: number; mean: number; median: number };
+    other:         { min: number; max: number; mean: number; median: number };
+  };
 }
 
 // ============================================================================
