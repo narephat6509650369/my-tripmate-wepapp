@@ -29,6 +29,10 @@ export const MOCK_TRIPS: Trip[] = [
     invite_code: 'A3K7-P9M2-X5Q8-R4W6',
     invite_link: 'http://localhost:3000/join/trip-001',
     status: 'voting',
+<<<<<<< HEAD
+=======
+    membercount: 3,
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
     is_active: true
   },
@@ -40,6 +44,10 @@ export const MOCK_TRIPS: Trip[] = [
     num_days: 4,
     invite_code: 'B5H9-L2N4-Y7T3-W8K1',
     invite_link: 'http://localhost:3000/join/trip-002',
+<<<<<<< HEAD
+=======
+    membercount: 3,
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     status: 'completed',
     created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
     confirmed_at: new Date(Date.now() - 3 * 86400000).toISOString(),
@@ -54,6 +62,10 @@ export const MOCK_TRIPS: Trip[] = [
     invite_code: 'C8M3-Q6P9-Z2R5-V4D7',
     invite_link: 'http://localhost:3000/join/trip-003',
     status: 'planning',
+<<<<<<< HEAD
+=======
+    membercount: 3,
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
     is_active: true
   }
@@ -390,6 +402,56 @@ export const getMockCloseTrip = (tripCode: string): ApiResponse => {
   };
 };
 
+<<<<<<< HEAD
+=======
+/**
+ * GET /api/votes/:tripId/date-matching-result
+ */
+export const getMockDateMatchingResult = (tripId: string): ApiResponse<DateMatchingResponse> => {
+  return {
+    success: true,
+    code: 'DATE_MATCHING_RESULT',
+    message: 'Matching result loaded',
+    data: {
+      rows: ['2025-01-20', '2025-01-21', '2025-01-22'],
+      countrows: 3,
+      summary: {
+        totalMembers: 4,
+        totalAvailableDays: 10
+      },
+      availability: [
+        { date: '2025-01-20', count: 4, percentage: 100 },
+        { date: '2025-01-21', count: 4, percentage: 100 },
+        { date: '2025-01-22', count: 3, percentage: 75 },
+        { date: '2025-01-23', count: 2, percentage: 50 },
+        { date: '2025-01-24', count: 3, percentage: 75 }
+      ],
+      recommendation: {
+        dates: ['2025-01-20', '2025-01-21', '2025-01-22'],
+        avgPeople: 3.7,
+        percentage: 93,
+        score: 895,
+        isConsecutive: true
+      },
+      rowlog: [
+        {
+          available_date: '2025-01-20',
+          proposed_at: new Date().toISOString(),
+          proposed_by: 'user-001',
+          proposed_by_name: 'สมชาย ใจดี'
+        },
+        {
+          available_date: '2025-01-21',
+          proposed_at: new Date().toISOString(),
+          proposed_by: 'user-002',
+          proposed_by_name: 'สมหญิง รักดี'
+        }
+      ]
+    }
+  };
+};
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 /*
 * GET /api/votes/:tripcode/get-budget
 */
@@ -481,5 +543,10 @@ export default {
   getMockUpdateBudget,
   getMockSubmitLocationVote,
   getMockCloseTrip,
+<<<<<<< HEAD
   getMockGetBudgetVoting
+=======
+  getMockGetBudgetVoting,
+  getMockDateMatchingResult
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 };  

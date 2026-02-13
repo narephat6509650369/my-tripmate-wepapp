@@ -53,13 +53,20 @@ export interface AuthResponse {
   };
 }
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 // ============================================================================
 // TRIP TYPES (ตรงกับ Backend Model)
 // ============================================================================
 
 export interface Trip {
+<<<<<<< HEAD
+=======
+  membercount: number;
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   trip_id: string;
   owner_id: string;
   trip_name: string;
@@ -100,7 +107,10 @@ export interface MyTripsResponse {
 }
 
 export interface TripDetail {
+<<<<<<< HEAD
   duration: number;
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   tripid: string;
   ownerid: string;
   tripname: string;
@@ -111,6 +121,10 @@ export interface TripDetail {
   status: string;
   createdat: string;
   updatedat?: string;
+<<<<<<< HEAD
+=======
+  membercount: number,
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   confirmedat?: string | null;
   isactive?: boolean;
   members: Member[];
@@ -344,6 +358,35 @@ export interface LocationScores {
   [province: string]: number;
 }
 
+<<<<<<< HEAD
+=======
+export interface DateMatchingResponse {
+  rows: string[];
+  countrows: number;
+  summary: {
+    totalMembers: number;
+    totalAvailableDays: number;
+  };
+  availability: Array<{
+    date: string;
+    count: number;
+    percentage: number;
+  }>;
+  recommendation: {
+    dates: string[];
+    avgPeople: number;
+    percentage: number;
+    score: number;
+    isConsecutive: boolean;
+  } | null;
+  rowlog: Array<{
+    available_date: string;
+    proposed_at: string;
+    proposed_by: string;
+    proposed_by_name: string;
+  }>;
+}
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
 // ============================================================================
 // FRONTEND UI TYPES
@@ -444,6 +487,13 @@ export const tripSummaryToCard = (trip: TripSummary): TripCard => {
 // ============================================================================
 // วันที่ที่มีคนว่างตรงกันทั้งหมด
 export interface DateIntersectionResult {
+<<<<<<< HEAD
+=======
+  rows: boolean;
+  recommendation: null;
+  availability: never[];
+  summary: { totalMembers: number; totalAvailableDays: number; };
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   userAvailability: string[]; // วันที่ผู้ใช้คนนี้ว่าง
   intersection: string[];
   weighted: WeightedDateResult[];

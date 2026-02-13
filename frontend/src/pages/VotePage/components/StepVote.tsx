@@ -14,6 +14,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
+<<<<<<< HEAD
   const [matchingInfo, setMatchingInfo] = useState<{
   fullMatches: string[][];
   partialMatches: { days: number; ranges: string[][] }[];
@@ -26,11 +27,28 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
       score: number;
       isConsecutive: boolean;
     } | null;
+=======
+  
+   const [matchingInfo, setMatchingInfo] = useState<{
+    availability: { date: string; count: number; percentage: number }[];
+    recommendation: {
+      dates: string[];
+      avgPeople: number;
+      percentage: number;
+      score: number;
+      isConsecutive: boolean;
+    } | null;
+    summary: {
+      totalMembers: number;
+      totalAvailableDays: number;
+    };
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   } | null>(null);
 
   // State สำหรับ Smart Toast & Modal
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+<<<<<<< HEAD
 
   const tripDuration = trip.duration || 3;
 
@@ -302,6 +320,80 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
     
     // หาจำนวนคนน้อยที่สุดในช่วงนั้น (เพราะต้องว่างทุกวัน)
     const counts = dateRange.map(date => matchingInfo.weighted![date] || 0);
+=======
+  
+  // ✅ เพิ่ม loading และ error states
+  const [matchingLoading, setMatchingLoading] = useState(false);
+  const [matchingError, setMatchingError] = useState<string | null>(null);
+
+  const tripDuration = trip.numdays;
+
+  useEffect(() => {
+    if (!trip.tripid) return;
+
+    setMatchingLoading(true);
+    setMatchingError(null);
+
+    voteAPI.getDateMatchingResult(trip.tripid)
+      .then((res) => {
+        console.log("📊 Date Matching Result Response:", res);
+        
+        if (!res.success) {
+          setMatchingError(res.message || 'ไม่สามารถโหลดข้อมูลได้');
+          return;
+        }
+        
+        const data = res.data?.data;
+        
+        if (!data) {
+          console.warn('⚠️ ไม่มีข้อมูล matching - ใช้ค่า default');
+          setMatchingInfo({
+            availability: [],
+            recommendation: null,
+            summary: { totalMembers: 0, totalAvailableDays: 0 }
+          });
+          return;
+        }
+
+        // ใช้ข้อมูลจาก Backend โดยตรง
+        setMatchingInfo({
+          availability: data.availability || [],
+          recommendation: data.recommendation || null,
+          summary: data.summary || { totalMembers: 0, totalAvailableDays: 0 }
+        });
+
+        // ✅ ถ้ามีวันที่ที่ user เคยเลือกไว้ → set selectedDates
+        if (data.rows && Array.isArray(data.rows) && data.rows.length > 0) {
+          console.log("✅ พบวันที่ที่เคยเลือกไว้:", data.rows);
+          setSelectedDates(data.rows);
+        }
+
+        console.log("✅ Matching Info from Backend:", data);
+      })
+      .catch((err) => {
+        console.error("❌ Load date matching failed", err);
+        setMatchingError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+        setMatchingInfo({
+          availability: [],
+          recommendation: null,
+          summary: { totalMembers: 0, totalAvailableDays: 0 }
+        });
+      })
+      .finally(() => {
+        setMatchingLoading(false);
+      });
+  }, [trip.tripid, tripDuration]);
+
+  // ✅ เก็บไว้ - ใช้แสดงจำนวนคนว่างใน UI
+  const getAvailableCount = (dateRange: string[]): number => {
+    if (!matchingInfo?.availability) return 0;
+    
+    // หาจำนวนคนน้อยที่สุดในช่วงนั้น
+    const counts = dateRange.map(date => {
+      const found = matchingInfo.availability.find(a => a.date === date);
+      return found?.count || 0;
+    });
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     return Math.min(...counts);
   };
 
@@ -324,6 +416,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
     try {
       setLoading(true);
 
+<<<<<<< HEAD
       if (!trip.tripid) {
         alert("ไม่พบข้อมูลทริป");
         return;
@@ -331,6 +424,10 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
 
       if (!trip.ownerid) {
         alert("ไม่พบข้อมูลผู้ใช้");
+=======
+      if (!trip.tripid || !trip.ownerid) {
+        alert("ไม่พบข้อมูลทริปหรือผู้ใช้");
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
         return;
       }
 
@@ -341,11 +438,16 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
       });
 
       console.log("Selected Dates:", selectedDates);
+<<<<<<< HEAD
 
       // ✅ แสดงแค่ Smart Toast (ไม่ใช้ toast.success)
       setJustSaved(true);
 
       // เรียก onSave callback
+=======
+      setJustSaved(true);
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
       if (onSave) {
         await onSave(selectedDates);
       }
@@ -358,12 +460,21 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
     }
   };
 
+<<<<<<< HEAD
   const currentCoverage = checkCoverageStatus(selectedDates);
 
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   // ============== ANALYSIS MODAL ==============
   const renderAnalysisModal = () => {
     if (!showAnalysisModal || !matchingInfo) return null;
 
+<<<<<<< HEAD
+=======
+    // ✅ ใช้ recommendation จาก Backend
+    const { recommendation, availability, summary } = matchingInfo;
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     return (
       <div 
         className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 animate-backdrop-fade-in"
@@ -394,17 +505,28 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
                   <div 
                     className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all"
                     style={{ 
+<<<<<<< HEAD
                       width: `${trip.members ? (Object.keys(matchingInfo?.weighted || {}).length / trip.members.length * 100) : 0}%` 
+=======
+                      width: `${summary.totalMembers > 0 
+                        ? (availability.length / summary.totalMembers * 100) 
+                        : 0}%` 
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
                     }}
                   />
                 </div>
                 <span className="text-sm font-semibold text-blue-900">
+<<<<<<< HEAD
                   {Object.keys(matchingInfo?.weighted || {}).length}/{trip.members?.length || 0} คน
+=======
+                  {summary.totalAvailableDays}/{summary.totalMembers} คน
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
                 </span>
               </div>
             </div>
 
             {/* ผลการวิเคราะห์ */}
+<<<<<<< HEAD
             {matchingInfo.fullMatches.length > 0 ? (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                 <p className="text-green-800 font-semibold mb-3">
@@ -594,6 +716,99 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
                 );
               })()
             )}
+=======
+            {recommendation ? (
+              <div className={`border rounded-lg p-4 ${
+                recommendation.isConsecutive 
+                  ? 'bg-blue-50 border-blue-300' 
+                  : 'bg-orange-50 border-orange-300'
+              }`}>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className={`font-semibold mb-1 ${
+                      recommendation.isConsecutive ? 'text-blue-800' : 'text-orange-800'
+                    }`}>
+                      {recommendation.isConsecutive ? '💡' : '⚠️'} ช่วงที่แนะนำ
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      คะแนน: {recommendation.score} • 
+                      {recommendation.dates.length === tripDuration 
+                        ? ' ✓ ครบจำนวนวัน' 
+                        : ` ${recommendation.dates.length}/${tripDuration} วัน`
+                      }
+                    </p>
+                  </div>
+                  
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {recommendation.avgPeople}
+                    </p>
+                    <p className="text-xs text-gray-600">คนว่างเฉลี่ย</p>
+                  </div>
+                </div>
+                
+                {/* แสดงวันที่ */}
+                <div className="bg-white rounded-lg p-3 border border-gray-200">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {recommendation.dates.map((date, idx) => {
+                      const d = new Date(date);
+                      const availInfo = availability.find(a => a.date === date);
+                      const peopleCount = availInfo?.count || 0;
+                      
+                      return (
+                        <React.Fragment key={date}>
+                          <div className="flex flex-col items-center">
+                            <div className={`px-3 py-2 rounded-lg font-semibold text-sm ${
+                              peopleCount >= (recommendation.avgPeople || 0) 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {d.toLocaleDateString('th-TH', { 
+                                day: 'numeric', 
+                                month: 'short' 
+                              })}
+                            </div>
+                            <span className="text-xs text-gray-600 mt-1">
+                              👥 {peopleCount}
+                            </span>
+                          </div>
+                          
+                          {idx < recommendation.dates.length - 1 && (
+                            <span className="text-gray-400 text-xl">
+                              {(() => {
+                                const gap = (new Date(recommendation.dates[idx + 1]).getTime() - d.getTime()) 
+                                          / (1000 * 60 * 60 * 24) - 1;
+                                return gap > 0 ? `··· ${gap}วัน ···` : '→';
+                              })()}
+                            </span>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* สรุปข้อมูล */}
+                <div className="mt-3 space-y-1 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className={recommendation.isConsecutive ? 'text-green-600' : 'text-orange-600'}>
+                      {recommendation.isConsecutive ? '✓ วันติดกันทั้งหมด' : '⚠️ มีช่องว่างระหว่างวัน'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <span>📊 {recommendation.percentage}% ของสมาชิกว่าง</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-gray-600 text-sm">
+                  💭 ยังไม่มีข้อมูลเพียงพอสำหรับการแนะนำ
+                </p>
+              </div>
+            )}
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
             {/* คำแนะนำ */}
             <div className="mt-6 bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
               <p className="text-sm text-purple-800">
@@ -608,7 +823,10 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
               onClick={() => setShowAnalysisModal(false)}
               className="flex-1 px-4 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
             >
+<<<<<<< HEAD
               {/* ← แก้ไขวันที่ */}
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
               ปิด
             </button>
             <button
@@ -677,8 +895,27 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
   // ============== RENDER ==============
   return (
     <>
+<<<<<<< HEAD
       <div className="space-y-6">
         {/* คำอธิบาย (Collapsible) */}
+=======
+        <div className="space-y-6">
+        {/* ✅ เพิ่ม Loading State */}
+        {matchingLoading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+            <span className="text-blue-700">กำลังโหลดข้อมูล...</span>
+          </div>
+        )}
+
+        {/* ✅ เพิ่ม Error State */}
+        {matchingError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800">⚠️ {matchingError}</p>
+          </div>
+        )}
+        
+        {/* คำอธิบาย */}
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
         <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
           <button
             onClick={() => setShowInstructions(!showInstructions)}
@@ -694,7 +931,11 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             <div className="px-4 pb-4 border-t border-blue-200">
               <ul className="text-sm text-blue-800 space-y-1 mt-3">
                 <li>• คลิกเลือกวันที่คุณว่าง (เลือกได้หลายวัน)</li>
+<<<<<<< HEAD
                 <li>• ระบบจะตรวจสอบอัตโนมัติว่าครอบคลุม <strong>{tripDuration} วันติดกัน</strong>หรือไม่</li>
+=======
+                <li>• ระบบจะวิเคราะห์ช่วงวันที่เหมาะสม<strong>หลังจากบันทึก</strong></li>
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
                 <li>• หากต้องการยกเลิกคลิกวันที่เลือกแล้วอีกครั้งเพื่อยกเลิก</li>
                 <li>• ถ้าเลือกไม่ครบ {tripDuration} วันติดกัน ระบบจะเตือนเมื่อบันทึก</li>
               </ul>
@@ -708,12 +949,18 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             <button
               onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))}
               className="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg hover:scale-105 active:scale-95 min-w-[44px] min-h-[44px] text-lg"
+<<<<<<< HEAD
               aria-label="เดือนก่อนหน้า"
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
             >
               ←
             </button>
 
+<<<<<<< HEAD
             {/* คลิกเพื่อเลือกเดือน/ปี */}
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
             <div className="flex items-center gap-2">
               <select
                 value={calendarMonth.getMonth()}
@@ -746,7 +993,10 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             <button
               onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))}
               className="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg hover:scale-105 active:scale-95 min-w-[44px] min-h-[44px] text-lg"
+<<<<<<< HEAD
               aria-label="เดือนถัดไป"
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
             >
               →
             </button>
@@ -772,6 +1022,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
           </div>
         </div>
 
+<<<<<<< HEAD
         {/* สถานะการเลือกปัจจุบัน */}
         {selectedDates.length > 0 && (
           <div className={`border rounded-lg p-4 ${
@@ -810,6 +1061,19 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             </div>
           </div>
         )}
+=======
+        {selectedDates.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-bold text-lg mb-2">
+            📅 เลือกแล้ว {selectedDates.length} วัน
+          </h3>
+          
+          <div className="text-sm text-blue-800">
+            <p>ระบบจะวิเคราะห์ช่วงวันที่เหมาะสมหลังจากบันทึก</p>
+          </div>
+        </div>
+      )}
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
         {/* ปุ่มบันทึก */}
         <button
@@ -819,14 +1083,18 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             w-full px-6 py-3 font-bold rounded-xl transition shadow-lg
             ${selectedDates.length === 0 || loading
               ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+<<<<<<< HEAD
               : currentCoverage.hasFullCoverage
               ? 'bg-green-600 hover:bg-green-700 text-white'
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
               : 'bg-blue-600 hover:bg-blue-700 text-white'
             }
           `}
         >
           {loading 
             ? "กำลังบันทึก..." 
+<<<<<<< HEAD
             : `บันทึกวันที่ (${selectedDates.length} วัน${
                 currentCoverage.hasFullCoverage ? ' ✓' : ''
               })`
@@ -837,11 +1105,21 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
         {justSaved && (
           <>
             {/* Backdrop - คลิกปิด Toast */}
+=======
+            : `บันทึกวันที่ (${selectedDates.length} วัน)`
+          }
+        </button>
+
+        {/* Smart Toast */}
+        {justSaved && (
+          <>
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
             <div 
               className="fixed inset-0 bg-black bg-opacity-50 z-50 animate-backdrop-fade-in"
               onClick={() => setJustSaved(false)}
             />
             
+<<<<<<< HEAD
             {/* Toast Content - กลางหน้าจอ */}
             <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-toast-pop-up">
               <div className="bg-white rounded-xl shadow-2xl border-2 border-green-500 p-4 max-w-md">
@@ -851,6 +1129,14 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
                     onClick={() => setJustSaved(false)}
                     className="ml-auto -mt-1 -mr-1 text-gray-400 hover:text-gray-600 transition"
                     aria-label="ปิด"
+=======
+            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-toast-pop-up">
+              <div className="bg-white rounded-xl shadow-2xl border-2 border-green-500 p-4 max-w-md">
+                <div className="flex items-start gap-3">
+                  <button
+                    onClick={() => setJustSaved(false)}
+                    className="ml-auto -mt-1 -mr-1 text-gray-400 hover:text-gray-600 transition"
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -863,16 +1149,23 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
                   <div className="flex-1">
                     <p className="font-bold text-gray-800 mb-1">บันทึกวันที่สำเร็จ!</p>
                     <p className="text-sm text-gray-600 mb-3">
+<<<<<<< HEAD
                       📊 {currentCoverage.hasFullCoverage 
                         ? `ครอบคลุม ${tripDuration} วันติดกัน ✓` 
                         : `ช่วงที่ดีที่สุด: ${currentCoverage.bestCoverage} วันติดกัน`
                       }
+=======
+                      📊 บันทึกแล้ว {selectedDates.length} วัน
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
                     </p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
+<<<<<<< HEAD
                           console.log('คลิกดูผลการวิเคราะห์'); 
                           console.log('matchingInfo:', matchingInfo);
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
                           setJustSaved(false);
                           setShowAnalysisModal(true);
                         }}

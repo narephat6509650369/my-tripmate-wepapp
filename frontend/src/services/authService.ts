@@ -54,6 +54,7 @@ export const authService = {
    * Login with Google
    */
   googleLogin: async (accessToken: string): Promise<ApiResponse<GoogleLoginResponse>> => {
+<<<<<<< HEAD
     try {
       const response = await fetch(`${API_URL}/auth/google`, {
         method: 'POST',
@@ -84,10 +85,43 @@ export const authService = {
       return handleApiError(error);
     }
   },
+=======
+  try {
+    const response = await fetch(`${API_URL}/auth/google`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include', 
+      body: JSON.stringify({
+        access_token: accessToken
+      })
+    });
+
+    const result: ApiResponse<GoogleLoginResponse> = await response.json();
+
+    if (!result.success || !result.data) {
+      throw new Error(result.message || 'Login failed');
+    }
+
+    // ไม่ต้องเก็บ token แล้ว
+    // cookie จะถูก set อัตโนมัติ
+
+    console.log('✅ Login successful:', result.data.user.email);
+
+    return result;
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
   /**
    * Logout - Clear all authentication data
    */
+<<<<<<< HEAD
   logout: (): void => {
     try {
       localStorage.removeItem('jwtToken');
@@ -97,6 +131,20 @@ export const authService = {
       localStorage.removeItem('userAvatar');
 
       console.log('✅ Logout successful');
+=======
+  logout: async (): Promise<void> => {
+    try {
+      const result = await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!result.ok) {
+        throw new Error('Logout failed');
+      }
+      
+      console.log('✅ Logout successful:',result);
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     } catch (error) {
       console.error('❌ Logout error:', error);
     }

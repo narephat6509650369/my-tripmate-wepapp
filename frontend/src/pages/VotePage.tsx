@@ -1,7 +1,13 @@
 // src/pages/VotePage.tsx
+<<<<<<< HEAD
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Loader2, AlertCircle, Copy } from "lucide-react";
+=======
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Loader2, AlertCircle, Copy, Clock } from "lucide-react";
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
 // Components
 import Header from "../components/Header";
@@ -13,6 +19,7 @@ import StepSummary from './VotePage/components/StepSummary';
 // Hooks & Utils
 import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, voteAPI } from '../services/tripService';
+<<<<<<< HEAD
 import type { TripDetail, LocationVote } from '../types';
 
 // ============== TYPES ==============
@@ -26,6 +33,9 @@ interface UserInput {
   };
   locations: { place: string; score: number }[];
 }
+=======
+import type { TripDetail, DateRange, LocationVote } from '../types';
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
 // ============== MAIN COMPONENT ==============
 const VotePage: React.FC = () => {
@@ -41,6 +51,7 @@ const VotePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+<<<<<<< HEAD
   
   // ✅ FIX #1: Central State Management
   const [userInput, setUserInput] = useState<UserInput>({
@@ -54,6 +65,12 @@ const VotePage: React.FC = () => {
   
   // ✅ FIX #3: Loading state for each step
   const [stepLoading, setStepLoading] = useState(false);
+=======
+
+  const [userDates, setUserDates] = useState<string[]>([]);
+  const [userBudget, setUserBudget] = useState({ accommodation: 0, transport: 0, food: 0, other: 0 });
+  const [userLocations, setUserLocations] = useState<{ place: string; score: number }[]>([]);
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
   const displayCode = inviteCode || tripCode;
 
@@ -65,6 +82,15 @@ const VotePage: React.FC = () => {
     return diffDays >= 7;
   };
 
+<<<<<<< HEAD
+=======
+  const getUserInput = () => ({
+    dates: userDates,
+    budget: userBudget,
+    locations: userLocations
+  });
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   // ============== LOAD TRIP DATA ==============
   useEffect(() => {
     const loadTripData = async () => {
@@ -80,12 +106,16 @@ const VotePage: React.FC = () => {
         
         const response = await tripAPI.getTripDetail(tripCode);
         console.log("Trip detail response:", response);
+<<<<<<< HEAD
         
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
         if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
 
         const tripData = response.data;
+<<<<<<< HEAD
         setInviteCode(tripData.invitecode);
         setTrip(tripData);
         
@@ -128,10 +158,48 @@ const VotePage: React.FC = () => {
       } catch (error: any) {
         const status = error.response?.status;
         
+=======
+        
+        setInviteCode(tripData.invitecode);
+        setTrip(tripData);
+        try {
+          // วันที่
+          const dateRes = await voteAPI.getDateMatchingResult(tripData.tripid);
+          if (dateRes?.data?.data?.userAvailability) {
+            setUserDates(dateRes.data.data.userAvailability);
+          }
+
+          // งบ
+          const budgetRes = await voteAPI.getBudgetVoting(tripData.tripid);
+          if (budgetRes?.data?.data?.budget_options) {
+            const b = { accommodation: 0, transport: 0, food: 0, other: 0 };
+            budgetRes.data.data.budget_options.forEach((item: any) => {
+              if (item.category_name in b) {
+                b[item.category_name as keyof typeof b] = item.estimated_amount;
+              }
+            });
+            setUserBudget(b);
+          }
+
+          // จังหวัด
+          const locRes = await voteAPI.getLocationVote(tripData.tripid);
+          if (locRes?.data?.data?.my_votes) {
+            setUserLocations(locRes.data.data.my_votes);
+          }
+        } catch (e) {
+          console.error('Load user input failed:', e);
+        }
+
+        setLoading(false);
+        
+      } catch (error: any) {
+        const status = error.response?.status;
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
         if (status === 401) {
           navigate(`/login?redirect=/votepage/${tripCode}`);
           return;
         }
+<<<<<<< HEAD
         
         if (status === 403) {
           console.log("User not in trip → auto join flow");
@@ -153,6 +221,29 @@ const VotePage: React.FC = () => {
         setError(error.message || 'เกิดข้อผิดพลาด');
       } finally {
         setLoading(false);
+=======
+        if (status === 403) {
+          console.log("User not in trip → auto join flow");
+
+        try {
+          const joinRes = await tripAPI.joinTrip(tripCode);
+
+            if (joinRes.success) {
+              console.log("Auto join success → reload trip");
+              // reload trip detail
+              const detail = await tripAPI.getTripDetail(tripCode);
+              setTrip(detail?.data || null);
+              setInviteCode(detail?.data?.invitecode ?? detail?.data?.invitecode ?? "");
+              setLoading(false);
+            return;
+            }
+        } catch (e) {
+          console.error("Join failed → fallback redirect");
+          navigate(`/join/${tripCode}`);
+          return;
+        }
+        }
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
       }
     };
     
@@ -170,10 +261,29 @@ const VotePage: React.FC = () => {
     logout();
   };
 
+<<<<<<< HEAD
   // ✅ FIX #5: Save Dates with State Update
   const handleSaveDates = useCallback(async (dates: string[]) => {
     if (!trip || !user) {
       console.log('No trip/user data available');
+=======
+  // ✅ Manual Navigation (สำหรับ Smart Toast)
+  const handleManualNext = () => {
+    if (step < 5) {
+      setStep(step + 1);
+    }
+  };
+
+  // ✅ Save Dates (มี Auto-navigation)
+  const handleSaveDates = async (dates: string[]) => {
+    if (!trip) {
+      console.log('No trip data available');
+      return;
+    }
+
+    if (!user) {
+      console.log('No user data available');
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
       return;
     }
     
@@ -185,15 +295,19 @@ const VotePage: React.FC = () => {
       });
       
       if (response.success) {
+<<<<<<< HEAD
         // ✅ Update local state
         setUserInput(prev => ({ ...prev, dates }));
         setHasUnsavedChanges(false);
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
         console.log('✅ บันทึกวันที่สำเร็จ');
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
       console.error('Error saving dates:', error);
+<<<<<<< HEAD
       throw error; // Re-throw for component to handle
     }
   }, [trip, user]);
@@ -204,11 +318,25 @@ const VotePage: React.FC = () => {
     
     try {
       const response = await voteAPI.updateBudget(trip.tripid, {
+=======
+      console.error('บันทึกวันที่ไม่สำเร็จ');
+    }
+  };
+
+  // ✅ Save Budget
+  const handleSaveBudget = async (category: string, amount: number) => {
+    if (!trip) return;
+    
+    try {
+      const response = await voteAPI.updateBudget(
+        trip.tripid, {
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
         category: category as any,
         amount
       });
       
       if (response.success) {
+<<<<<<< HEAD
         // ✅ Update local state
         setUserInput(prev => ({
           ...prev,
@@ -216,21 +344,34 @@ const VotePage: React.FC = () => {
         }));
         setHasUnsavedChanges(false);
         console.log('✅ บันทึกงบประมาณสำเร็จ');
+=======
+        console.log('บันทึกงบประมาณสำเร็จ');
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
       console.error('Error saving budget:', error);
+<<<<<<< HEAD
       throw error;
     }
   }, [trip]);
 
   // ✅ FIX #7: Vote Location with State Update
   const handleVoteLocation = useCallback(async (votes: LocationVote[]) => {
+=======
+      console.error('บันทึกงบประมาณไม่สำเร็จ');
+    }
+  };
+
+  // ✅ Vote Location
+  const handleVoteLocation = async (votes: LocationVote[]) => {
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     if (!trip) return;
     
     try {
       const response = await voteAPI.submitLocationVote(trip.tripid, { votes });
+<<<<<<< HEAD
       
       if (response.success) {
         // ✅ Update local state
@@ -240,11 +381,17 @@ const VotePage: React.FC = () => {
         }));
         setHasUnsavedChanges(false);
         console.log('✅ โหวตสำเร็จ');
+=======
+      console.log("submitLocationVote", response);
+      if (response.success) {
+        console.log('โหวตสำเร็จ');
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
       console.error('Error voting location:', error);
+<<<<<<< HEAD
       throw error;
     }
   }, [trip]);
@@ -344,6 +491,26 @@ const VotePage: React.FC = () => {
   const handleInputChange = useCallback(() => {
     setHasUnsavedChanges(true);
   }, []);
+=======
+      console.error('โหวตสถานที่ไม่สำเร็จ');
+    }
+  };
+
+  const next = async () => {
+    if (step >= 5) return;
+    
+    try {
+      // Auto-save logic here if needed
+      setStep(step + 1);
+    } catch (error) {
+      console.error('Error moving to next step:', error);
+    }
+  };
+
+  const back = () => { 
+    if (step > 2) setStep(step - 1); 
+  };
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
   // ============== LOADING & ERROR STATES ==============
   if (loading) {
@@ -394,6 +561,10 @@ const VotePage: React.FC = () => {
           </button>
           
           <div className="flex items-center gap-3">
+<<<<<<< HEAD
+=======
+            {/* ปุ่มคัดลอกรหัส */}
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
             <button 
               className={`px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 transition-all font-mono text-sm sm:text-base min-w-[44px] min-h-[44px] ${
                 copied === 'code' 
@@ -407,6 +578,10 @@ const VotePage: React.FC = () => {
               <Copy className="w-4 h-4" />
             </button>
 
+<<<<<<< HEAD
+=======
+            {/* ปุ่มแชร์ลิงก์ */}
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
             <button 
               className={`px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 transition-all text-sm sm:text-base min-w-[44px] min-h-[44px] ${
                 copied === 'link' 
@@ -425,6 +600,7 @@ const VotePage: React.FC = () => {
       </div>
       
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<<<<<<< HEAD
         {/* ✅ แสดง unsaved changes warning */}
         {hasUnsavedChanges && (
           <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg animate-pulse">
@@ -441,6 +617,12 @@ const VotePage: React.FC = () => {
         {/* Progress Steps */}
         <div className="mb-8 sm:mb-12">
           <div className="relative">
+=======
+        {/* Progress Steps */}
+        <div className="mb-8 sm:mb-12">
+          <div className="relative">
+            {/* Progress Bar */}
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
             <div className="absolute top-5 sm:top-6 left-0 right-0 h-0.5 sm:h-1 bg-gray-200 rounded-full" />
             <div 
               className="absolute top-5 sm:top-6 left-0 h-0.5 sm:h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
@@ -455,6 +637,10 @@ const VotePage: React.FC = () => {
                 
                 return (
                   <div key={idx} className="flex flex-col items-center">
+<<<<<<< HEAD
+=======
+                    {/* Step Circle */}
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
                     <div className={`
                       w-10 h-10 sm:w-12 sm:h-12 
                       flex items-center justify-center 
@@ -471,6 +657,10 @@ const VotePage: React.FC = () => {
                       {isCompleted ? "✓" : stepNum}
                     </div>
                     
+<<<<<<< HEAD
+=======
+                    {/* Step Label */}
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
                     <span className={`
                       text-[10px] sm:text-xs 
                       mt-2 sm:mt-3 
@@ -491,6 +681,7 @@ const VotePage: React.FC = () => {
 
         {/* Step Content */}
         <div className="mb-8">
+<<<<<<< HEAD
           {stepLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
@@ -536,6 +727,38 @@ const VotePage: React.FC = () => {
                 />
               )}
             </>
+=======
+          {step === 2 && (
+            <StepVote 
+              trip={trip}
+              onSave={handleSaveDates}
+              onManualNext={handleManualNext}
+            />
+          )}
+
+          {step === 3 && (
+            <StepBudget 
+              trip={trip}
+              onSave={handleSaveBudget}
+            />
+          )}
+
+          {step === 4 && (
+            <StepPlace 
+              trip={trip}
+              onVote={handleVoteLocation}
+            />
+          )}
+
+          {step === 5 && (
+            <StepSummary 
+              trip={trip}
+              onNavigateToStep={setStep}
+              isOwner={trip.ownerid === user?.user_id}
+              canViewSummary={trip.ownerid === user?.user_id || isSummaryUnlocked(trip)}
+              userInput={getUserInput()} 
+            />
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
           )}
         </div>
 
@@ -543,7 +766,11 @@ const VotePage: React.FC = () => {
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <button 
             onClick={back}
+<<<<<<< HEAD
             disabled={step === 2 || stepLoading}
+=======
+            disabled={step === 2}
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
             className="bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-gray-700 font-semibold text-sm sm:text-base border-2 border-gray-200 hover:border-gray-300 transition-all shadow-sm min-h-[48px]"
           >
             <span className="hidden sm:inline">← ย้อนกลับ</span>
@@ -551,6 +778,7 @@ const VotePage: React.FC = () => {
           </button>
           <button 
             onClick={next}
+<<<<<<< HEAD
             disabled={step === stepLabels.length || stepLoading}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-white font-semibold text-sm sm:text-base transition-all shadow-lg hover:shadow-xl min-h-[48px] relative"
           >
@@ -562,6 +790,13 @@ const VotePage: React.FC = () => {
                 <span className="sm:hidden">ถัดไป →</span>
               </>
             )}
+=======
+            disabled={step === stepLabels.length}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-white font-semibold text-sm sm:text-base transition-all shadow-lg hover:shadow-xl min-h-[48px]"
+          >
+            <span className="hidden sm:inline">หน้าถัดไป →</span>
+            <span className="sm:hidden">ถัดไป →</span>
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
           </button>
         </div>
       </main>

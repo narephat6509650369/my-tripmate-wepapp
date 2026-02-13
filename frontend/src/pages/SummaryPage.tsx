@@ -60,6 +60,10 @@ const SummaryPage: React.FC = () => {
         setLoading(true);
         
         const response = await tripAPI.getTripSummary(tripCode);
+<<<<<<< HEAD
+=======
+        console.log("getTripSummary:",response)
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
         if (!response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');

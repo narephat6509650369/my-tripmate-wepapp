@@ -1,6 +1,10 @@
 // ============================================================================
 // frontend/src/services/tripService.ts
+<<<<<<< HEAD
 // ✅ รองรับทั้ง Mock Data และ API จริง
+=======
+// ✅ รองรับทั้ง Mock Data และ API จริง - จัดเรียงตาม Step
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 // ============================================================================
 
 import { CONFIG } from '../config/app.config';
@@ -39,7 +43,12 @@ import {
   getMockSubmitLocationVote,
   getMockCloseTrip,
   mockDelay,
+<<<<<<< HEAD
   getMockGetBudgetVoting
+=======
+  getMockGetBudgetVoting,
+  getMockDateMatchingResult 
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 } from '../data/mockData';
 
 // ============================================================================
@@ -111,6 +120,7 @@ const handleApiError = (error: any): ApiResponse => {
 
 export const tripAPI = {
   /**
+<<<<<<< HEAD
    * POST /api/trips/AddTrip
    */
   createTrip: async (payload: CreateTripPayload): Promise<ApiResponse<CreateTripResponse>> => {
@@ -148,11 +158,17 @@ export const tripAPI = {
    */
   getMyTrips: async (): Promise<ApiResponse<MyTripsResponse>> => {
     // ✅ Mock Mode
+=======
+   * GET /api/trips/all-my-trips
+   */
+  getMyTrips: async (): Promise<ApiResponse<MyTripsResponse>> => {
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockMyTrips();
     }
 
+<<<<<<< HEAD
     // ✅ Real API
     try {
       if (!checkAuth()) {
@@ -200,6 +216,19 @@ export const tripAPI = {
       });
 
       return await response.json();
+=======
+    try {
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/all-my-trips`,
+        {
+          method: "GET",
+          credentials: "include"
+        }
+      );
+
+      return await response.json();
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     } catch (error) {
       return handleApiError(error);
     }
@@ -209,12 +238,16 @@ export const tripAPI = {
    * GET /api/trips/:tripId
    */
   getTripDetail: async (tripId: string): Promise<ApiResponse<TripDetail>> => {
+<<<<<<< HEAD
     // ✅ Mock Mode
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockTripDetail(tripId);
     }
 
+<<<<<<< HEAD
     // ✅ Real API
     try {
       if (!checkAuth()) {
@@ -230,6 +263,19 @@ export const tripAPI = {
       });
 
       return await response.json();
+=======
+    try {
+
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/${tripId}`,
+      {
+        credentials: "include"
+      }
+      );
+
+      return await response.json();
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     } catch (error) {
       return handleApiError(error);
     }
@@ -239,13 +285,19 @@ export const tripAPI = {
    * GET /api/trips/:tripId/summary
    */
   getTripSummary: async (tripId: string): Promise<ApiResponse<TripSummaryResult>> => {
+<<<<<<< HEAD
     // ✅ Mock Mode
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockTripSummary(tripId);
     }
 
+<<<<<<< HEAD
     // ✅ Real API
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     try {
       if (!checkAuth()) {
         return {
@@ -266,6 +318,7 @@ export const tripAPI = {
   },
 
   /**
+<<<<<<< HEAD
    * DELETE /api/trips/:tripId
    */
   deleteTrip: async (tripId: string): Promise<ApiResponse> => {
@@ -288,6 +341,25 @@ export const tripAPI = {
       const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
+=======
+   * POST /api/trips/AddTrip
+   */
+  createTrip: async (payload: CreateTripPayload): Promise<ApiResponse<CreateTripResponse>> => {
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      return getMockCreateTrip(payload);
+    }
+
+    try {
+
+      const response = await fetchWithTimeout(`${API_URL}/trips/AddTrip`, {
+        method: 'POST',
+        credentials: 'include',  
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
       });
 
       return await response.json();
@@ -297,16 +369,75 @@ export const tripAPI = {
   },
 
   /**
+<<<<<<< HEAD
    * DELETE /api/trips/:tripId/members/:memberId
    */
   removeMember: async (tripId: string, memberId: string): Promise<ApiResponse> => {
     // ✅ Mock Mode
+=======
+   * POST /api/trips/join
+   */
+  joinTrip: async (inviteCode: string): Promise<ApiResponse<JoinTripResponse>> => {
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockJoinTrip(inviteCode);
+  }
+
+  try {
+    const response = await fetchWithTimeout(`${API_URL}/trips/join`, {
+      method: 'POST',
+      credentials: 'include', // 🔥 สำคัญมาก
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ invite_code: inviteCode })
+    });
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
+  },
+
+
+  /**
+   * DELETE /api/trips/:tripId
+   */
+  deleteTrip: async (tripId: string): Promise<ApiResponse> => {
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockDeleteTrip(tripId);
+  }
+
+  try {
+    const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}`, {
+      method: 'DELETE',
+      credentials: 'include', 
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
+  /**
+   * DELETE /api/trips/:tripId/members/:memberId
+   */
+  removeMember: async (tripId: string, memberId: string): Promise<ApiResponse> => {
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockRemoveMember(tripId, memberId);
     }
 
+<<<<<<< HEAD
     // ✅ Real API
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     try {
       if (!checkAuth()) {
         return {
@@ -332,6 +463,7 @@ export const tripAPI = {
 };
 
 // ============================================================================
+<<<<<<< HEAD
 // VOTE APIs
 // ============================================================================
 
@@ -339,10 +471,53 @@ export const voteAPI = {
   // ============================================================================
   // DATE AVAILABILITY & VOTING
   // ============================================================================
+=======
+// VOTE APIs - จัดเรียงตาม Step
+// ============================================================================
+
+export const voteAPI = {
+  
+  // ============================================================================
+  // STEP 1: VOTE (Date Availability & Voting)
+  // ============================================================================
+  
+  /**
+   * GET /api/votes/:tripId/date-matching-result
+   */
+  getDateMatchingResult: async (tripId: string): Promise<ApiResponse<DateMatchingResponse>> => {
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockDateMatchingResult(tripId);
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/${tripId}/date-matching-result`,
+      {
+        method: "GET",
+        credentials: "include", 
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const result = await response.json();
+
+    return result;
+
+  } catch (error) {
+    console.error("❌ getDateMatchingResult error:", error);
+    return handleApiError(error);
+  }
+},
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   /**
    * POST /api/votes/availability
    */
   submitAvailability: async (payload: SubmitAvailabilityPayload): Promise<ApiResponse> => {
+<<<<<<< HEAD
     // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
@@ -400,18 +575,52 @@ export const voteAPI = {
       return handleApiError(error);
     }
   },
+=======
+
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockSubmitAvailability(payload);
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/availability`,
+      {
+        method: "POST",
+        credentials: "include", 
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    return await response.json();
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
   /**
    * POST /api/votes/start-voting
    */
   startVoting: async (tripId: string): Promise<ApiResponse<StartVotingResponse>> => {
+<<<<<<< HEAD
     // ✅ Mock Mode
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockStartVoting(tripId);
     }
 
+<<<<<<< HEAD
     // ✅ Real API
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     try {
       if (!checkAuth()) {
         return {
@@ -433,6 +642,7 @@ export const voteAPI = {
     }
   },
 
+<<<<<<< HEAD
   /**
   * GET /:tripId/date-matching-result
   */
@@ -541,6 +751,114 @@ export const voteAPI = {
 // ============================================================================
 // LOCATION VOTING
 // ============================================================================
+=======
+  // ============================================================================
+  // STEP 2: BUDGET (Budget Voting)
+  // ============================================================================
+
+  /**
+   * GET /api/votes/:tripId/get-budget
+   */
+  getBudgetVoting: async (tripId: string): Promise<ApiResponse<BudgetVotingResponse>> => {
+
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockGetBudgetVoting(tripId);
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/${tripId}/get-budget`,
+      {
+        credentials: "include" 
+      }
+    );
+
+    return await response.json();
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
+
+  /**
+   * POST /api/votes/:tripId/budget
+   */
+  updateBudget: async (tripId: string,payload: UpdateBudgetPayload): Promise<ApiResponse<UpdateBudgetResponse>> => {
+
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockUpdateBudget(tripId, payload.category, payload.amount);
+  }
+
+  try {
+
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/${tripId}/budget`,
+      {
+        method: "POST",
+        credentials: "include", 
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    return await response.json();
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
+
+  // ============================================================================
+  // STEP 3: PLACE (Location Voting)
+  // ============================================================================
+
+  /**
+   * GET /api/votes/:tripId/get-vote-place
+   */
+  getLocationVote: async (tripId: string) => {
+  if (CONFIG.USE_MOCK_DATA) {
+    return {
+      success: true,
+      code: 'LOCATION_VOTES_FETCHED',
+      message: 'Mock location votes',
+      data: []
+    };
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/${tripId}/get-vote-place`,
+      {
+        method: "GET",
+        credentials: "include" 
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        code: data.code || "API_ERROR",
+        message: data.message || "Failed to fetch location votes"
+      };
+    }
+
+    return data;
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
+
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   /**
    * POST /api/votes/:tripid/vote-place
    */
@@ -548,13 +866,19 @@ export const voteAPI = {
     tripid: string,
     payload: SubmitLocationVotePayload
   ): Promise<ApiResponse<{ scores: LocationScores }>> => {
+<<<<<<< HEAD
     // ✅ Mock Mode
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockSubmitLocationVote(tripid, payload.votes.map(v => v.place));
     }
 
+<<<<<<< HEAD
     // ✅ Real API
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     try {
       if (!checkAuth()) {
         return {
@@ -576,6 +900,7 @@ export const voteAPI = {
     }
   },
 
+<<<<<<< HEAD
   getLocationVote: async (tripId: string) => {
     // ✅ Mock Mode
     if (CONFIG.USE_MOCK_DATA) {
@@ -613,18 +938,29 @@ export const voteAPI = {
     }
 },
   //close ต้องแก้เพิ่ม
+=======
+  // ============================================================================
+  // STEP 4: SUMMARY (Trip Close & Summary)
+  // ============================================================================
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
   /**
    * POST /api/votes/:tripCode/close
    */
   closeTrip: async (tripCode: string): Promise<ApiResponse> => {
+<<<<<<< HEAD
     // ✅ Mock Mode
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
       return getMockCloseTrip(tripCode);
     }
 
+<<<<<<< HEAD
     // ✅ Real API
+=======
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
     try {
       if (!checkAuth()) {
         return {

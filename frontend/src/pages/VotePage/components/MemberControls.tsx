@@ -18,7 +18,11 @@ export const MemberControls: React.FC<MemberControlsProps> = ({ trip }) => {
   const [isLeaving, setIsLeaving] = useState(false);
 
   // ✅ เช็คว่าเป็น Member หรือไม่ (ไม่ใช่ Owner)
+<<<<<<< HEAD
   const isMember = user?.user_id !== trip.owner_id;
+=======
+  const isMember = user?.user_id !== trip.ownerid;
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   
   if (!isMember) return null;
 
@@ -27,7 +31,11 @@ export const MemberControls: React.FC<MemberControlsProps> = ({ trip }) => {
     // Confirmation dialog
     const confirmed = window.confirm(
       `⚠️ ยืนยันการออกจากทริป\n\n` +
+<<<<<<< HEAD
       `คุณต้องการออกจากทริป "${trip.trip_name}" ใช่หรือไม่?\n\n` +
+=======
+      `คุณต้องการออกจากทริป "${trip.tripname}" ใช่หรือไม่?\n\n` +
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
       `⚠️ หากออกจากทริป:\n` +
       `• ข้อมูลโหวตของคุณจะถูกลบ\n` +
       `• คุณจะไม่สามารถเข้าถึงทริปนี้ได้อีก\n` +
@@ -46,7 +54,11 @@ export const MemberControls: React.FC<MemberControlsProps> = ({ trip }) => {
       alert(
         '⚠️ การออกจากทริป\n\n' +
         'กรุณาติดต่อเจ้าของทริปเพื่อลบคุณออกจากทริป\n\n' +
+<<<<<<< HEAD
         `รหัสทริป: ${trip.invite_code}`
+=======
+        `รหัสทริป: ${trip.invitecode}`
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
       );
       
     } catch (error) {

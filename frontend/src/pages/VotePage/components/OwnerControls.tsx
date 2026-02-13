@@ -21,7 +21,11 @@ export const OwnerControls: React.FC<OwnerControlsProps> = ({ trip }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   
   // ✅ เช็คว่าเป็น Owner หรือไม่
+<<<<<<< HEAD
   const isOwner = user?.user_id === trip.owner_id;
+=======
+  const isOwner = user?.user_id === trip.ownerid;
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
   
   if (!isOwner) return null;
 
@@ -44,7 +48,11 @@ export const OwnerControls: React.FC<OwnerControlsProps> = ({ trip }) => {
     try {
       setIsDeleting(true);
 
+<<<<<<< HEAD
       const response = await tripAPI.deleteTrip(trip.trip_id);
+=======
+      const response = await tripAPI.deleteTrip(trip.tripid);
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
       if (response.success) {
         alert("✅ ลบทริปเรียบร้อยแล้ว");
@@ -87,7 +95,11 @@ export const OwnerControls: React.FC<OwnerControlsProps> = ({ trip }) => {
     try {
       setDeletingMember(memberId);
 
+<<<<<<< HEAD
       const response = await tripAPI.removeMember(trip.trip_id, memberId);
+=======
+      const response = await tripAPI.removeMember(trip.tripid, memberId);
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
 
       if (response.success) {
         alert(`✅ ลบ "${memberName}" ออกจากทริปสำเร็จ`);
@@ -127,7 +139,11 @@ export const OwnerControls: React.FC<OwnerControlsProps> = ({ trip }) => {
           className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition"
         >
           <Users className="w-5 h-5" />
+<<<<<<< HEAD
           จัดการสมาชิก ({trip.member_count})
+=======
+          จัดการสมาชิก ({trip.membercount})
+>>>>>>> f492aee28674c43c171d6934ee550a04ec49bb25
         </button>
 
         {/* ปุ่มลบทริป */}
