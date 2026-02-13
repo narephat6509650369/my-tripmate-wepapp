@@ -469,6 +469,10 @@ export const tripSummaryToCard = (trip: TripSummary): TripCard => {
 // ============================================================================
 // วันที่ที่มีคนว่างตรงกันทั้งหมด
 export interface DateIntersectionResult {
+  rows: boolean;
+  recommendation: null;
+  availability: never[];
+  summary: { totalMembers: number; totalAvailableDays: number; };
   userAvailability: string[]; // วันที่ผู้ใช้คนนี้ว่าง
   intersection: string[];
   weighted: WeightedDateResult[];

@@ -146,19 +146,16 @@ export const tripAPI = {
     }
 
     try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
 
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}`, {
-        headers: getAuthHeaders()
-      });
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/${tripId}`,
+      {
+        credentials: "include"
+      }
+      );
 
       return await response.json();
+
     } catch (error) {
       return handleApiError(error);
     }
@@ -202,18 +199,13 @@ export const tripAPI = {
     }
 
     try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่',
-          error: { reason: 'NO_AUTH_TOKEN' }
-        };
-      }
 
       const response = await fetchWithTimeout(`${API_URL}/trips/AddTrip`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        credentials: 'include',  
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(payload)
       });
 
@@ -227,60 +219,51 @@ export const tripAPI = {
    * POST /api/trips/join
    */
   joinTrip: async (inviteCode: string): Promise<ApiResponse<JoinTripResponse>> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockJoinTrip(inviteCode);
-    }
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockJoinTrip(inviteCode);
+  }
 
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
+  try {
+    const response = await fetchWithTimeout(`${API_URL}/trips/join`, {
+      method: 'POST',
+      credentials: 'include', // 🔥 สำคัญมาก
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ invite_code: inviteCode })
+    });
 
-      const response = await fetchWithTimeout(`${API_URL}/trips/join`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ invite_code: inviteCode })
-      });
-
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
   },
+
 
   /**
    * DELETE /api/trips/:tripId
    */
   deleteTrip: async (tripId: string): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockDeleteTrip(tripId);
-    }
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockDeleteTrip(tripId);
+  }
 
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
+  try {
+    const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}`, {
+      method: 'DELETE',
+      credentials: 'include', 
+      headers: {
+        'Content-Type': 'application/json'
       }
+    });
 
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
-
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
 
   /**
    * DELETE /api/trips/:tripId/members/:memberId
@@ -329,66 +312,63 @@ export const voteAPI = {
    * GET /api/votes/:tripId/date-matching-result
    */
   getDateMatchingResult: async (tripId: string): Promise<ApiResponse<DateMatchingResponse>> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockDateMatchingResult(tripId);
-    }
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockDateMatchingResult(tripId);
+  }
 
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
-
-      const response = await fetchWithTimeout(
-        `${API_URL}/votes/${tripId}/date-matching-result`, 
-        {
-          headers: getAuthHeaders()
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/${tripId}/date-matching-result`,
+      {
+        method: "GET",
+        credentials: "include", 
+        headers: {
+          "Content-Type": "application/json"
         }
-      );
+      }
+    );
 
-      const result = await response.json();
-      console.log("📊 Date Matching Result from API:", result);
+    const result = await response.json();
 
-      return result;
-    } catch (error) {
-      console.error("❌ getDateMatchingResult error:", error);
-      return handleApiError(error);
-    }
-  },
+    return result;
+
+  } catch (error) {
+    console.error("❌ getDateMatchingResult error:", error);
+    return handleApiError(error);
+  }
+},
 
   /**
    * POST /api/votes/availability
    */
   submitAvailability: async (payload: SubmitAvailabilityPayload): Promise<ApiResponse> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockSubmitAvailability(payload);
-    }
 
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockSubmitAvailability(payload);
+  }
 
-      const response = await fetchWithTimeout(`${API_URL}/votes/availability`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/availability`,
+      {
+        method: "POST",
+        credentials: "include", 
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify(payload)
-      });
+      }
+    );
 
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
+    return await response.json();
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
 
   /**
    * POST /api/votes/start-voting
@@ -428,62 +408,59 @@ export const voteAPI = {
    * GET /api/votes/:tripId/get-budget
    */
   getBudgetVoting: async (tripId: string): Promise<ApiResponse<BudgetVotingResponse>> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockGetBudgetVoting(tripId);
-    }
 
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockGetBudgetVoting(tripId);
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/${tripId}/get-budget`,
+      {
+        credentials: "include" 
       }
+    );
 
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/get-budget`, {
-        headers: getAuthHeaders()
-      });
+    return await response.json();
 
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
 
   /**
    * POST /api/votes/:tripId/budget
    */
-  updateBudget: async (
-    tripId: string,
-    payload: UpdateBudgetPayload
-  ): Promise<ApiResponse<UpdateBudgetResponse>> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockUpdateBudget(tripId, payload.category, payload.amount);
-    }
+  updateBudget: async (tripId: string,payload: UpdateBudgetPayload): Promise<ApiResponse<UpdateBudgetResponse>> => {
 
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockUpdateBudget(tripId, payload.category, payload.amount);
+  }
 
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/budget`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
+  try {
+
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/${tripId}/budget`,
+      {
+        method: "POST",
+        credentials: "include", 
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify(payload)
-      });
+      }
+    );
 
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
+    return await response.json();
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
 
   // ============================================================================
   // STEP 3: PLACE (Location Voting)
@@ -493,40 +470,41 @@ export const voteAPI = {
    * GET /api/votes/:tripId/get-vote-place
    */
   getLocationVote: async (tripId: string) => {
-    if (CONFIG.USE_MOCK_DATA) {
+  if (CONFIG.USE_MOCK_DATA) {
+    return {
+      success: true,
+      code: 'LOCATION_VOTES_FETCHED',
+      message: 'Mock location votes',
+      data: []
+    };
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/${tripId}/get-vote-place`,
+      {
+        method: "GET",
+        credentials: "include" 
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
       return {
-        success: true,
-        code: 'LOCATION_VOTES_FETCHED',
-        message: 'Mock location votes',
-        data: []
+        success: false,
+        code: data.code || "API_ERROR",
+        message: data.message || "Failed to fetch location votes"
       };
     }
 
-    try {
-      const response = await fetchWithTimeout(
-        `${API_URL}/votes/${tripId}/get-vote-place`,
-        {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        }
-      );
+    return data;
 
-      const data = await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
 
-      if (!response.ok) {
-        return {
-          success: false,
-          code: data.code || 'API_ERROR',
-          message: data.message || 'Failed to fetch location votes'
-        };
-      }
-
-      return data;
-
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
 
   /**
    * POST /api/votes/:tripid/vote-place
