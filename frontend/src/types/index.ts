@@ -109,7 +109,7 @@ export interface TripDetail {
   status: string;
   createdat: string;
   updatedat?: string;
-  membercount: number;
+  membercount: number,
   confirmedat?: string | null;
   isactive?: boolean;
   current_user_id?: string; // ⭐ เพิ่มสำหรับ StepBudget
@@ -249,25 +249,37 @@ export interface StartVotingResponse {
   message: string;
 }
 
-export interface DateIntersectionResult {
-  userAvailability: string[];
-  intersection: string[];
-  weighted: WeightedDateResult[];
-  totalMembers: number;
-}
-
-export interface WeightedDateResult {
-  day: string;
-  freeMembers: number;
-  score: number;
-}
-
 export interface DateMatchingResponse {
-  success: boolean;
-  code: string;
-  message: string;
-  data: DateIntersectionResult;
+  rows: string[];
+  countrows: number;
+
+  summary: {
+    totalMembers: number;
+    totalAvailableDays: number;
+  };
+
+  availability: {
+    date: string;
+    count: number;
+    percentage: number;
+  }[];
+
+  recommendation: {
+    dates: string[];
+    avgPeople: number;
+    percentage: number;
+    score: number;
+    isConsecutive: boolean;
+  } | null;
+
+  rowlog: {
+    available_date: string;
+    proposed_at: string;
+    proposed_by: string;
+    proposed_by_name: string;
+  }[];
 }
+
 
 // ============================================================================
 // STEP 2: BUDGET VOTING TYPES
@@ -289,97 +301,45 @@ export interface Budget {
 }
 
 /**
- * Vote ของแต่ละคนในแต่ละ category
- * ใช้สำหรับคำนวณสถิติและแสดงผล
+ * Response จากการดึงผลโหวตงบประมาณ
  */
-export interface BudgetVote {
-  user_id: string;
-  category_name: string;
-  estimated_amount: number;
-  voted_at?: string | Date;
-}
+export type BudgetVotingResponse = {
+  rows: Array<{
+    user_id: string;
+    category_name: BudgetCategory;
+    estimated_amount: number;
+    voted_at: string;
+  }>;
 
-/**
- * Budget category พร้อมข้อมูล votes ทั้งหมด
- * Backend ต้องส่ง all_votes มาด้วยเพื่อให้ Frontend คำนวณสถิติได้
- */
-export interface BudgetCategoryData {
-  category_name: string;
-  estimated_amount: number;
-  proposed_by?: string;
-  proposed_at?: string | Date;
-  priority?: number;
-  is_backup?: boolean;
-  all_votes?: BudgetVote[]; // ⭐ สำคัญ: สำหรับคำนวณสถิติ
-}
-
-/**
- * Budget item จาก API (รูปแบบที่ Backend อาจส่งมา)
- */
-export interface BudgetItem {
-  category?: string;
-  category_name?: string;
-  amount?: number;
-  estimated_amount?: number;
-  proposed_by?: string;
-  proposed_at?: string | Date;
-  user_id?: string;
-  last_updated?: string;
-}
-
-/**
- * Log การเสนองบประมาณ (ประวัติ)
- */
-export interface BudgetProposalLog {
-  proposed_by: string;
-  proposed_at: string | Date;
-  category_name: string;
-  estimated_amount: number;
-  priority?: number;
-  proposed_by_name: string;
-}
-
-/**
- * Response จาก getBudgetVoting API
- * ⚠️ Backend ต้องส่งตามโครงสร้างนี้
- */
-export interface BudgetVotingDetailResponse {
-  success: boolean;
-  code?: string;
-  message?: string;
-  data: {
-    budgets?: BudgetItem[];
-    budget_options?: BudgetCategoryData[]; // ⭐ ต้องมี all_votes
-    rowlog?: BudgetProposalLog[];
+  stats: {
+    [K in BudgetCategory]: {
+      q1: number;
+      q2: number;
+      q3: number;
+      iqr: number;
+      lowerBound: number;
+      upperBound: number;
+      filteredCount: number;
+      removedCount: number;
+      removedValues: number[];
+    };
   };
-}
 
-/**
- * สถิติงบประมาณสำหรับแต่ละ category
- * (Frontend-only type สำหรับคำนวณและแสดงผล)
- */
-export interface BudgetStats {
-  avg: number;
-  min: number;
-  max: number;
-  myValue: number;
-  median?: number;
-  outliersCount?: number;
-}
+  budgetTotal: number;
+  minTotal: number;
+  maxTotal: number;
+  filledMembers: number;
 
-/**
- * Map ของสถิติทุก category
- */
-export interface BudgetStatsMap {
-  accommodation: BudgetStats;
-  transport: BudgetStats;
-  food: BudgetStats;
-  other: BudgetStats;
-}
+  rowlog: Array<{
+    proposed_by: string;
+    proposed_by_name: string;
+    proposed_at: string;
+    category_name: BudgetCategory;
+    estimated_amount: number;
+    priority?: number;
+  }>;
+};
 
-/**
- * Payload สำหรับ update budget
- */
 export interface UpdateBudgetPayload {
   category: BudgetCategory;
   amount: number;
@@ -393,54 +353,6 @@ export interface UpdateBudgetResponse {
   new_amount: number;
 }
 
-/**
- * Budget log (สำหรับ history)
- */
-export interface BudgetLog {
-  log_id: string;
-  user_id: string;
-  category_name: string;
-  old_amount: number;
-  new_amount: number;
-  created_at: string;
-  full_name: string;
-  avatar_url: string | null;
-}
-
-/**
- * Budget voting response (สำหรับ summary page)
- */
-export interface BudgetVotingResponse {
-  success: boolean;
-  code: string;
-  message: string;
-  data: {
-    trip_id: string;
-    budget_voting: {
-      budget_voting_id: string;
-      total_budget: number;
-      status: 'active' | 'closed';
-      closed_at: string | null;
-    } | null;
-    budget_options: {
-      category_name: BudgetCategory;
-      estimated_amount: number;
-      priority: number;
-      is_backup: boolean;
-    }[];
-    user_budgets: {
-      category_name: BudgetCategory;
-      proposed_amount: number;
-    }[];
-  };
-}
-
-export interface UserBudgetOption {
-  category_name: Budget;
-  estimated_amount: number;
-  user_id: string;
-  last_updated: string;
-}
 
 // ============================================================================
 // BUDGET CONSTANTS
@@ -534,7 +446,7 @@ export interface VotingResult {
 }
 
 // Response จากการดึงผลโหวตจังหวัด
-export interface GetLocationVoteResponse {  
+export interface GetLocationVoteResponse {
   rows: Array<{
     location_vote_id: string;
     location_option_id: string;
@@ -542,6 +454,34 @@ export interface GetLocationVoteResponse {
     voted_at: string;
     score: number;
   }>;
+
+  analysis: {
+    hasWinner: boolean;
+    winner: {
+      place: string;
+      region: string;
+      total_score: number;
+      voteCount: number;
+      rank1Count: number;
+    } | null;
+
+    topProvinces: Array<{
+      place: string;
+      region: string;
+      total_score: number;
+      voteCount: number;
+      rank1Count: number;
+    }>;
+  };
+
+  locationVotesTotal: Array<{
+    place: string;
+    region: string;
+    total_score: number;
+    voteCount: number;
+    rank1Count: number;
+  }>;
+
   rowlog: Array<{
     proposed_by: string;
     province_name: string;
@@ -550,6 +490,7 @@ export interface GetLocationVoteResponse {
     proposed_by_name: string;
   }>;
 }
+
 
 // ✅ Type Guard
 export const isLocationVote = (obj: any): obj is LocationVote => {
@@ -565,6 +506,34 @@ export const isLocationVote = (obj: any): obj is LocationVote => {
 
 export interface LocationScores {
   [province: string]: number;
+}
+
+
+export interface DateMatchingResponse {
+  rows: string[];
+  countrows: number;
+  summary: {
+    totalMembers: number;
+    totalAvailableDays: number;
+  };
+  availability: Array<{
+    date: string;
+    count: number;
+    percentage: number;
+  }>;
+  recommendation: {
+    dates: string[];
+    avgPeople: number;
+    percentage: number;
+    score: number;
+    isConsecutive: boolean;
+  } | null;
+  rowlog: Array<{
+    available_date: string;
+    proposed_at: string;
+    proposed_by: string;
+    proposed_by_name: string;
+  }>;
 }
 
 // ============================================================================
@@ -659,3 +628,4 @@ export const tripSummaryToCard = (trip: TripSummary): TripCard => {
     isCompleted
   };
 };
+

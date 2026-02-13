@@ -12,8 +12,11 @@ import type {
   JoinTripResponse,
   ApiResponse,
   HeatmapData,
+
   SubmitLocationVotePayload,
-  GetLocationVoteResponse
+  GetLocationVoteResponse,
+  //DateRange,
+  DateMatchingResponse
 } from '../types';
 
 // ============================================================================
@@ -34,8 +37,8 @@ export const MOCK_TRIPS: Trip[] = [
     invite_code: 'A3K7-P9M2-X5Q8-R4W6',
     invite_link: 'http://localhost:3000/join/trip-001',
     status: 'voting',
+    membercount: 3,
     created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
-    membercount: 5,
     is_active: true
   },
   {
@@ -46,10 +49,10 @@ export const MOCK_TRIPS: Trip[] = [
     num_days: 4,
     invite_code: 'B5H9-L2N4-Y7T3-W8K1',
     invite_link: 'http://localhost:3000/join/trip-002',
+    membercount: 3,
     status: 'completed',
     created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
     confirmed_at: new Date(Date.now() - 3 * 86400000).toISOString(),
-    membercount: 4,
     is_active: true
   },
   {
@@ -61,8 +64,8 @@ export const MOCK_TRIPS: Trip[] = [
     invite_code: 'C8M3-Q6P9-Z2R5-V4D7',
     invite_link: 'http://localhost:3000/join/trip-003',
     status: 'planning',
+    membercount: 3,
     created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
-    membercount: 6,
     is_active: true
   }
 ];
@@ -168,6 +171,7 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       invitelink: trip.invite_link,
       status: trip.status,
       createdat: trip.created_at,
+
       membercount: trip.membercount,
       current_user_id: MOCK_CURRENT_USER_ID,
       members: [
@@ -211,7 +215,7 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       dateRanges: [],
       provinceVotes: [],
       budgetOptions: [],
-      memberAvailabilitys: []
+      memberAvailabilitys: [],
     }
   };
 };
@@ -539,6 +543,7 @@ export const getMockUpdateBudget = (
 /**
  * ✅ GET /api/votes/:tripcode/get-budget (เพิ่ม budgets field)
  */
+/*
 export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
   return {
     success: true,
@@ -601,7 +606,7 @@ export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
     }
   };
 };
-
+/
 // ============================================================================
 // STEP 3: LOCATION VOTING - ✅ ใหม่ทั้งหมด
 // ============================================================================
@@ -679,58 +684,99 @@ export const getMockGetLocationVote = (
     code: 'OK',
     message: 'Location voting retrieved successfully',
     data: {
-      trip_id: tripId,
-      
-      my_votes: [
-        { place: 'เชียงใหม่', score: 3 },
-        { place: 'ภูเก็ต', score: 2 },
-        { place: 'กระบี่', score: 1 }
+      rows: [
+        {
+          location_vote_id: 'vote-001',
+          location_option_id: 'option-001',
+          user_id: 'user-001',
+          voted_at: new Date().toISOString(),
+          score: 3
+        },
+        {
+          location_vote_id: 'vote-002',
+          location_option_id: 'option-002',
+          user_id: 'user-001',
+          voted_at: new Date().toISOString(),
+          score: 2
+        },
+        {
+          location_vote_id: 'vote-003',
+          location_option_id: 'option-003',
+          user_id: 'user-001',
+          voted_at: new Date().toISOString(),
+          score: 1
+        }
       ],
-      
-      voting_results: [
+
+      analysis: {
+        hasWinner: true,
+        winner: {
+          place: 'เชียงใหม่',
+          region: 'ภาคเหนือ',
+          total_score: 15,
+          voteCount: 6,
+          rank1Count: 3
+        },
+        topProvinces: [
+          {
+            place: 'เชียงใหม่',
+            region: 'ภาคเหนือ',
+            total_score: 15,
+            voteCount: 6,
+            rank1Count: 3
+          },
+          {
+            place: 'ภูเก็ต',
+            region: 'ภาคใต้',
+            total_score: 12,
+            voteCount: 6,
+            rank1Count: 1
+          }
+        ]
+      },
+
+      locationVotesTotal: [
         {
           place: 'เชียงใหม่',
+          region: 'ภาคเหนือ',
           total_score: 15,
-          vote_count: 6,
-          voters: ['user-001', 'user-002', 'user-003', 'user-004', 'user-005', 'user-006'],
-          rank_distribution: { rank_1: 3, rank_2: 3, rank_3: 0 }
+          voteCount: 6,
+          rank1Count: 3
         },
         {
           place: 'ภูเก็ต',
+          region: 'ภาคใต้',
           total_score: 12,
-          vote_count: 6,
-          voters: ['user-001', 'user-002', 'user-003', 'user-004', 'user-005', 'user-006'],
-          rank_distribution: { rank_1: 1, rank_2: 4, rank_3: 1 }
+          voteCount: 6,
+          rank1Count: 1
         },
         {
           place: 'กระบี่',
+          region: 'ภาคใต้',
           total_score: 8,
-          vote_count: 6,
-          voters: ['user-001', 'user-003', 'user-004', 'user-005', 'user-006', 'user-007'],
-          rank_distribution: { rank_1: 0, rank_2: 2, rank_3: 4 }
-        },
+          voteCount: 6,
+          rank1Count: 0
+        }
+      ],
+
+      rowlog: [
         {
-          place: 'พังงา',
-          total_score: 6,
-          vote_count: 4,
-          voters: ['user-002', 'user-003', 'user-005', 'user-007'],
-          rank_distribution: { rank_1: 0, rank_2: 2, rank_3: 2 }
-        },
-        {
-          place: 'นครราชสีมา',
-          total_score: 5,
-          vote_count: 3,
-          voters: ['user-002', 'user-004', 'user-006'],
-          rank_distribution: { rank_1: 1, rank_2: 0, rank_3: 2 }
+          proposed_by: 'user-001',
+          province_name: 'เชียงใหม่',
+          score: 3,
+          proposed_at: new Date().toISOString(),
+          proposed_by_name: 'Mock User'
         }
       ]
     }
   };
 };
 
+
 /**
  * ✅ Regional Winner
  */
+/*
 export const getMockGetLocationVote_RegionalWinner = (
   tripId: string
 ): ApiResponse<GetLocationVoteResponse> => {
@@ -787,7 +833,7 @@ export const getMockGetLocationVote_RegionalWinner = (
     }
   };
 };
-
+*/
 /**
  * ✅ Empty
  */
@@ -799,16 +845,23 @@ export const getMockGetLocationVote_Empty = (
     code: 'OK',
     message: 'No votes yet',
     data: {
-      trip_id: tripId,
-      my_votes: [],
-      voting_results: []
+      rows: [],
+      analysis: {
+        hasWinner: false,
+        winner: null,
+        topProvinces: []
+      },
+      locationVotesTotal: [],
+      rowlog: []
     }
   };
 };
 
+
 /**
  * ✅ All Tied
  */
+/*
 export const getMockGetLocationVote_AllTied = (
   tripId: string
 ): ApiResponse<GetLocationVoteResponse> => {
@@ -865,10 +918,11 @@ export const getMockGetLocationVote_AllTied = (
     }
   };
 };
-
+*/
 /**
  * ✅ Single User
  */
+/*
 export const getMockGetLocationVote_SingleUser = (
   tripId: string
 ): ApiResponse<GetLocationVoteResponse> => {
@@ -911,7 +965,7 @@ export const getMockGetLocationVote_SingleUser = (
     }
   };
 };
-
+*/
 /**
  * POST /api/votes/:tripCode/close
  */
@@ -922,6 +976,282 @@ export const getMockCloseTrip = (tripCode: string): ApiResponse => {
     message: 'Trip voting closed successfully'
   };
 };
+
+
+/*
+ * GET /api/votes/:tripId/date-matching-result
+ */
+export const getMockDateMatchingResult = (tripId: string): ApiResponse<DateMatchingResponse> => {
+  return {
+    success: true,
+    code: 'DATE_MATCHING_RESULT',
+    message: 'Matching result loaded',
+    data: {
+      rows: ['2025-01-20', '2025-01-21', '2025-01-22'],
+      countrows: 3,
+      summary: {
+        totalMembers: 4,
+        totalAvailableDays: 10
+      },
+      availability: [
+        { date: '2025-01-20', count: 4, percentage: 100 },
+        { date: '2025-01-21', count: 4, percentage: 100 },
+        { date: '2025-01-22', count: 3, percentage: 75 },
+        { date: '2025-01-23', count: 2, percentage: 50 },
+        { date: '2025-01-24', count: 3, percentage: 75 }
+      ],
+      recommendation: {
+        dates: ['2025-01-20', '2025-01-21', '2025-01-22'],
+        avgPeople: 3.7,
+        percentage: 93,
+        score: 895,
+        isConsecutive: true
+      },
+      rowlog: [
+        {
+          available_date: '2025-01-20',
+          proposed_at: new Date().toISOString(),
+          proposed_by: 'user-001',
+          proposed_by_name: 'สมชาย ใจดี'
+        },
+        {
+          available_date: '2025-01-21',
+          proposed_at: new Date().toISOString(),
+          proposed_by: 'user-002',
+          proposed_by_name: 'สมหญิง รักดี'
+        }
+      ],
+    }
+  };
+};
+
+/*
+* GET /api/votes/:tripcode/get-budget
+*/
+export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
+
+  return {
+    success: true,
+    code: 'BUDGET_VOTING_LOADED',
+    message: 'Budget voting data loaded',
+    data: {
+      // ✅ 1. งบของ User ปัจจุบัน (rows)
+      rows: [
+        { 
+          user_id: 'user-002',
+          category_name: 'accommodation',
+          estimated_amount: 5000,
+          voted_at: new Date(Date.now() - 3600000).toISOString()
+        },
+        { 
+          user_id: 'user-002',
+          category_name: 'transport',
+          estimated_amount: 3000,
+          voted_at: new Date(Date.now() - 3600000).toISOString()
+        },
+        { 
+          user_id: 'user-002',
+          category_name: 'food',
+          estimated_amount: 2000,
+          voted_at: new Date(Date.now() - 3600000).toISOString()
+        },
+        { 
+          user_id: 'user-002',
+          category_name: 'other',
+          estimated_amount: 1000,
+          voted_at: new Date(Date.now() - 3600000).toISOString()
+        }
+      ],
+
+      // ✅ 2. สถิติจากทุกคน (stats)
+      stats: {
+        accommodation: {
+          q1: 4000,      // Q1 (25th percentile)
+          q2: 5000,      // Q2 (Median) = avg
+          q3: 7000,      // Q3 (75th percentile)
+          iqr: 3000,
+          lowerBound: 0,
+          upperBound: 11500,
+          filteredCount: 3,   // จำนวนข้อมูลที่ใช้คำนวณ
+          removedCount: 1,    // จำนวน outliers ที่ตัดทิ้ง
+          removedValues: [50000] // ค่า outliers
+        },
+        transport: {
+          q1: 2500,
+          q2: 3250,   // Median
+          q3: 4000,
+          iqr: 1500,
+          lowerBound: 0,
+          upperBound: 6250,
+          filteredCount: 4,
+          removedCount: 0,
+          removedValues: []
+        },
+        food: {
+          q1: 1800,
+          q2: 2250,   // Median
+          q3: 3000,
+          iqr: 1200,
+          lowerBound: 0,
+          upperBound: 4800,
+          filteredCount: 4,
+          removedCount: 0,
+          removedValues: []
+        },
+        other: {
+          q1: 500,
+          q2: 1250,   // Median
+          q3: 2000,
+          iqr: 1500,
+          lowerBound: 0,
+          upperBound: 4250,
+          filteredCount: 4,
+          removedCount: 0,
+          removedValues: []
+        }
+      },
+
+      // ✅ 3. ข้อมูลสรุป
+      budgetTotal: 11750,    // รวม Q2 ทุก category
+      minTotal: 8800,        // รวม Q1 ทุก category
+      maxTotal: 16000,       // รวม Q3 ทุก category
+      filledMembers: 4,      // จำนวนคนที่กรอบ
+
+      // ✅ 4. ประวัติการเสนอทั้งหมด (rowlog)
+      rowlog: [
+        {
+          proposed_by: 'user-001',
+          proposed_by_name: 'Alice',
+          proposed_at: new Date(Date.now() - 7200000).toISOString(),
+          category_name: 'accommodation',
+          estimated_amount: 4000,
+          priority: 1
+        },
+        {
+          proposed_by: 'user-002',
+          proposed_by_name: 'Bob (คุณ)',
+          proposed_at: new Date(Date.now() - 3600000).toISOString(),
+          category_name: 'accommodation',
+          estimated_amount: 5000,
+          priority: 1
+        },
+        {
+          proposed_by: 'user-003',
+          proposed_by_name: 'Charlie',
+          proposed_at: new Date(Date.now() - 1800000).toISOString(),
+          category_name: 'accommodation',
+          estimated_amount: 7000,
+          priority: 1
+        },
+        {
+          proposed_by: 'user-004',
+          proposed_by_name: 'David',
+          proposed_at: new Date(Date.now() - 900000).toISOString(),
+          category_name: 'accommodation',
+          estimated_amount: 50000, // outlier
+          priority: 1
+        },
+        {
+          proposed_by: 'user-001',
+          proposed_by_name: 'Alice',
+          proposed_at: new Date(Date.now() - 7000000).toISOString(),
+          category_name: 'transport',
+          estimated_amount: 2500,
+          priority: 2
+        },
+        {
+          proposed_by: 'user-002',
+          proposed_by_name: 'Bob (คุณ)',
+          proposed_at: new Date(Date.now() - 3600000).toISOString(),
+          category_name: 'transport',
+          estimated_amount: 3000,
+          priority: 2
+        },
+        {
+          proposed_by: 'user-003',
+          proposed_by_name: 'Charlie',
+          proposed_at: new Date(Date.now() - 1800000).toISOString(),
+          category_name: 'transport',
+          estimated_amount: 4000,
+          priority: 2
+        },
+        {
+          proposed_by: 'user-004',
+          proposed_by_name: 'David',
+          proposed_at: new Date(Date.now() - 900000).toISOString(),
+          category_name: 'transport',
+          estimated_amount: 3500,
+          priority: 2
+        },
+        {
+          proposed_by: 'user-001',
+          proposed_by_name: 'Alice',
+          proposed_at: new Date(Date.now() - 6000000).toISOString(),
+          category_name: 'food',
+          estimated_amount: 1800,
+          priority: 3
+        },
+        {
+          proposed_by: 'user-002',
+          proposed_by_name: 'Bob (คุณ)',
+          proposed_at: new Date(Date.now() - 3600000).toISOString(),
+          category_name: 'food',
+          estimated_amount: 2000,
+          priority: 3
+        },
+        {
+          proposed_by: 'user-003',
+          proposed_by_name: 'Charlie',
+          proposed_at: new Date(Date.now() - 1800000).toISOString(),
+          category_name: 'food',
+          estimated_amount: 3000,
+          priority: 3
+        },
+        {
+          proposed_by: 'user-004',
+          proposed_by_name: 'David',
+          proposed_at: new Date(Date.now() - 900000).toISOString(),
+          category_name: 'food',
+          estimated_amount: 2500,
+          priority: 3
+        },
+        {
+          proposed_by: 'user-001',
+          proposed_by_name: 'Alice',
+          proposed_at: new Date(Date.now() - 5000000).toISOString(),
+          category_name: 'other',
+          estimated_amount: 500,
+          priority: 4
+        },
+        {
+          proposed_by: 'user-002',
+          proposed_by_name: 'Bob (คุณ)',
+          proposed_at: new Date(Date.now() - 3600000).toISOString(),
+          category_name: 'other',
+          estimated_amount: 1000,
+          priority: 4
+        },
+        {
+          proposed_by: 'user-003',
+          proposed_by_name: 'Charlie',
+          proposed_at: new Date(Date.now() - 1800000).toISOString(),
+          category_name: 'other',
+          estimated_amount: 2000,
+          priority: 4
+        },
+        {
+          proposed_by: 'user-004',
+          proposed_by_name: 'David',
+          proposed_at: new Date(Date.now() - 900000).toISOString(),
+          category_name: 'other',
+          estimated_amount: 1500,
+          priority: 4
+        }
+      ]
+    }
+  };
+};
+
 
 // ============================================================================
 // EXPORTS
@@ -962,11 +1292,12 @@ export default {
   // Location Voting
   getMockSubmitLocationVote,
   getMockGetLocationVote,
-  getMockGetLocationVote_RegionalWinner,
+  //getMockGetLocationVote_RegionalWinner,
   getMockGetLocationVote_Empty,
-  getMockGetLocationVote_AllTied,
-  getMockGetLocationVote_SingleUser,
+  //getMockGetLocationVote_AllTied,
+  //getMockGetLocationVote_SingleUser,
 
   // Other
   getMockCloseTrip
 };
+
