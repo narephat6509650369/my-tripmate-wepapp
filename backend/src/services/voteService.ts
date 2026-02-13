@@ -126,48 +126,38 @@ export const startVotingSession = async (trip_id: string, user_id: string) => {
 };
 */
 export const getTripDateMatchingResult = async (tripId: string,userId: string) => {
-  //หาวันว่างสำหรับ user คนนั้น get row กัย rowlog วันว่างทั้งหมด ที่ user คนนั้นเลือกจะ return ดึงจากตาราง date_votes กับ rowlog แสดงค่าท้ังหมดการเลือกทุอย่างของ user ทุกคนใน 1 trip
-  const userAvailabilityRows = await voteModel.getTripAvailabilities(tripId, userId);
-  const availabilities = await voteModel.getAvailabilitiesByTrip(tripId);
-  const totalMembers = await voteModel.getActiveMemberCount(tripId);
-  const trip = await tripModel.findTripById(tripId);
-  const tripDuration = trip.num_days;
-  
-  if (!trip) {
-    throw new Error("Trip not found");
-  }
 
-  if (tripDuration == null) {
+  const trip = await tripModel.findTripById(tripId);
+  if (!trip) throw new Error("Trip not found");
+
+  if (trip.num_days == null) {
     throw new Error("Trip duration is missing");
   }
 
+  const tripDuration = trip.num_days;
 
+  const {rows, rowlog,countrows} = await voteModel.getTripAvailabilities(tripId, userId);
+  const availabilities = await voteModel.getAvailabilitiesByTrip(tripId);
+  const totalMembers = await voteModel.getActiveMemberCount(tripId);
 
   if (!availabilities.length || totalMembers === 0) {
     return {
-      userAvailabilityRows,
-      table: {},
-      intersection: [],
-      weighted: [],
-      bestMatch: null,
-      totalMembers
+      rows: [],
+      summary: { totalMembers, totalAvailableDays: 0 },
+      availability: {},
+      recommendation: null,
+      rowlog: []
     };
   }
 
+  // 1️ สร้างตาราง availability table วัน+user_id
 
-  //1. Build table + weight
-  type DateTable = Record<string, string[]>;
-  type DateWeight = Record<string, number>;
-
-  const table: DateTable = {};
-  const weight: DateWeight = {};
+  const table: Record<string, string[]> = {};
 
   for (const row of availabilities) {
-    if (!row.available_date) continue;
-
     const day = new Date(row.available_date)
-    .toISOString()
-    .split("T")[0]; // YYYY-MM-DD
+      .toISOString()
+      .split("T")[0];
 
     if (!day) continue;
 
@@ -175,118 +165,101 @@ export const getTripDateMatchingResult = async (tripId: string,userId: string) =
     table[day].push(row.user_id);
   }
 
+  // 2️ สร้างตาราง weigth วัน+จำนวนคนว่าง
+
+  const weight: Record<string, number> = {};
+
   for (const day in table) {
-    const users = table[day];
-    if (!users) continue;
-    weight[day] = users.length;
+    weight[day] = table[day]?.length ?? 0;
   }
 
-  // 2. Intersection (100%)
+  
+/*// 3️ หา Intersection (100%) วันที่ทุกคนว่าง 
   const intersection = Object.keys(weight)
     .filter(day => weight[day] === totalMembers)
     .sort();
+*/
+  // 4️ Weighted list แสดงวันททีี่คนว่าง + เปอร์เซ็นต์ 
 
-  
-  // 3. Weighted list (for UI)
-  //เอาจำนวนวันที่ซ้ำมาคำนวณเป็นคะแนน
-  const weighted = Object.entries(weight)
+  const rankedDays = Object.entries(weight)
     .map(([day, count]) => ({
-      day,
-      freeMembers: count,
-      score: Math.round((count / totalMembers) * 100)
+      date: day,
+      count,
+      percentage: Math.round((count / totalMembers) * 100)
     }))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.percentage - a.percentage);
 
-  // 4. Helper functions
-  //ตำนวณอะไร แล้ว return เป็น true false
+  // 5️ Helper
+
   const isConsecutive = (dates: string[]) => {
-  for (let i = 1; i < dates.length; i++) {
-    const current = dates[i];
-    const previous = dates[i - 1];
+    for (let i = 1; i < dates.length; i++) {
+      const diff =
+        (new Date(dates[i]!).getTime() -
+          new Date(dates[i - 1]!).getTime()) /
+        86400000;
 
-    if (!current || !previous) return false;
-
-    const diff =
-      (new Date(current).getTime() - new Date(previous).getTime()) /
-      86400000;
-
-    if (diff !== 1) return false;
+      if (diff !== 1) return false;
     }
     return true;
-   };
+  };
 
-  //เหมือนหน้าที่จะซ้ำกะ weight รึป้าว
+// Score Range Function คำนวณคะแนนช่วงวัน
   const scoreRange = (dates: string[]) => {
-    const totalPeople = dates.reduce((s, d) => s + (weight[d] ?? 0), 0);
+    const totalPeople = dates.reduce(
+      (sum, d) => sum + (weight[d] ?? 0),
+      0
+    );
+
     const avgPeople = totalPeople / dates.length;
+    const availabilityScore = avgPeople / totalMembers; // 0–1
 
-    const diff = Math.abs(dates.length - tripDuration);
-    const lengthScore =
-      diff === 0 ? 500 :
-      diff === 1 ? 300 :
-      Math.max(0, 100 - diff * 30);
+    const lengthDiff = Math.abs(dates.length - tripDuration);
+    const lengthScore = Math.max(0, 1 - lengthDiff * 0.3);
 
-    const consecutiveBonus = isConsecutive(dates) ? 200 : 0;
+    const consecutiveBonus = isConsecutive(dates) ? 0.1 : 0;
+
+    const finalScore =
+      (availabilityScore * 0.7 +
+        lengthScore * 0.2 +
+        consecutiveBonus) *
+      100;
 
     return {
       dates,
       avgPeople: Math.round(avgPeople * 10) / 10,
-      score: Math.round(avgPeople * 100 + lengthScore + consecutiveBonus),
+      percentage: Math.round(availabilityScore * 100),
+      score: Math.round(finalScore),
       isConsecutive: isConsecutive(dates)
     };
   };
-  //หาระยะระหว่างที่ใกล้ใน กรณีที่ไม่มีbestmatch ไม่ควรreturn แค่คะแนนนะควร return date ด้วย เพื่อแสดงเป็น score ใกล้กันมากสุดโดยอิงจกวันที่ว่าง tripduration 
-  const findBestRange = async () => {
-    const days = Object.keys(weight).sort();
-  
-    if (!days.length) return null;
 
-    let best: ReturnType<typeof scoreRange> | null = null;
+  // 6️ Find Best Range หาวันที่เหมาะสมที่สุด
 
-    for (
-      let size = tripDuration;
-      size >= Math.max(1, tripDuration - 2);
-      size--
-    ) {
-      for (let i = 0; i <= days.length - size; i++) {
-        const range = days.slice(i, i + size);
-        const result = scoreRange(range);
+  const days = Object.keys(weight).sort();
+  let bestMatch: ReturnType<typeof scoreRange> | null = null;
 
-        if (!best || result.score > best.score) {
-          best = result;
-        }
+  for (let size = tripDuration; size >= 1; size--) {
+    for (let i = 0; i <= days.length - size; i++) {
+      const range = days.slice(i, i + size);
+      const result = scoreRange(range);
+
+      if (!bestMatch || result.score > bestMatch.score) {
+        bestMatch = result;
       }
     }
-    return best;
-  };
-
- 
-  //5. Decision Flow
-  let bestMatch = null;
-
-  // 5.1 Perfect consecutive intersection if intersection มากกว่า 1
-  for (let i = 0; i <= intersection.length - tripDuration; i++) {
-    const range = intersection.slice(i, i + tripDuration);
-    if (isConsecutive(range)) {
-      bestMatch = scoreRange(range);
-      console.log("best match:",bestMatch)
-      break;
-    }
-  }
-
-  // 5.2 Fallback เก็บตกอันนี้มาเพื่อถ้าไม่ intersect กันเลยจะแสดง findBestRenge
-  if (!bestMatch) {
-    bestMatch =await findBestRange();
   }
 
   return {
-    userAvailabilityRows,
-    table,
-    intersection,
-    weighted,
-    bestMatch,
-    totalMembers
-  };
+  rows, 
+  countrows,  
+  summary: {
+      totalMembers,
+      totalAvailableDays: Object.keys(table).length
+  },
+  availability: rankedDays,
+  recommendation: bestMatch, // หรือจะทำ unique voter count ก็ได้
+  rowlog
+};
 };
 
 // ===================== BUDGET VOTING =====================

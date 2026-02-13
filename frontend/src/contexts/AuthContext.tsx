@@ -111,6 +111,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // ✅ Login with Google
+  const login = async (accessToken: string, redirectPath?: string): Promise<void> => {
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${API_URL}/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include', 
+        body: JSON.stringify({
+          access_token: accessToken
+        })
+      });
+  
+      const result: ApiResponse<GoogleLoginResponse> = await response.json();
+  
+      if (!result.success || !result.data) {
+        throw new Error(result.message || 'Login failed');
+      }
+  
+      // ไม่ต้องเก็บ token แล้ว
+      // cookie จะถูก set อัตโนมัติ
+  
+      console.log('✅ Login successful:', result.data.user.email);
+      if (redirectPath) navigate(redirectPath);
+      else {
+        console.log('🔄 No redirect path, navigating to homepage');
+        navigate('/homepage');
+      }
+  
+    } catch (error) {
+      throw error;
+    }
+  }
+  /*
   const login = useCallback(async (accessToken: string, redirectPath?: string) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
@@ -170,9 +205,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       throw error;
     }
-  }, [navigate]);
+  }, [navigate]);*/
 
   // ✅ Logout
+  /*
   const logout = useCallback(() => {
     try {
       // Clear localStorage
@@ -197,7 +233,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('❌ Logout error:', error);
     }
-  }, [navigate]);
+  }, [navigate]);*/
+
+  const logout = async (): Promise<void> => {
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const result = await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!result.ok) {
+        throw new Error('Logout failed');
+      }
+      
+      console.log('✅ Logout successful:',result);
+      navigate('/');
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+    }
+  };
+
 
   // ✅ Update user data
   const updateUser = useCallback((userData: Partial<User>) => {

@@ -1,15 +1,18 @@
 import "express";
 
 export interface JwtPayload {
-    userId: string;
-    email: string;
-    // อาจมี property อื่นๆ จาก JWT payload เช่น iat, exp
+  userId: string;
+  email: string;
+  jti?: string;
 }
+
 declare global {
   namespace Express {
     interface User {
       userId: string;
-      email?: string;
+      email: string;
+      jti?: string;
     }
   }
 }
+
