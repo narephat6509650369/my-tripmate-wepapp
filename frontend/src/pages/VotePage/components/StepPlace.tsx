@@ -65,37 +65,6 @@ const calculateUniqueVoters = (results: VotingResult[]): number => {
   return votersSet.size;
 };
 
-// Simple fallback analysis - ลบทิ้งเมื่อ backend พร้อม
-const calculateSimpleAnalysis = (results: VotingResult[]): AnalysisResult | null => {
-  if (results.length === 0) return null;
-
-  // เรียงตามคะแนนรวม
-  const sorted = [...results].sort((a, b) => {
-    if (b.total_score !== a.total_score) return b.total_score - a.total_score;
-    if (b.rank_distribution.rank_1 !== a.rank_distribution.rank_1) {
-      return b.rank_distribution.rank_1 - a.rank_distribution.rank_1;
-    }
-    return b.vote_count - a.vote_count;
-  });
-
-  // Check if there's a clear winner
-  const hasWinner = sorted.length === 1 || (
-    sorted[0].total_score > sorted[1].total_score ||
-    (sorted[0].total_score === sorted[1].total_score && 
-     sorted[0].rank_distribution.rank_1 > sorted[1].rank_distribution.rank_1)
-  );
-
-  return {
-    hasWinner,
-    topProvinces: sorted.slice(0, 3).map(p => ({
-      name: p.place,
-      score: p.total_score,
-      rank1: p.rank_distribution.rank_1,
-      region: p.region || 'ไม่ระบุภูมิภาค'
-    }))
-  };
-};
-
 // ============== MAIN COMPONENT ==============
 export const StepPlace: React.FC<StepPlaceProps> = ({
   trip,
@@ -212,9 +181,14 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         if (votingData.analysis) {
           setAnalysisResult(votingData.analysis);
         } else {
-          setAnalysisResult(calculateSimpleAnalysis(validResults));
+          console.warn('⚠️ Backend did not return analysis');
+          setAnalysisResult(null);
+          
+          // ✅ set error เฉพาะเมื่อมี results แต่ไม่มี analysis
+          if (validResults.length > 0) {
+            setError('ไม่สามารถวิเคราะห์ผลโหวตได้');
+          }
         }
-        
       } catch (err) {
         console.error("Failed to load voting results:", err);
         setVotingResults([]);
@@ -295,7 +269,8 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
           if (votingData.analysis) {
             setAnalysisResult(votingData.analysis);
           } else {
-            setAnalysisResult(calculateSimpleAnalysis(newResults));
+            console.warn('⚠️ Backend did not return analysis after vote');
+            setAnalysisResult(null);
           }
           break;
         }

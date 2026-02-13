@@ -14,223 +14,97 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
-  const [matchingInfo, setMatchingInfo] = useState<{
-    fullMatches: string[][];
-    partialMatches: { days: number; ranges: string[][] }[];
-    weighted?: Record<string, number>;
-    bestAlternative?: {
+  
+   const [matchingInfo, setMatchingInfo] = useState<{
+    availability: { date: string; count: number; percentage: number }[];
+    recommendation: {
       dates: string[];
-      totalPeople: number;
       avgPeople: number;
-      totalGap: number;
+      percentage: number;
       score: number;
       isConsecutive: boolean;
     } | null;
+    summary: {
+      totalMembers: number;
+      totalAvailableDays: number;
+    };
   } | null>(null);
 
+  // State สำหรับ Smart Toast & Modal
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  
+  // ✅ เพิ่ม loading และ error states
+  const [matchingLoading, setMatchingLoading] = useState(false);
+  const [matchingError, setMatchingError] = useState<string | null>(null);
 
   const tripDuration = trip.numdays;
 
-  // ============== LOAD MATCHING DATA ==============
   useEffect(() => {
     if (!trip.tripid) return;
 
+    setMatchingLoading(true);
+    setMatchingError(null);
+
     voteAPI.getDateMatchingResult(trip.tripid)
       .then((res) => {
-        const matching = res.data?.data;
-
-        if (!matching || !matching.intersection) {
-          setMatchingInfo({ fullMatches: [], partialMatches: [], weighted: {} });
+        console.log("📊 Date Matching Result Response:", res);
+        
+        if (!res.success) {
+          setMatchingError(res.message || 'ไม่สามารถโหลดข้อมูลได้');
+          return;
+        }
+        
+        const data = res.data?.data;
+        
+        if (!data) {
+          console.warn('⚠️ ไม่มีข้อมูล matching - ใช้ค่า default');
+          setMatchingInfo({
+            availability: [],
+            recommendation: null,
+            summary: { totalMembers: 0, totalAvailableDays: 0 }
+          });
           return;
         }
 
-        // ✅ เปิดใช้ logic จริง (ไม่ comment out แล้ว)
-        const matchInfo = findAllMatches(
-          matching.intersection,
-          tripDuration,
-          matching.weighted
-        );
-
+        // ใช้ข้อมูลจาก Backend โดยตรง
         setMatchingInfo({
-          ...matchInfo,
-          weighted: matching.weighted || {},
+          availability: data.availability || [],
+          recommendation: data.recommendation || null,
+          summary: data.summary || { totalMembers: 0, totalAvailableDays: 0 }
         });
+
+        // ✅ ถ้ามีวันที่ที่ user เคยเลือกไว้ → set selectedDates
+        if (data.rows && Array.isArray(data.rows) && data.rows.length > 0) {
+          console.log("✅ พบวันที่ที่เคยเลือกไว้:", data.rows);
+          setSelectedDates(data.rows);
+        }
+
+        console.log("✅ Matching Info from Backend:", data);
       })
       .catch((err) => {
-        console.error('Load date matching failed', err);
-        setMatchingInfo({ fullMatches: [], partialMatches: [], weighted: {} });
+        console.error("❌ Load date matching failed", err);
+        setMatchingError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+        setMatchingInfo({
+          availability: [],
+          recommendation: null,
+          summary: { totalMembers: 0, totalAvailableDays: 0 }
+        });
+      })
+      .finally(() => {
+        setMatchingLoading(false);
       });
   }, [trip.tripid, tripDuration]);
 
-  // ================= HELPER FUNCTIONS =================
-
-  const findConsecutiveDays = (dates: string[], targetDays: number): string[][] => {
-    if (!dates || dates.length === 0) return [];
-    const sortedDates = [...dates].sort();
-    const ranges: string[][] = [];
-
-    for (let i = 0; i <= sortedDates.length - targetDays; i++) {
-      const potentialRange: string[] = [];
-      let isConsecutive = true;
-
-      for (let j = 0; j < targetDays; j++) {
-        const currentDate = new Date(sortedDates[i + j]);
-        if (j > 0) {
-          const prevDate = new Date(sortedDates[i + j - 1]);
-          const dayDiff =
-            (currentDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
-          if (dayDiff !== 1) {
-            isConsecutive = false;
-            break;
-          }
-        }
-        potentialRange.push(sortedDates[i + j]);
-      }
-
-      if (isConsecutive && potentialRange.length === targetDays) {
-        ranges.push(potentialRange);
-      }
-    }
-    return ranges;
-  };
-
-  const findAllMatches = (
-    intersection: string[],
-    maxDays: number,
-    weighted?: Record<string, number>
-  ) => {
-    const fullMatches = findConsecutiveDays(intersection, maxDays);
-    const partialMatches: { days: number; ranges: string[][] }[] = [];
-
-    if (fullMatches.length === 0) {
-      for (let days = maxDays - 1; days >= 1; days--) {
-        const matches = findConsecutiveDays(intersection, days);
-        if (matches.length > 0) {
-          partialMatches.push({ days, ranges: matches });
-        }
-      }
-    }
-
-    let bestAlternative = null;
-    if (fullMatches.length === 0 && partialMatches.length === 0 && weighted) {
-      bestAlternative = findBestDateRange(weighted, maxDays);
-    }
-
-    return { fullMatches, partialMatches, bestAlternative };
-  };
-
-  const checkCoverageStatus = (dates: string[]): {
-    hasFullCoverage: boolean;
-    bestCoverage: number;
-    suggestedDates: string[];
-  } => {
-    if (dates.length === 0) {
-      return { hasFullCoverage: false, bestCoverage: 0, suggestedDates: [] };
-    }
-    for (let targetDays = tripDuration; targetDays >= 1; targetDays--) {
-      const ranges = findConsecutiveDays(dates, targetDays);
-      if (ranges.length > 0) {
-        return {
-          hasFullCoverage: targetDays === tripDuration,
-          bestCoverage: targetDays,
-          suggestedDates: ranges[0],
-        };
-      }
-    }
-    return { hasFullCoverage: false, bestCoverage: 0, suggestedDates: [] };
-  };
-
-  // ================= SLIDING WINDOW =================
-
-  const findBestDateRange = (
-    weighted: Record<string, number>,
-    targetDays: number
-  ): {
-    dates: string[];
-    totalPeople: number;
-    avgPeople: number;
-    totalGap: number;
-    score: number;
-    isConsecutive: boolean;
-  } | null => {
-    const allDates = Object.keys(weighted).sort();
-    if (allDates.length === 0) return null;
-    if (allDates.length < targetDays) {
-      return evaluateRange(allDates, weighted, targetDays);
-    }
-
-    let bestResult: ReturnType<typeof evaluateRange> = null;
-    let bestScore = -Infinity;
-
-    for (
-      let windowSize = targetDays;
-      windowSize >= Math.max(1, targetDays - 2);
-      windowSize--
-    ) {
-      for (let i = 0; i <= allDates.length - windowSize; i++) {
-        const window = allDates.slice(i, i + windowSize);
-        const result = evaluateRange(window, weighted, targetDays);
-        if (result && result.score > bestScore) {
-          bestScore = result.score;
-          bestResult = result;
-        }
-      }
-    }
-    return bestResult;
-  };
-
-  const evaluateRange = (
-    dates: string[],
-    weighted: Record<string, number>,
-    targetDays: number
-  ) => {
-    if (dates.length === 0) return null;
-    const totalPeople = dates.reduce((sum, date) => sum + (weighted[date] || 0), 0);
-    const avgPeople = totalPeople / dates.length;
-
-    let totalGap = 0;
-    let isConsecutive = true;
-
-    for (let i = 0; i < dates.length - 1; i++) {
-      const dayDiff =
-        (new Date(dates[i + 1]).getTime() - new Date(dates[i]).getTime()) /
-        (1000 * 60 * 60 * 24);
-      const gap = dayDiff - 1;
-      if (gap > 0) {
-        isConsecutive = false;
-        totalGap += gap;
-      }
-    }
-
-    const lengthScore = calculateLengthScore(dates.length, targetDays);
-    const availabilityScore = avgPeople * 100;
-    const gapPenalty = totalGap * 50;
-    const consecutiveBonus = isConsecutive ? 200 : 0;
-    const score = lengthScore + availabilityScore - gapPenalty + consecutiveBonus;
-
-    return {
-      dates,
-      totalPeople,
-      avgPeople: Math.round(avgPeople * 10) / 10,
-      totalGap,
-      score: Math.round(score),
-      isConsecutive,
-    };
-  };
-
-  const calculateLengthScore = (actualDays: number, targetDays: number): number => {
-    if (actualDays === targetDays) return 500;
-    const diff = Math.abs(actualDays - targetDays);
-    if (diff === 1) return 300;
-    if (diff === 2) return 150;
-    return Math.max(0, 100 - diff * 30);
-  };
-
+  // ✅ เก็บไว้ - ใช้แสดงจำนวนคนว่างใน UI
   const getAvailableCount = (dateRange: string[]): number => {
-    if (!matchingInfo?.weighted) return 0;
-    const counts = dateRange.map(date => matchingInfo.weighted![date] || 0);
+    if (!matchingInfo?.availability) return 0;
+    
+    // หาจำนวนคนน้อยที่สุดในช่วงนั้น
+    const counts = dateRange.map(date => {
+      const found = matchingInfo.availability.find(a => a.date === date);
+      return found?.count || 0;
+    });
     return Math.min(...counts);
   };
 
@@ -238,297 +112,189 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
 
   const toggleDate = (dateStr: string) => {
     setSelectedDates(prev =>
-      prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr]
+      prev.includes(dateStr)
+        ? prev.filter(d => d !== dateStr)
+        : [...prev, dateStr]
     );
   };
 
   const handleSave = async () => {
     if (selectedDates.length === 0) {
-      alert('กรุณาเลือกอย่างน้อย 1 วัน');
-      return;
-    }
-    if (!trip.tripid) {
-      alert('ไม่พบข้อมูลทริป');
+      alert("กรุณาเลือกอย่างน้อย 1 วัน");
       return;
     }
 
     try {
       setLoading(true);
+
+      if (!trip.tripid || !trip.ownerid) {
+        alert("ไม่พบข้อมูลทริปหรือผู้ใช้");
+        return;
+      }
+
+      await voteAPI.submitAvailability({
+        trip_id: trip.tripid,
+        user_id: trip.ownerid,
+        ranges: selectedDates.sort(),
+      });
+
+      console.log("Selected Dates:", selectedDates);
+      setJustSaved(true);
+
       if (onSave) {
         await onSave(selectedDates);
       }
-      setJustSaved(true);
+
     } catch (err: any) {
       console.error(err);
-      alert(err?.response?.data?.message || 'บันทึกไม่สำเร็จ');
+      alert(err?.response?.data?.message || "บันทึกไม่สำเร็จ");
     } finally {
       setLoading(false);
     }
   };
 
-  const currentCoverage = checkCoverageStatus(selectedDates);
-
   // ============== ANALYSIS MODAL ==============
   const renderAnalysisModal = () => {
     if (!showAnalysisModal || !matchingInfo) return null;
 
+    // ✅ ใช้ recommendation จาก Backend
+    const { recommendation, availability, summary } = matchingInfo;
+
     return (
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 animate-backdrop-fade-in"
         onClick={() => setShowAnalysisModal(false)}
       >
-        <div
-          className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
-          onClick={e => e.stopPropagation()}
+        <div 
+          className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto animate-modal-scale-in"
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-t-xl flex justify-between items-center z-10">
             <h3 className="text-xl font-bold">🔍 ผลการวิเคราะห์วันที่</h3>
             <button
               onClick={() => setShowAnalysisModal(false)}
-              className="text-white hover:text-gray-200 text-2xl font-bold w-8 h-8 flex items-center justify-center"
+              className="text-white hover:text-gray-200 text-2xl font-bold w-8 h-8 flex items-center justify-center transition"
             >
               ✕
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-6">
+          <div className="p-6 custom-scrollbar">
             {/* ความคืบหน้า */}
             <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800 mb-2 font-semibold">📊 ความคืบหน้าการกรอก</p>
               <div className="flex items-center gap-3">
                 <div className="flex-1 bg-gray-200 rounded-full h-3">
-                  <div
+                  <div 
                     className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all"
-                    style={{
-                      width: `${
-                        trip.members
-                          ? (Object.keys(matchingInfo?.weighted || {}).length /
-                              trip.members.length) *
-                            100
-                          : 0
-                      }%`,
+                    style={{ 
+                      width: `${summary.totalMembers > 0 
+                        ? (availability.length / summary.totalMembers * 100) 
+                        : 0}%` 
                     }}
                   />
                 </div>
                 <span className="text-sm font-semibold text-blue-900">
-                  {Object.keys(matchingInfo?.weighted || {}).length}/{trip.members?.length || 0} คน
+                  {summary.totalAvailableDays}/{summary.totalMembers} คน
                 </span>
               </div>
             </div>
 
             {/* ผลการวิเคราะห์ */}
-            {matchingInfo.fullMatches.length > 0 ? (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <p className="text-green-800 font-semibold mb-3">
-                  ✅ พบวันที่ทุกคนว่างพร้อมกัน {tripDuration} วัน:{' '}
-                  {matchingInfo.fullMatches.length} ช่วง
-                </p>
-                <div className="space-y-3">
-                  {matchingInfo.fullMatches.slice(0, 3).map((range, idx) => {
-                    const start = new Date(range[0]);
-                    const end = new Date(range[range.length - 1]);
-                    return (
-                      <div
-                        key={idx}
-                        className="bg-white rounded-lg p-3 border border-green-300 shadow-sm"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold text-gray-800">
-                              {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'} ช่วงที่ {idx + 1}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              📅{' '}
-                              {start.toLocaleDateString('th-TH', {
-                                day: 'numeric',
-                                month: 'short',
-                              })}{' '}
-                              -{' '}
-                              {end.toLocaleDateString('th-TH', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-green-600">
-                              {getAvailableCount(range)}
-                            </p>
-                            <p className="text-xs text-gray-600">คนว่าง</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {matchingInfo.fullMatches.length > 3 && (
-                    <p className="text-sm text-green-600 text-center">
-                      และอีก {matchingInfo.fullMatches.length - 3} ช่วง...
+            {recommendation ? (
+              <div className={`border rounded-lg p-4 ${
+                recommendation.isConsecutive 
+                  ? 'bg-blue-50 border-blue-300' 
+                  : 'bg-orange-50 border-orange-300'
+              }`}>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className={`font-semibold mb-1 ${
+                      recommendation.isConsecutive ? 'text-blue-800' : 'text-orange-800'
+                    }`}>
+                      {recommendation.isConsecutive ? '💡' : '⚠️'} ช่วงที่แนะนำ
                     </p>
-                  )}
-                </div>
-              </div>
-            ) : matchingInfo.partialMatches.length > 0 ? (
-              <div className="space-y-3">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-yellow-800 font-semibold">
-                    ⚠️ ไม่พบวันที่ทุกคนว่างพร้อมกัน {tripDuration} วันติดกัน
-                  </p>
-                </div>
-                {matchingInfo.partialMatches.map((partial, idx) => (
-                  <div key={idx} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-blue-800 font-semibold mb-3">
-                      📌 พบวันที่ว่างพร้อมกัน {partial.days} วันติดกัน: {partial.ranges.length}{' '}
-                      ช่วง
+                    <p className="text-xs text-gray-600">
+                      คะแนน: {recommendation.score} • 
+                      {recommendation.dates.length === tripDuration 
+                        ? ' ✓ ครบจำนวนวัน' 
+                        : ` ${recommendation.dates.length}/${tripDuration} วัน`
+                      }
                     </p>
-                    <div className="space-y-2">
-                      {partial.ranges.slice(0, 3).map((range, ridx) => {
-                        const start = new Date(range[0]);
-                        const end = new Date(range[range.length - 1]);
-                        return (
-                          <div
-                            key={ridx}
-                            className="bg-white rounded-lg p-3 border border-blue-300 shadow-sm"
-                          >
-                            <p className="text-sm text-blue-700">
-                              📅{' '}
-                              {start.toLocaleDateString('th-TH', {
-                                day: 'numeric',
-                                month: 'short',
-                              })}{' '}
-                              -{' '}
-                              {end.toLocaleDateString('th-TH', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                              <span className="ml-2 font-semibold">
-                                👥 {getAvailableCount(range)} คน
-                              </span>
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              (() => {
-                const bestAlt = matchingInfo?.bestAlternative;
-                return (
-                  <div className="space-y-3">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <p className="text-red-800 font-semibold">
-                        ❌ ไม่พบวันที่ทุกคนว่างพร้อมกัน {tripDuration} วันติดกัน
-                      </p>
-                    </div>
-
-                    {bestAlt && (
-                      <div
-                        className={`border rounded-lg p-4 ${
-                          bestAlt.isConsecutive
-                            ? 'bg-blue-50 border-blue-300'
-                            : 'bg-orange-50 border-orange-300'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <p
-                              className={`font-semibold mb-1 ${
-                                bestAlt.isConsecutive ? 'text-blue-800' : 'text-orange-800'
-                              }`}
-                            >
-                              {bestAlt.isConsecutive ? '💡' : '⚠️'} ช่วงที่แนะนำ (ใกล้เคียงที่สุด)
-                            </p>
-                            <p className="text-xs text-gray-600">
-                              คะแนน: {bestAlt.score} •{' '}
-                              {bestAlt.dates.length === tripDuration
-                                ? ' ✓ ครบจำนวนวัน'
-                                : ` ${bestAlt.dates.length}/${tripDuration} วัน`}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-blue-600">{bestAlt.avgPeople}</p>
-                            <p className="text-xs text-gray-600">คนว่างเฉลี่ย</p>
-                          </div>
-                        </div>
-
-                        <div className="bg-white rounded-lg p-3 border border-gray-200">
-                          <div className="flex flex-wrap gap-2 items-center">
-                            {bestAlt.dates.map((date, idx) => {
-                              const d = new Date(date);
-                              const peopleCount = matchingInfo?.weighted?.[date] || 0;
-                              return (
-                                <React.Fragment key={date}>
-                                  <div className="flex flex-col items-center">
-                                    <div
-                                      className={`px-3 py-2 rounded-lg font-semibold text-sm ${
-                                        peopleCount >= (bestAlt.avgPeople || 0)
-                                          ? 'bg-green-100 text-green-800'
-                                          : 'bg-yellow-100 text-yellow-800'
-                                      }`}
-                                    >
-                                      {d.toLocaleDateString('th-TH', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                      })}
-                                    </div>
-                                    <span className="text-xs text-gray-600 mt-1">
-                                      👥 {peopleCount}
-                                    </span>
-                                  </div>
-                                  {idx < bestAlt.dates.length - 1 && (
-                                    <span className="text-gray-400 text-xl">
-                                      {(() => {
-                                        const gap =
-                                          (new Date(bestAlt.dates[idx + 1]).getTime() -
-                                            d.getTime()) /
-                                            (1000 * 60 * 60 * 24) -
-                                          1;
-                                        return gap > 0 ? `··· ${gap}วัน ···` : '→';
-                                      })()}
-                                    </span>
-                                  )}
-                                </React.Fragment>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="mt-3 space-y-1 text-sm">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={
-                                bestAlt.isConsecutive ? 'text-green-600' : 'text-orange-600'
-                              }
-                            >
-                              {bestAlt.isConsecutive
-                                ? '✓ วันติดกันทั้งหมด'
-                                : `⚠️ มีช่องว่าง ${bestAlt.totalGap} วัน`}
+                  
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {recommendation.avgPeople}
+                    </p>
+                    <p className="text-xs text-gray-600">คนว่างเฉลี่ย</p>
+                  </div>
+                </div>
+                
+                {/* แสดงวันที่ */}
+                <div className="bg-white rounded-lg p-3 border border-gray-200">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {recommendation.dates.map((date, idx) => {
+                      const d = new Date(date);
+                      const availInfo = availability.find(a => a.date === date);
+                      const peopleCount = availInfo?.count || 0;
+                      
+                      return (
+                        <React.Fragment key={date}>
+                          <div className="flex flex-col items-center">
+                            <div className={`px-3 py-2 rounded-lg font-semibold text-sm ${
+                              peopleCount >= (recommendation.avgPeople || 0) 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {d.toLocaleDateString('th-TH', { 
+                                day: 'numeric', 
+                                month: 'short' 
+                              })}
+                            </div>
+                            <span className="text-xs text-gray-600 mt-1">
+                              👥 {peopleCount}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <span>📊 รวม {bestAlt.totalPeople} คน-วัน</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {!bestAlt && (
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <p className="text-gray-600 text-sm">
-                          💭 ยังไม่มีข้อมูลเพียงพอสำหรับการแนะนำ
-                        </p>
-                      </div>
-                    )}
+                          
+                          {idx < recommendation.dates.length - 1 && (
+                            <span className="text-gray-400 text-xl">
+                              {(() => {
+                                const gap = (new Date(recommendation.dates[idx + 1]).getTime() - d.getTime()) 
+                                          / (1000 * 60 * 60 * 24) - 1;
+                                return gap > 0 ? `··· ${gap}วัน ···` : '→';
+                              })()}
+                            </span>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </div>
-                );
-              })()
+                </div>
+                
+                {/* สรุปข้อมูล */}
+                <div className="mt-3 space-y-1 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className={recommendation.isConsecutive ? 'text-green-600' : 'text-orange-600'}>
+                      {recommendation.isConsecutive ? '✓ วันติดกันทั้งหมด' : '⚠️ มีช่องว่างระหว่างวัน'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <span>📊 {recommendation.percentage}% ของสมาชิกว่าง</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-gray-600 text-sm">
+                  💭 ยังไม่มีข้อมูลเพียงพอสำหรับการแนะนำ
+                </p>
+              </div>
             )}
 
+            {/* คำแนะนำ */}
             <div className="mt-6 bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
               <p className="text-sm text-purple-800">
                 💡 <strong>คำแนะนำ:</strong> คุณสามารถปรับเปลี่ยนวันที่ได้ก่อนไปหน้าถัดไป
@@ -536,7 +302,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             </div>
           </div>
 
-          {/* Footer */}
+          {/* Footer Actions */}
           <div className="sticky bottom-0 bg-gray-50 p-4 rounded-b-xl border-t flex gap-3">
             <button
               onClick={() => setShowAnalysisModal(false)}
@@ -566,14 +332,15 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
     const month = calendarMonth.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const days = [];
 
+    const days = [];
+    
     for (let i = 0; i < firstDay; i++) {
       days.push(<div key={`empty-${i}`} className="h-10 sm:h-12" />);
     }
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const isSelected = selectedDates.includes(dateStr);
       const isPast = new Date(dateStr) < new Date(new Date().setHours(0, 0, 0, 0));
 
@@ -583,15 +350,18 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
           onClick={() => !isPast && toggleDate(dateStr)}
           disabled={isPast}
           className={`
-            h-10 sm:h-12 rounded-lg font-semibold text-sm sm:text-base transition-all
-            min-w-[40px] min-h-[40px] relative
-            ${isPast ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}
-            ${
-              isSelected && !isPast
-                ? 'bg-green-500 text-white shadow-lg scale-105'
-                : !isPast
-                ? 'bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-400'
-                : ''
+            h-10 sm:h-12 
+            rounded-lg font-semibold 
+            text-sm sm:text-base
+            transition-all
+            min-w-[40px] min-h-[40px]
+            relative
+            ${isPast ? "bg-gray-100 text-gray-400 cursor-not-allowed" : ""}
+            ${isSelected && !isPast
+              ? "bg-green-500 text-white shadow-lg scale-105"
+              : !isPast
+              ? "bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-400"
+              : ""
             }
           `}
         >
@@ -599,32 +369,45 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
         </button>
       );
     }
+
     return days;
   };
 
   // ============== RENDER ==============
   return (
     <>
-      <div className="space-y-6">
+        <div className="space-y-6">
+        {/* ✅ เพิ่ม Loading State */}
+        {matchingLoading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+            <span className="text-blue-700">กำลังโหลดข้อมูล...</span>
+          </div>
+        )}
+
+        {/* ✅ เพิ่ม Error State */}
+        {matchingError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800">⚠️ {matchingError}</p>
+          </div>
+        )}
+        
         {/* คำอธิบาย */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
           <button
             onClick={() => setShowInstructions(!showInstructions)}
             className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-100 transition"
           >
-            <h3 className="font-bold text-blue-900">
-              📅 เลือกวันที่ว่าง (ต้องการ {tripDuration} วันติดกัน)
-            </h3>
-            <span className="text-blue-700 text-xl">{showInstructions ? '−' : '+'}</span>
+            <h3 className="font-bold text-blue-900">📅 เลือกวันที่ว่าง (ต้องการ {tripDuration} วันติดกัน)</h3>
+            <span className="text-blue-700 text-xl">
+              {showInstructions ? '−' : '+'}
+            </span>
           </button>
+          
           {showInstructions && (
             <div className="px-4 pb-4 border-t border-blue-200">
               <ul className="text-sm text-blue-800 space-y-1 mt-3">
                 <li>• คลิกเลือกวันที่คุณว่าง (เลือกได้หลายวัน)</li>
-                <li>
-                  • ระบบจะตรวจสอบอัตโนมัติว่าครอบคลุม{' '}
-                  <strong>{tripDuration} วันติดกัน</strong>หรือไม่
-                </li>
+                <li>• ระบบจะวิเคราะห์ช่วงวันที่เหมาะสม<strong>หลังจากบันทึก</strong></li>
                 <li>• หากต้องการยกเลิกคลิกวันที่เลือกแล้วอีกครั้งเพื่อยกเลิก</li>
                 <li>• ถ้าเลือกไม่ครบ {tripDuration} วันติดกัน ระบบจะเตือนเมื่อบันทึก</li>
               </ul>
@@ -636,12 +419,8 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
         <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
           <div className="flex items-center justify-between mb-4 gap-2">
             <button
-              onClick={() =>
-                setCalendarMonth(
-                  new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1)
-                )
-              }
-              className="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-bold transition-all shadow-md min-w-[44px] min-h-[44px] text-lg"
+              onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))}
+              className="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg hover:scale-105 active:scale-95 min-w-[44px] min-h-[44px] text-lg"
             >
               ←
             </button>
@@ -649,16 +428,12 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             <div className="flex items-center gap-2">
               <select
                 value={calendarMonth.getMonth()}
-                onChange={e =>
-                  setCalendarMonth(
-                    new Date(calendarMonth.getFullYear(), parseInt(e.target.value), 1)
-                  )
-                }
-                className="px-3 py-2 border-2 border-blue-300 rounded-xl font-bold text-sm sm:text-base hover:border-blue-500 focus:border-blue-600 focus:outline-none bg-white cursor-pointer shadow-sm"
+                onChange={(e) => setCalendarMonth(new Date(calendarMonth.getFullYear(), parseInt(e.target.value), 1))}
+                className="px-3 py-2 border-2 border-blue-300 rounded-xl font-bold text-sm sm:text-base hover:border-blue-500 hover:bg-blue-50 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all bg-white cursor-pointer shadow-sm hover:shadow-md"
               >
                 {[
-                  'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-                  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม',
+                  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
                 ].map((month, index) => (
                   <option key={index} value={index}>
                     {month}
@@ -668,12 +443,8 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
 
               <select
                 value={calendarMonth.getFullYear()}
-                onChange={e =>
-                  setCalendarMonth(
-                    new Date(parseInt(e.target.value), calendarMonth.getMonth(), 1)
-                  )
-                }
-                className="px-3 py-2 border-2 border-blue-300 rounded-xl font-bold text-sm sm:text-base hover:border-blue-500 focus:border-blue-600 focus:outline-none bg-white cursor-pointer shadow-sm"
+                onChange={(e) => setCalendarMonth(new Date(parseInt(e.target.value), calendarMonth.getMonth(), 1))}
+                className="px-3 py-2 border-2 border-blue-300 rounded-xl font-bold text-sm sm:text-base hover:border-blue-500 hover:bg-blue-50 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all bg-white cursor-pointer shadow-sm hover:shadow-md"
               >
                 {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i).map(year => (
                   <option key={year} value={year}>
@@ -684,26 +455,24 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             </div>
 
             <button
-              onClick={() =>
-                setCalendarMonth(
-                  new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1)
-                )
-              }
-              className="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-bold transition-all shadow-md min-w-[44px] min-h-[44px] text-lg"
+              onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))}
+              className="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg hover:scale-105 active:scale-95 min-w-[44px] min-h-[44px] text-lg"
             >
               →
             </button>
           </div>
 
           <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
-            {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(day => (
+            {["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map(day => (
               <div key={day} className="text-center font-bold text-gray-600 text-xs sm:text-sm">
                 {day}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1 sm:gap-2">{renderCalendar()}</div>
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
+            {renderCalendar()}
+          </div>
 
           <div className="mt-4 flex items-center gap-4 flex-wrap text-sm text-gray-600">
             <div className="flex items-center gap-2">
@@ -713,50 +482,17 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
           </div>
         </div>
 
-        {/* สถานะการเลือก */}
         {selectedDates.length > 0 && (
-          <div
-            className={`border rounded-lg p-4 ${
-              currentCoverage.hasFullCoverage
-                ? 'bg-green-50 border-green-200'
-                : currentCoverage.bestCoverage > 0
-                ? 'bg-yellow-50 border-yellow-200'
-                : 'bg-red-50 border-red-200'
-            }`}
-          >
-            <h3 className="font-bold text-lg mb-2">
-              {currentCoverage.hasFullCoverage
-                ? '✅ สถานะ: ครบ ' + tripDuration + ' วันติดกันแล้ว'
-                : currentCoverage.bestCoverage > 0
-                ? '⚠️ สถานะ: ยังไม่ครบ ' + tripDuration + ' วันติดกัน'
-                : '❌ สถานะ: ยังไม่มีวันติดกัน'}
-            </h3>
-            <div className="text-sm space-y-1">
-              <p>
-                <strong>จำนวนวันที่เลือก:</strong> {selectedDates.length} วัน
-              </p>
-              {currentCoverage.bestCoverage > 0 && (
-                <p>
-                  <strong>ช่วงที่ดีที่สุด:</strong> {currentCoverage.bestCoverage} วันติดกัน
-                  {currentCoverage.suggestedDates.length > 0 && (
-                    <span className="ml-2 text-xs">
-                      (
-                      {new Date(currentCoverage.suggestedDates[0]).toLocaleDateString('th-TH', {
-                        day: 'numeric',
-                        month: 'short',
-                      })}
-                      {' - '}
-                      {new Date(
-                        currentCoverage.suggestedDates[currentCoverage.suggestedDates.length - 1]
-                      ).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                      )
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-bold text-lg mb-2">
+            📅 เลือกแล้ว {selectedDates.length} วัน
+          </h3>
+          
+          <div className="text-sm text-blue-800">
+            <p>ระบบจะวิเคราะห์ช่วงวันที่เหมาะสมหลังจากบันทึก</p>
           </div>
-        )}
+        </div>
+      )}
 
         {/* ปุ่มบันทึก */}
         <button
@@ -764,48 +500,45 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
           disabled={selectedDates.length === 0 || loading}
           className={`
             w-full px-6 py-3 font-bold rounded-xl transition shadow-lg
-            ${
-              selectedDates.length === 0 || loading
-                ? 'bg-gray-300 cursor-not-allowed text-gray-500'
-                : currentCoverage.hasFullCoverage
-                ? 'bg-green-600 hover:bg-green-700 text-white'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            ${selectedDates.length === 0 || loading
+              ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
             }
           `}
         >
-          {loading
-            ? 'กำลังบันทึก...'
-            : `บันทึกวันที่ (${selectedDates.length} วัน${currentCoverage.hasFullCoverage ? ' ✓' : ''})`}
+          {loading 
+            ? "กำลังบันทึก..." 
+            : `บันทึกวันที่ (${selectedDates.length} วัน)`
+          }
         </button>
 
         {/* Smart Toast */}
         {justSaved && (
           <>
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-50"
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 z-50 animate-backdrop-fade-in"
               onClick={() => setJustSaved(false)}
             />
-            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+            
+            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-toast-pop-up">
               <div className="bg-white rounded-xl shadow-2xl border-2 border-green-500 p-4 max-w-md">
                 <div className="flex items-start gap-3">
                   <button
                     onClick={() => setJustSaved(false)}
-                    className="ml-auto text-gray-400 hover:text-gray-600 transition"
+                    className="ml-auto -mt-1 -mr-1 text-gray-400 hover:text-gray-600 transition"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
+                
                 <div className="flex items-start gap-3 mt-2">
                   <div className="flex-shrink-0 text-3xl">✅</div>
                   <div className="flex-1">
                     <p className="font-bold text-gray-800 mb-1">บันทึกวันที่สำเร็จ!</p>
                     <p className="text-sm text-gray-600 mb-3">
-                      📊{' '}
-                      {currentCoverage.hasFullCoverage
-                        ? `ครอบคลุม ${tripDuration} วันติดกัน ✓`
-                        : `ช่วงที่ดีที่สุด: ${currentCoverage.bestCoverage} วันติดกัน`}
+                      📊 บันทึกแล้ว {selectedDates.length} วัน
                     </p>
                     <div className="flex gap-2">
                       <button

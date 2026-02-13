@@ -109,7 +109,7 @@ export interface TripDetail {
   status: string;
   createdat: string;
   updatedat?: string;
-  membercount: number,
+  membercount: number;
   confirmedat?: string | null;
   isactive?: boolean;
   current_user_id?: string; // ⭐ เพิ่มสำหรับ StepBudget
@@ -174,6 +174,7 @@ export interface BudgetVoting {
 export interface LocationResult {
   province_name: string;
   vote_count: number;
+  voter_count?: number;
 }
 
 export interface DateOption {
@@ -190,12 +191,27 @@ export interface TripSummaryResult {
     status: string;
     confirmed_at: string | null;
     created_at: string;
+    owner_id: string;        // ← เพิ่มนี้
   };
   members: TripSummaryMember[];
   budgetVoting: BudgetVoting | null;
   budgetOptions: BudgetOption[];
-  locationResult: LocationResult | null;
+  locationResult: LocationResult[] | LocationResult | null;  // ← เปลี่ยนเป็น array ได้
   dateOptions: DateOption[];
+
+  // ← เพิ่ม 2 fields นี้
+  dateResult?: {
+    weighted: Record<string, number>;
+    fullMatches: string[][];
+    tripDuration: number;
+  };
+
+  budgetResult?: {
+    accommodation: { min: number; max: number; mean: number; median: number };
+    transport:     { min: number; max: number; mean: number; median: number };
+    food:          { min: number; max: number; mean: number; median: number };
+    other:         { min: number; max: number; mean: number; median: number };
+  };
 }
 
 // ============================================================================
@@ -494,12 +510,8 @@ export const BUDGET_CATEGORIES = [
 // ============================================================================
 
 export interface LocationVote {
-  place: string; 
+  location_name: string;
   score: number;
-}
-
-export interface SubmitLocationVotePayload {
-  votes: LocationVote[];
 }
 
 // Location Vote Result (สำหรับแสดงผล)
@@ -515,8 +527,8 @@ export interface LocationVoteResult {
   };
 }
 
-export interface SubmitLocationVoteResponse {
-  [province: string]: number;  // { "เชียงใหม่": 15, "ภูเก็ต": 12 }
+export interface SubmitLocationVotePayload {
+  votes: LocationVote[]; 
 }
 
 // Voting Result Item
@@ -535,20 +547,12 @@ export interface VotingResult {
 
 // Response จากการดึงผลโหวตจังหวัด
 export interface GetLocationVoteResponse {  
-  rows: Array<{
-    location_vote_id: string;
-    location_option_id: string;
-    user_id: string;
-    voted_at: string;
+  trip_id: string;
+  my_votes: Array<{
+    place: string;        // ✅ Backend ส่งกลับมาเป็น "place"
     score: number;
   }>;
-  rowlog: Array<{
-    proposed_by: string;
-    province_name: string;
-    score: number;
-    proposed_at: string;
-    proposed_by_name: string;
-  }>;
+  voting_results: LocationVoteResult[];
 }
 
 // ✅ Type Guard
@@ -556,12 +560,29 @@ export const isLocationVote = (obj: any): obj is LocationVote => {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    typeof obj.place === 'string' &&
+    typeof obj.location_name === 'string' &&
     typeof obj.score === 'number' &&
     obj.score >= 1 &&
     obj.score <= 3
   );
 };
+
+// ✅ Helper: แปลง place → location_name
+export const placeToLocationVote = (
+  place: string,
+  score: number
+): LocationVote => ({
+  location_name: place,
+  score
+});
+
+// ✅ Helper: แปลง location_name → place
+export const locationVoteToPlace = (
+  vote: LocationVote
+): { place: string; score: number } => ({
+  place: vote.location_name,
+  score: vote.score
+});
 
 export interface LocationScores {
   [province: string]: number;
