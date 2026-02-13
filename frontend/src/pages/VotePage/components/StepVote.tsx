@@ -96,68 +96,6 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
       });
   }, [trip.tripid, tripDuration]);
 
-  // ================= HELPER FUNCTIONS (เฉพาะที่จำเป็นสำหรับ Local State) =================
-
-  // ✅ เก็บไว้ - ใช้เช็ควันที่ที่ user เลือกเอง (local state)
-  const findConsecutiveDays = (dates: string[], targetDays: number): string[][] => {
-    if (!dates || dates.length === 0) return [];
-    
-    const sortedDates = [...dates].sort();
-    const ranges: string[][] = [];
-    
-    for (let i = 0; i <= sortedDates.length - targetDays; i++) {
-      const potentialRange: string[] = [];
-      let isConsecutive = true;
-      
-      for (let j = 0; j < targetDays; j++) {
-        const currentDate = new Date(sortedDates[i + j]);
-        
-        if (j > 0) {
-          const prevDate = new Date(sortedDates[i + j - 1]);
-          const dayDiff = (currentDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
-          
-          if (dayDiff !== 1) {
-            isConsecutive = false;
-            break;
-          }
-        }
-        
-        potentialRange.push(sortedDates[i + j]);
-      }
-      
-      if (isConsecutive && potentialRange.length === targetDays) {
-        ranges.push(potentialRange);
-      }
-    }
-    
-    return ranges;
-  };
-
-  // ✅ เก็บไว้ - ใช้เช็คสถานะการเลือกของ user (local state)
-  const checkCoverageStatus = (dates: string[]): {
-    hasFullCoverage: boolean;
-    bestCoverage: number;
-    suggestedDates: string[];
-  } => {
-    if (dates.length === 0) {
-      return { hasFullCoverage: false, bestCoverage: 0, suggestedDates: [] };
-    }
-
-    for (let targetDays = tripDuration; targetDays >= 1; targetDays--) {
-      const ranges = findConsecutiveDays(dates, targetDays);
-      
-      if (ranges.length > 0) {
-        return {
-          hasFullCoverage: targetDays === tripDuration,
-          bestCoverage: targetDays,
-          suggestedDates: ranges[0],
-        };
-      }
-    }
-
-    return { hasFullCoverage: false, bestCoverage: 0, suggestedDates: [] };
-  };
-
   // ✅ เก็บไว้ - ใช้แสดงจำนวนคนว่างใน UI
   const getAvailableCount = (dateRange: string[]): number => {
     if (!matchingInfo?.availability) return 0;
@@ -214,8 +152,6 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
       setLoading(false);
     }
   };
-
-  const currentCoverage = checkCoverageStatus(selectedDates);
 
   // ============== ANALYSIS MODAL ==============
   const renderAnalysisModal = () => {
@@ -471,7 +407,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             <div className="px-4 pb-4 border-t border-blue-200">
               <ul className="text-sm text-blue-800 space-y-1 mt-3">
                 <li>• คลิกเลือกวันที่คุณว่าง (เลือกได้หลายวัน)</li>
-                <li>• ระบบจะตรวจสอบอัตโนมัติว่าครอบคลุม <strong>{tripDuration} วันติดกัน</strong>หรือไม่</li>
+                <li>• ระบบจะวิเคราะห์ช่วงวันที่เหมาะสม<strong>หลังจากบันทึก</strong></li>
                 <li>• หากต้องการยกเลิกคลิกวันที่เลือกแล้วอีกครั้งเพื่อยกเลิก</li>
                 <li>• ถ้าเลือกไม่ครบ {tripDuration} วันติดกัน ระบบจะเตือนเมื่อบันทึก</li>
               </ul>
@@ -546,44 +482,17 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
           </div>
         </div>
 
-        {/* สถานะการเลือกปัจจุบัน */}
         {selectedDates.length > 0 && (
-          <div className={`border rounded-lg p-4 ${
-            currentCoverage.hasFullCoverage 
-              ? 'bg-green-50 border-green-200' 
-              : currentCoverage.bestCoverage > 0
-              ? 'bg-yellow-50 border-yellow-200'
-              : 'bg-red-50 border-red-200'
-          }`}>
-            <h3 className="font-bold text-lg mb-2">
-              {currentCoverage.hasFullCoverage 
-                ? '✅ สถานะ: ครบ ' + tripDuration + ' วันติดกันแล้ว' 
-                : currentCoverage.bestCoverage > 0
-                ? '⚠️ สถานะ: ยังไม่ครบ ' + tripDuration + ' วันติดกัน'
-                : '❌ สถานะ: ยังไม่มีวันติดกัน'
-              }
-            </h3>
-            
-            <div className="text-sm space-y-1">
-              <p>
-                <strong>จำนวนวันที่เลือก:</strong> {selectedDates.length} วัน
-              </p>
-              
-              {currentCoverage.bestCoverage > 0 && (
-                <p>
-                  <strong>ช่วงที่ดีที่สุด:</strong> {currentCoverage.bestCoverage} วันติดกัน
-                  {currentCoverage.suggestedDates.length > 0 && (
-                    <span className="ml-2 text-xs">
-                      ({new Date(currentCoverage.suggestedDates[0]).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                      {' - '}
-                      {new Date(currentCoverage.suggestedDates[currentCoverage.suggestedDates.length - 1]).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })})
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-bold text-lg mb-2">
+            📅 เลือกแล้ว {selectedDates.length} วัน
+          </h3>
+          
+          <div className="text-sm text-blue-800">
+            <p>ระบบจะวิเคราะห์ช่วงวันที่เหมาะสมหลังจากบันทึก</p>
           </div>
-        )}
+        </div>
+      )}
 
         {/* ปุ่มบันทึก */}
         <button
@@ -593,17 +502,13 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             w-full px-6 py-3 font-bold rounded-xl transition shadow-lg
             ${selectedDates.length === 0 || loading
               ? 'bg-gray-300 cursor-not-allowed text-gray-500'
-              : currentCoverage.hasFullCoverage
-              ? 'bg-green-600 hover:bg-green-700 text-white'
               : 'bg-blue-600 hover:bg-blue-700 text-white'
             }
           `}
         >
           {loading 
             ? "กำลังบันทึก..." 
-            : `บันทึกวันที่ (${selectedDates.length} วัน${
-                currentCoverage.hasFullCoverage ? ' ✓' : ''
-              })`
+            : `บันทึกวันที่ (${selectedDates.length} วัน)`
           }
         </button>
 
@@ -633,10 +538,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
                   <div className="flex-1">
                     <p className="font-bold text-gray-800 mb-1">บันทึกวันที่สำเร็จ!</p>
                     <p className="text-sm text-gray-600 mb-3">
-                      📊 {currentCoverage.hasFullCoverage 
-                        ? `ครอบคลุม ${tripDuration} วันติดกัน ✓` 
-                        : `ช่วงที่ดีที่สุด: ${currentCoverage.bestCoverage} วันติดกัน`
-                      }
+                      📊 บันทึกแล้ว {selectedDates.length} วัน
                     </p>
                     <div className="flex gap-2">
                       <button
