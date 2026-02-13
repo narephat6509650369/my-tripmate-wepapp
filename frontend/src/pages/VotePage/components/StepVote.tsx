@@ -48,37 +48,22 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
 
     voteAPI.getDateMatchingResult(trip.tripid)
       .then((res) => {
-        console.log("📊 Date Matching Result Response:", res);
-        
-        if (!res.success) {
-          setMatchingError(res.message || 'ไม่สามารถโหลดข้อมูลได้');
-          return;
-        }
-        
-        const data = res.data?.data;
-        
-        if (!data) {
-          console.warn('⚠️ ไม่มีข้อมูล matching - ใช้ค่า default');
-          setMatchingInfo({
-            availability: [],
-            recommendation: null,
-            summary: { totalMembers: 0, totalAvailableDays: 0 }
-          });
-          return;
-        }
+      if (!res.success || !res.data) {
+        setMatchingError(res.message || 'ไม่สามารถโหลดข้อมูลได้');
+        return;
+    }
 
-        // ใช้ข้อมูลจาก Backend โดยตรง
-        setMatchingInfo({
-          availability: data.availability || [],
-          recommendation: data.recommendation || null,
-          summary: data.summary || { totalMembers: 0, totalAvailableDays: 0 }
-        });
+    const data = res.data;
 
-        // ✅ ถ้ามีวันที่ที่ user เคยเลือกไว้ → set selectedDates
-        if (data.rows && Array.isArray(data.rows) && data.rows.length > 0) {
-          console.log("✅ พบวันที่ที่เคยเลือกไว้:", data.rows);
-          setSelectedDates(data.rows);
-        }
+    setMatchingInfo({
+      availability: data.availability || [],
+      recommendation: data.recommendation || null,
+      summary: data.summary || { totalMembers: 0, totalAvailableDays: 0 }
+    });
+
+    if (data.rows?.length > 0) {
+      setSelectedDates(data.rows);
+    }
 
         console.log("✅ Matching Info from Backend:", data);
       })

@@ -273,7 +273,7 @@ export interface Budget {
   other: number;
 }
 
-export type BudgetVotingData = {
+export type BudgetVotingResponse = {
   rows: Array<{
     user_id: string;
     category_name: BudgetCategory;
@@ -482,10 +482,5 @@ export interface WeightedDateResult {
 }
 
 // response wrapper จาก backend
-export interface DateMatchingResponse {
-  success: boolean;
-  code: string;
-  message: string;
-  data: DateIntersectionResult;
-}
+
 
