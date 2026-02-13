@@ -171,15 +171,8 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       invitelink: trip.invite_link,
       status: trip.status,
       createdat: trip.created_at,
-<<<<<<< HEAD
-<<<<<<< HEAD
-      membercount: trip.membercount,
-      members: [],
-=======
-=======
       membercount: trip.membercount,
       current_user_id: MOCK_CURRENT_USER_ID,
->>>>>>> 28d51299 (Implement location algorithm)
       members: [
         { 
           id: 'member-001',
