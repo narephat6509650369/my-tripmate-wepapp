@@ -275,47 +275,43 @@ export interface Budget {
   other: number;
 }
 
-export interface BudgetVotingResponse {
-  success: boolean;
-  code: string;
-  message: string;
-  data: {
-    rows: Array<{
-      user_id: string;
-      category_name: BudgetCategory;
-      estimated_amount: number;
-      voted_at: string;
-    }>;
+export type BudgetVotingData = {
+  rows: Array<{
+    user_id: string;
+    category_name: BudgetCategory;
+    estimated_amount: number;
+    voted_at: string;
+  }>;
 
-    stats: {
-      [K in BudgetCategory]: {
-        q1: number;
-        q2: number;
-        q3: number;
-        iqr: number;
-        lowerBound: number;
-        upperBound: number;
-        filteredCount: number;
-        removedCount: number;
-        removedValues: number[];
-      };
+  stats: {
+    [K in BudgetCategory]: {
+      q1: number;
+      q2: number;
+      q3: number;
+      iqr: number;
+      lowerBound: number;
+      upperBound: number;
+      filteredCount: number;
+      removedCount: number;
+      removedValues: number[];
     };
-
-    budgetTotal: number;
-    minTotal: number;
-    maxTotal: number;
-    filledMembers: number;
-
-    rowlog: Array<{
-      proposed_by: string;
-      proposed_by_name: string;
-      proposed_at: string;
-      category_name: BudgetCategory;
-      estimated_amount: number;
-      priority?: number;
-    }>;
   };
-}
+
+  budgetTotal: number;
+  minTotal: number;
+  maxTotal: number;
+  filledMembers: number;
+
+  rowlog: Array<{
+    proposed_by: string;
+    proposed_by_name: string;
+    proposed_at: string;
+    category_name: BudgetCategory;
+    estimated_amount: number;
+    priority?: number;
+  }>;
+};
+
 
 export interface UpdateBudgetPayload {
   category: BudgetCategory;

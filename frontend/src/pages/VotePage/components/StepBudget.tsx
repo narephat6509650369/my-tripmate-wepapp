@@ -45,10 +45,21 @@ interface BudgetProposalLog {
 
 interface BudgetVotingResponse {
   success: boolean;
-  data: {
+  data?: {
     budgets?: BudgetItem[];
     budget_options?: BudgetCategoryData[];
     rowlog?: BudgetProposalLog[];
+    rows?: BudgetVote[];
+    stats?: {
+      accommodation?: { q1: number; q2: number; q3: number };
+      transport?: { q1: number; q2: number; q3: number };
+      food?: { q1: number; q2: number; q3: number };
+      other?: { q1: number; q2: number; q3: number };
+    };
+    budgetTotal?: number;
+    minTotal?: number;
+    maxTotal?: number;
+    filledMembers?: number;
   };
 }
 
@@ -189,6 +200,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
           food: 0,
           other: 0
         };
+        
+        
 
         // ✅ 1. โหลดงบประมาณที่ user กรอกไว้ (จาก rowlog)
         if (data.rows && Array.isArray(data.rows)) {
