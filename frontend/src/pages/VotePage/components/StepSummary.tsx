@@ -123,7 +123,9 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
               <span className="text-2xl">👥</span>
               <div>
                 <p className="text-sm text-gray-600">จำนวนสมาชิก</p>
-                {/*<p className="font-semibold text-gray-800">{trip.membercount} คน</p>*/}
+                <p className="font-semibold text-gray-800">
+                  {trip.membercount || trip.members?.length || 0} คน
+                </p>
               </div>
             </div>
 
