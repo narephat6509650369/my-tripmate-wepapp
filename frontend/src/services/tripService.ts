@@ -19,8 +19,9 @@ import type {
   UpdateBudgetResponse,
   SubmitLocationVotePayload,
   DateMatchingResponse,
-  BudgetVotingResponse,
-  LocationScores
+  BudgetVotingResponse, 
+  LocationScores,
+  LocationVoteResponse
 } from '../types';
 
 // Import Mock Data
@@ -469,13 +470,18 @@ export const voteAPI = {
   /**
    * GET /api/votes/:tripId/get-vote-place
    */
-  getLocationVote: async (tripId: string) => {
+  getLocationVote: async (tripId: string): Promise<ApiResponse<LocationVoteResponse>> => {
   if (CONFIG.USE_MOCK_DATA) {
     return {
       success: true,
       code: 'LOCATION_VOTES_FETCHED',
       message: 'Mock location votes',
-      data: []
+      data: {
+        rows: [],
+        analysis: null,
+        locationVotesTotal: [],
+        rowlog: []
+      }
     };
   }
 
