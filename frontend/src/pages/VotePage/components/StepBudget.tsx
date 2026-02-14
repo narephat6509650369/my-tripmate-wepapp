@@ -182,11 +182,11 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
     voteAPI.getBudgetVoting(trip.tripid)
       .then((res) => {
         console.log('✅ Budget API Response:', res);
-        console.log('📊 Stats:', res.data?.data?.stats);
-        console.log('👥 Filled Members:', res.data?.data?.filledMembers);
-        console.log('🗒️ Rowlog:', res.data?.data?.rowlog);
+        console.log('📊 Stats:', res.data?.stats);
+        console.log('👥 Filled Members:', res.data?.filledMembers);
+        console.log('🗒️ Rowlog:', res.data?.rowlog);
         
-        const data = res.data?.data || res.data;
+        const data = res.data;
 
         if (!data) {
           console.log('No data returned');
