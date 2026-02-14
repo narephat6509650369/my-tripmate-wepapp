@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { voteAPI } from '../../../services/tripService';
 import type { TripDetail } from '../../../types';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface StepVoteProps {
   trip: TripDetail;
@@ -10,6 +11,7 @@ interface StepVoteProps {
 }
 
 export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }) => {
+  const { user } = useAuth();
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
