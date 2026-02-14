@@ -161,43 +161,43 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       status: trip.status,
       createdat: trip.created_at,
       members: [
-        {
-          userId: 'user-001',
-          id: '',
-          role: '',
-          fullName: '',
-          avatarUrl: null,
-          joinedAt: 0,
-          isActive: false
-        },
-        {
-          userId: 'user-002',
-          id: '',
-          role: '',
-          fullName: '',
-          avatarUrl: null,
-          joinedAt: 0,
-          isActive: false
-        },
-        {
-          userId: 'user-003',
-          id: '',
-          role: '',
-          fullName: '',
-          avatarUrl: null,
-          joinedAt: 0,
-          isActive: false
-        },
-        {
-          userId: 'user-004',
-          id: '',
-          role: '',
-          fullName: '',
-          avatarUrl: null,
-          joinedAt: 0,
-          isActive: false
-        }
-      ],
+      {
+        id: 'member-001',
+        userId: 'user-001',
+        role: 'owner',
+        fullName: 'สมชาย ใจดี',
+        avatarUrl: null,
+        joinedAt: Date.now() - 5 * 86400000,
+        isActive: true
+      },
+      {
+        id: 'member-002',
+        userId: 'user-002',
+        role: 'member',
+        fullName: 'สมหญิง รักดี',
+        avatarUrl: null,
+        joinedAt: Date.now() - 4 * 86400000,
+        isActive: true
+      },
+      {
+        id: 'member-003',
+        userId: 'user-003',
+        role: 'member',
+        fullName: 'Charlie',
+        avatarUrl: null,
+        joinedAt: Date.now() - 3 * 86400000,
+        isActive: true
+      },
+      {
+        id: 'member-004',
+        userId: 'user-004',
+        role: 'member',
+        fullName: 'David',
+        avatarUrl: null,
+        joinedAt: Date.now() - 2 * 86400000,
+        isActive: true
+      }
+    ],
       dateRanges: [],
       provinceVotes: [],
       budgetOptions: [],
@@ -490,25 +490,25 @@ export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
       // ✅ 1. งบของ User ปัจจุบัน (rows)
       rows: [
         { 
-          user_id: 'user-002',
+          user_id: 'user-001',
           category_name: 'accommodation',
           estimated_amount: 5000,
           voted_at: new Date(Date.now() - 3600000).toISOString()
         },
         { 
-          user_id: 'user-002',
+          user_id: 'user-001',
           category_name: 'transport',
           estimated_amount: 3000,
           voted_at: new Date(Date.now() - 3600000).toISOString()
         },
         { 
-          user_id: 'user-002',
+          user_id: 'user-001',
           category_name: 'food',
           estimated_amount: 2000,
           voted_at: new Date(Date.now() - 3600000).toISOString()
         },
         { 
-          user_id: 'user-002',
+          user_id: 'user-001',
           category_name: 'other',
           estimated_amount: 1000,
           voted_at: new Date(Date.now() - 3600000).toISOString()

@@ -282,7 +282,7 @@ export type BudgetVotingResponse = {
   }>;
 
   stats: {
-    [K in BudgetCategory]: {
+    [K in BudgetCategory]?: {
       q1: number;
       q2: number;
       q3: number;
@@ -374,7 +374,7 @@ export interface LocationVoteResponse {
       }>;
       provinces: string[];
       totalScore: number;
-      weightedScore: number;
+      // weightedScore: number;
       rank1Count: number;
       diversity: number;
     };
