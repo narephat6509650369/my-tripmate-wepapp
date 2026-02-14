@@ -434,7 +434,7 @@ export const getUserBudgetForTrip = async (tripid: string, user_id: string) => {
   (budget as any[]).forEach((vote: any) => {
     const category = vote.category_name;
     const amount = Number(vote.estimated_amount);
-    console.log("vote:",vote);
+    //console.log("vote:",vote);
 
     if (!categoryMap[category]) {
       categoryMap[category] = [];
@@ -555,22 +555,50 @@ export const getUserBudgetForTrip = async (tripid: string, user_id: string) => {
 
 
 // ===================== LOCATION VOTING =====================
+const PROVINCE_REGIONS: Record<string, string[]> = {
+  'ภาคเหนือ': ['เชียงใหม่','เชียงราย','ลำปาง','ลำพูน','แม่ฮ่องสอน','น่าน','พะเยา','แพร่','อุตรดิตถ์'],
+  'ภาคตะวันออกเหนือ': [
+    'นครราชสีมา','บุรีรัมย์','สุรินทร์','ศรีสะเกษ','อุบลราชธานี',
+    'ยโสธร','ชัยภูมิ','อำนาจเจริญ','หนองบัวลำภู','ขอนแก่น',
+    'อุดรธานี','เลย','หนองคาย','มหาสารคาม','ร้อยเอ็ด',
+    'กาฬสินธุ์','สกลนคร','นครพนม','มุกดาหาร','บึงกาฬ'
+  ],
+  'ภาคกลาง': [
+    'กรุงเทพมหานคร','นนทบุรี','ปทุมธานี','สมุทรปราการ',
+    'นครปฐม','สมุทรสาคร','สมุทรสงคราม','พระนครศรีอยุธยา',
+    'อ่างทอง','ลพบุรี','สิงห์บุรี','ชัยนาท','สระบุรี',
+    'ฉะเชิงเทรา','ปราจีนบุรี','นครนายก','สุพรรณบุรี',
+    'กาญจนบุรี','ราชบุรี','เพชรบุรี','ประจวบคีรีขันธ์'
+  ],
+  'ภาคตะวันออก': ['ชลบุรี','ระยอง','จันทบุรี','ตราด','สระแก้ว'],
+  'ภาคใต้': [
+    'นครศรีธรรมราช','กระบี่','พังงา','ภูเก็ต','สุราษฎร์ธานี',
+    'ระนอง','ชุมพร','สงขลา','สตูล','ตรัง','พัทลุง',
+    'ปัตตานี','ยะลา','นราธิวาส'
+  ],
+  'ภาคตะวันตก': [
+    'ตาก','กำแพงเพชร','พิษณุโลก','สุโขทัย','พิจิตร',
+    'เพชรบูรณ์','นครสวรรค์','อุทัยธานี'
+  ]
+};
 
-/**
- * 6. โหวตจังหวัด (Ranked Voting: 3 อันดับ)
- */
-export const voteLocation = async (
-  tripid: string,
-  user_id: string,
-  votes: LocationVotePayload[]
-) => {
+const getRegion = (province: string): string => {
+  for (const [region, provinces] of Object.entries(PROVINCE_REGIONS)) {
+    if (provinces.includes(province)) return region;
+  }
+  return 'ไม่ระบุภูมิภาค';
+};
+
+ // 6. โหวตจังหวัด (Ranked Voting: 3 อันดับ)
+export const voteLocation = async (tripid: string,user_id: string,votes: LocationVotePayload[]) => {
   // 1. Validate จำนวน
   if (!Array.isArray(votes) || votes.length !== 3) {
     throw new Error("Must vote for exactly 3 provinces");
   }
 
   // 2. Validate จังหวัดไม่ซ้ำ
-  const provinces = votes.map(v => v.place);
+  const provinces = votes.map(v => v.place );
+
   const unique = new Set(provinces);
   if (unique.size !== 3) {
     throw new Error("Must vote for 3 different provinces");
@@ -601,10 +629,115 @@ export const voteLocation = async (
 
 
 // get location vote
-export const getLocationVote = async ( tripId: string ) => {
-  const location = await voteModel.getVoteLocation(tripId);
-  return location ;
-}
+export const getLocationVote = async (tripId: string, user_id: string) => {
+  const { rows, rowlog, locationVotesTotal } = await voteModel.getVoteLocation(tripId, user_id);
+
+  if (!Array.isArray(locationVotesTotal) || locationVotesTotal.length === 0) {
+    return {
+      rows,
+      analysis: null,
+      rowlog,
+      locationVotesTotal: []
+    };
+  }
+
+  const provinceScores = locationVotesTotal
+    .map((r: any) => ({
+      place: r.place,
+      region: getRegion(r.place),
+      total_score: Number(r.total_score),
+      voteCount: Number(r.vote_count),
+      rank1Count: Number(r.rank_1)
+    }))
+    .sort((a, b) =>
+      b.total_score - a.total_score ||   // คะแนนรวม (3-2-1) 
+      b.rank1Count - a.rank1Count ||     // //จำนวน คน ที่ให้จังหวัดนั้นเป็นอันดับ 1
+      b.voteCount - a.voteCount          // จำนวนคนโหวตให้จังหวัดนั้น (ไม่สนอันดับ)
+    );
+
+  const first = provinceScores[0];
+  const second = provinceScores[1];
+
+  const hasDistinctWinner =
+    provinceScores.length === 1 ||
+    (first && second && (
+      first.total_score > second.total_score ||
+      (
+        first.total_score === second.total_score &&
+        first.rank1Count > second.rank1Count
+      ) ||
+      (
+        first.total_score === second.total_score &&
+        first.rank1Count === second.rank1Count &&
+        first.voteCount > second.voteCount
+      )
+    ));
+
+  let analysis: any = null;
+
+  if (hasDistinctWinner) {
+    analysis = {
+      hasWinner: true,
+      winner: first,
+      topProvinces: provinceScores.slice(0, 3)
+    };
+  } else {
+
+    // ไม่มีผู้ชนะที่ชัดเจน ให้วิเคราะห์ระดับภูมิภาคต่อ (รวมคะแนนตามภูมิภาค)
+
+    const regionScores: Record<string, any> = {};
+
+    provinceScores.forEach(p => {
+      if (!regionScores[p.region]) {
+        regionScores[p.region] = {
+          totalScore: 0,
+          rank1Count: 0,
+          voteCount: 0,
+          provinces: new Set<string>()
+        };
+      }
+
+      regionScores[p.region].totalScore += p.total_score;
+      regionScores[p.region].rank1Count += p.rank1Count;
+      regionScores[p.region].voteCount += p.voteCount;
+      regionScores[p.region].provinces.add(p.place);
+    });
+
+    const sortedRegions = Object.entries(regionScores).sort(
+      ([regionA, a]: any, [regionB, b]: any) =>
+        b.totalScore - a.totalScore ||
+        b.rank1Count - a.rank1Count ||
+        b.voteCount - a.voteCount ||
+        b.provinces.size - a.provinces.size ||
+        regionA.localeCompare(regionB, 'th')
+    );
+
+    const [bestRegion, data]: any = sortedRegions[0];
+
+    analysis = {
+      hasWinner: false,
+      bestRegion: {
+        region: bestRegion,
+        topProvinces: provinceScores
+          .filter(p => p.region === bestRegion)
+          .slice(0, 3),
+        provinces: Array.from(data.provinces),
+        totalScore: data.totalScore,
+        rank1Count: data.rank1Count,
+        voteCount: data.voteCount,
+        diversity: data.provinces.size
+      }
+    };
+  }
+
+  return {
+    rows,
+    analysis,
+    locationVotesTotal: provinceScores,
+    rowlog
+  };
+};
+
 
 /*ปิดทริป
 export const closeTrip = async (tripCode: string, user_id: string) => {
@@ -680,4 +813,6 @@ export default {
 export function getBudgetVoting(tripCode: string, userId: string) {
   throw new Error('Function not implemented.');
 }
+
+
 

@@ -489,21 +489,20 @@ export const submitLocationVotes = async (trip_id: string,user_id: string,votes:
     );
 
     let voting_id = votingRows[0]?.location_voting_id;
-    //check ถ้ามีก็ไม่มี insert แล้ว แต่ 2 อันบนใช่ duplicat
+
     if (!voting_id) {
       voting_id = uuidv4();
       await connection.query(
-        `INSERT INTO location_votings (location_voting_id, trip_id, status)
-         VALUES (?, ?,'active')
-         ON DUPLICATE KEY UPDATE location_voting_id = location_voting_id
-         `,
+        `INSERT INTO location_votings (location_voting_id, trip_id)
+         VALUES (?, ?)`,
         [voting_id, trip_id]
       );
     }
 
     // 2. ลบโหวตเก่าของ user ในทริปนี้
     await connection.query(
-      `DELETE lv FROM location_votes lv
+      `DELETE lv 
+      FROM location_votes lv
        JOIN location_options lo 
          ON lv.location_option_id = lo.location_option_id
        WHERE lo.location_voting_id = ?
@@ -595,7 +594,7 @@ export const clearLocation = async (trip_id: string, user_id: string) => {
   await pool.query(sql, [trip_id, user_id]);
 };
 
-export const getVoteLocation = async (tripId:string) => {
+export const getVoteLocation = async (tripId:string, user_id: string) => {
   const connection = await pool.getConnection();
   try{
     const [rows] = await connection.query (
@@ -609,10 +608,30 @@ export const getVoteLocation = async (tripId:string) => {
       FROM location_votes lv
       JOIN location_options lo ON lv.location_option_id = lo.location_option_id
       JOIN location_votings lvt ON lo.location_voting_id = lvt.location_voting_id
-      WHERE lvt.trip_id = ?
+      WHERE lvt.trip_id = ? AND lv.user_id = ?
       `,
-      [tripId]
+      [tripId, user_id]
     );
+
+  const [locationVotesTotal] = await connection.query(
+  `
+    SELECT 
+      lo.province_name AS place,
+        SUM(lv.score) AS total_score,
+        COUNT(lv.location_vote_id) AS vote_count,
+        SUM(CASE WHEN lv.score = 3 THEN 1 ELSE 0 END) AS rank_1,
+        SUM(CASE WHEN lv.score = 2 THEN 1 ELSE 0 END) AS rank_2,
+        SUM(CASE WHEN lv.score = 1 THEN 1 ELSE 0 END) AS rank_3
+      FROM location_votes lv
+      JOIN location_options lo ON lv.location_option_id = lo.location_option_id
+      JOIN location_votings lvt ON lo.location_voting_id = lvt.location_voting_id
+      WHERE lvt.trip_id = ?
+      GROUP BY lo.province_name
+      ORDER BY total_score DESC;
+
+  `,
+  [tripId]
+  );
 
   const [rowlog] = await connection.query(
     `
@@ -631,9 +650,14 @@ export const getVoteLocation = async (tripId:string) => {
   )
     return {
       rows,
+      locationVotesTotal,
       rowlog
      };
+  } catch (err) {
+    console.log("ERROR:",err);
+    throw err;
   } finally {
+    
     connection.release();
   }
 }

@@ -390,6 +390,16 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
 export const getLocationVoteController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
+    const user_id = (req.user as JwtPayload)?.userId;
+
+    if (!user_id) {
+      return res.status(401).json({
+        success: false,
+        code: "UNAUTHORIZED",
+        message: "User not authenticated"
+    });
+  }
+
 
     if (!tripId) {
       return res.status(400).json({
@@ -400,7 +410,7 @@ export const getLocationVoteController = async (req: Request, res: Response) => 
       });
     }
 
-    const locationVotes = await voteService.getLocationVote(tripId);
+    const locationVotes = await voteService.getLocationVote(tripId, user_id);
 
     return res.status(200).json({
       success: true,
@@ -411,6 +421,7 @@ export const getLocationVoteController = async (req: Request, res: Response) => 
 
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
+    console.log("Error fetching location votes:", message);
 
     if (message === "ไม่พบทริป") {
       return res.status(404).json({

@@ -509,35 +509,33 @@ export const voteAPI = {
   /**
    * POST /api/votes/:tripid/vote-place
    */
-  submitLocationVote: async (
-    tripid: string,
-    payload: SubmitLocationVotePayload
-  ): Promise<ApiResponse<{ scores: LocationScores }>> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockSubmitLocationVote(tripid, payload.votes.map(v => v.place));
-    }
+  submitLocationVote: async (tripid: string,payload: SubmitLocationVotePayload): Promise<ApiResponse<{ scores: LocationScores }>> => {
 
-    try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockSubmitLocationVote(tripid, payload.votes.map(v => v.place));
+  }
 
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripid}/vote-place`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/votes/${tripid}/vote-place`,
+      {
+        method: "POST",
+        credentials: "include", 
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify(payload)
-      });
+      }
+    );
 
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
+    return await response.json();
+
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
+
 
   // ============================================================================
   // STEP 4: SUMMARY (Trip Close & Summary)
