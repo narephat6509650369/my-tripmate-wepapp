@@ -3,8 +3,8 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Loader2 } from 'lucide-react';
 import { voteAPI } from '../../../services/tripService';
 import { formatCurrency } from '../../../utils';
-import type { TripDetail, BudgetCategory } from '../../../types';
-import { CONFIG } from '../../../config/app.config'; 
+import type { TripDetail, BudgetCategory, BudgetVotingResponse } from '../../../types';
+import { CONFIG } from '../../../config/app.config';
 
 // ============== API RESPONSE TYPES ==============
 
@@ -13,54 +13,6 @@ interface BudgetVote {
   category_name: string;
   estimated_amount: number;
   voted_at?: string | Date;
-}
-
-interface BudgetCategoryData {
-  category_name: string;
-  estimated_amount: number;
-  proposed_by?: string;
-  proposed_at?: string | Date;
-  priority?: number;
-  is_backup?: boolean;
-  all_votes?: BudgetVote[];
-}
-
-interface BudgetItem {
-  category?: string;
-  category_name?: string;
-  amount?: number;
-  estimated_amount?: number;
-  proposed_by?: string;
-  proposed_at?: string | Date;
-}
-
-interface BudgetProposalLog {
-  proposed_by: string;
-  proposed_at: string | Date;
-  category_name: string;
-  estimated_amount: number;
-  priority?: number;
-  proposed_by_name: string;
-}
-
-interface BudgetVotingResponse {
-  success: boolean;
-  data?: {
-    budgets?: BudgetItem[];
-    budget_options?: BudgetCategoryData[];
-    rowlog?: BudgetProposalLog[];
-    rows?: BudgetVote[];
-    stats?: {
-      accommodation?: { q1: number; q2: number; q3: number };
-      transport?: { q1: number; q2: number; q3: number };
-      food?: { q1: number; q2: number; q3: number };
-      other?: { q1: number; q2: number; q3: number };
-    };
-    budgetTotal?: number;
-    minTotal?: number;
-    maxTotal?: number;
-    filledMembers?: number;
-  };
 }
 
 interface BudgetStats {
@@ -182,11 +134,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
     voteAPI.getBudgetVoting(trip.tripid)
       .then((res) => {
         console.log('✅ Budget API Response:', res);
-        console.log('📊 Stats:', res.data?.stats);
-        console.log('👥 Filled Members:', res.data?.filledMembers);
-        console.log('🗒️ Rowlog:', res.data?.rowlog);
         
-        const data = res.data;
+        const data = res.data;  // ✅ เปลี่ยนจาก res.data?.data
 
         if (!data) {
           console.log('No data returned');
@@ -200,25 +149,21 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
           food: 0,
           other: 0
         };
-        
-        
 
-        // ✅ 1. โหลดงบประมาณที่ user กรอกไว้ (จาก rowlog)
+        // ✅ 1. โหลดงบประมาณที่ user กรอกไว้ (จาก rows)
         if (data.rows && Array.isArray(data.rows)) {
           data.rows.forEach((vote: any) => {
             const category = vote.category_name as keyof BudgetState;
             if (category in loadedBudget) {
               loadedBudget[category] = Number(vote.estimated_amount) || 0;
-              console.log(`📝 Loaded ${category}: ฿${loadedBudget[category]}`);
             }
           });
-
           setBudget(loadedBudget);
           console.log('✅ Final loadedBudget:', loadedBudget);
         }
 
         // ✅ 2. ใช้สถิติจาก backend โดยตรง
-        if (data.stats) {
+        if (data.stats) {  // ✅ ใช้ data.stats โดยตรง
           console.log('📈 Processing stats...');
           const statsMap: BudgetStatsMap = {
             accommodation: {
@@ -263,7 +208,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, onSave, onManualNe
         }
 
         // ✅ 3. เก็บข้อมูลรวม
-        if (data.budgetTotal !== undefined) {
+        if (data.budgetTotal !== undefined) {  // ✅ ใช้ data.budgetTotal โดยตรง
           setTotalBudgetInfo({
             budgetTotal: data.budgetTotal || 0,
             minTotal: data.minTotal || 0,
