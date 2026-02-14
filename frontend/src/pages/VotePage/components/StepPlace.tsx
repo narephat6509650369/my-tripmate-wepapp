@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { voteAPI } from '../../../services/tripService';
 import { THAILAND_PROVINCES } from '../../../constants/provinces';
-import type { LocationVote, TripDetail } from '../../../types';
+import type { LocationVote, TripDetail, LocationVoteResponse, LocationVoteResult  } from '../../../types';
 
 // ============== CONSTANTS ==============
 const WEIGHTS = [3, 2, 1] as const;
@@ -17,52 +17,12 @@ interface StepPlaceProps {
   onInputChange?: () => void;
 }
 
-interface VotingResult {
-  place: string;
-  total_score: number;
-  vote_count: number;
-  voters: string[];
-  rank_distribution: {
-    rank_1: number;
-    rank_2: number;
-    rank_3: number;
-  };
-  region?: string;
-}
-
-interface AnalysisResult {
-  hasWinner: boolean;
-  topProvinces?: Array<{
-    name: string;
-    score: number;
-    rank1: number;
-    region: string;
-  }>;
-  bestRegion?: {
-    region: string;
-    topProvinces: Array<{
-      name: string;
-      score: number;
-      rank1: number;
-    }>;
-    provinces: string[];
-    totalScore: number;
-    weightedScore: number;
-    rank1Count: number;
-    diversity: number;
-    explanation: string;
-  };
-}
+type AnalysisResult = NonNullable<LocationVoteResponse['analysis']>;
 
 // ============== HELPER FUNCTIONS ==============
-const calculateUniqueVoters = (results: VotingResult[]): number => {
-  const votersSet = new Set<string>();
-  results.forEach(r => {
-    if (r.voters && Array.isArray(r.voters)) {
-      r.voters.forEach(v => votersSet.add(v));
-    }
-  });
-  return votersSet.size;
+const calculateUniqueVoters = (results: LocationVoteResult[]): number => {
+  // ใช้ voteCount สูงสุด = จำนวนคนที่โหวตมากที่สุด
+  return results.length > 0 ? Math.max(...results.map(r => r.voteCount)) : 0;
 };
 
 // ============== MAIN COMPONENT ==============
@@ -78,7 +38,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [votingResults, setVotingResults] = useState<VotingResult[]>([]);
+  const [votingResults, setVotingResults] = useState<LocationVoteResult[]>([]);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -141,11 +101,10 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         setIsLoading(true);
         setError('');
         const response = await voteAPI.getLocationVote(trip.tripid);
-
-        const votingData = response?.data?.data;
+        const votingData = response?.data as LocationVoteResponse | undefined; 
 
         // Validate structure
-        if (!votingData.voting_results || !Array.isArray(votingData.voting_results)) {
+        if (!votingData?.locationVotesTotal || !Array.isArray(votingData.locationVotesTotal)) {
           console.warn('Invalid voting results structure:', votingData);
           setVotingResults([]);
           setAnalysisResult(null);
@@ -153,31 +112,21 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         }
 
         // Validate each result
-        const validResults = votingData.voting_results.filter((r: any) => {
-          if (!r.place || typeof r.total_score !== 'number' || typeof r.vote_count !== 'number') {
+        const validResults = votingData.locationVotesTotal.filter((r: any) => {
+          if (!r.place || typeof r.total_score !== 'number' || typeof r.voteCount !== 'number') {
             return false;
           }
           
-          if (r.total_score < 0 || r.vote_count < 0) {
+          if (r.total_score < 0 || r.voteCount < 0) {
             console.warn(`Invalid negative values for ${r.place}`);
             return false;
           }
-          
-          if (!r.rank_distribution || 
-              typeof r.rank_distribution.rank_1 !== 'number' ||
-              typeof r.rank_distribution.rank_2 !== 'number' ||
-              typeof r.rank_distribution.rank_3 !== 'number') {
-            return false;
-          }
-          
-          if (!Array.isArray(r.voters)) return false;
-          
           return true;
         });
 
         setVotingResults(validResults);
 
-        // Use analysis from backend if available, otherwise calculate simple fallback
+        // Use analysis from backend if available
         if (votingData.analysis) {
           setAnalysisResult(votingData.analysis);
         } else {
@@ -255,18 +204,17 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         await new Promise(resolve => setTimeout(resolve, 300));
         
         const response = await voteAPI.getLocationVote(trip.tripid);
-        const votingData = response?.data?.data ?? response?.data ?? {};
-        const newResults = votingData.voting_results || [];
-        
+        const votingData = response?.data as LocationVoteResponse | undefined; 
+        const newResults = votingData?.locationVotesTotal || [];
+
         hasMyVote = newResults.some((r: any) => 
           myVote.some(place => r.place === place)
         );
-        
+
         if (hasMyVote && newResults.length > 0) {
           setVotingResults(newResults);
           
-          // Update analysis
-          if (votingData.analysis) {
+          if (votingData?.analysis) {
             setAnalysisResult(votingData.analysis);
           } else {
             console.warn('⚠️ Backend did not return analysis after vote');
@@ -299,7 +247,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
             <p className="text-xl font-semibold text-gray-800 mb-2">ยังไม่มีข้อมูลการโหวต</p>
             <p className="text-gray-600 mb-6">รอให้สมาชิกในทริปเริ่มโหวตก่อนนะ</p>
             <button
-              onClick={() => setShowAnalysisModal(false)}
+              onClick={() => setShowAnalysisModal(false)} 
               className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
             >
               ปิด
@@ -387,7 +335,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                 <div className="space-y-3">
                   {analysis.topProvinces.map((prov, idx) => (
                     <div
-                      key={prov.name}
+                      key={prov.place}
                       className={`bg-white rounded-xl p-4 border-2 transition-all hover:shadow-md ${
                         idx === 0 ? 'border-yellow-400 shadow-lg' :
                         idx === 1 ? 'border-gray-300' :
@@ -401,19 +349,19 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                           </span>
                           <div>
                             <p className="font-bold text-lg text-gray-900">
-                              {prov.name}
+                              {prov.place}
                             </p>
                             <p className="text-xs text-gray-500">{prov.region}</p>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="text-3xl font-bold text-purple-600">
-                            {prov.score}
+                            {prov.total_score}
                           </p>
                           <p className="text-xs text-gray-500">คะแนน</p>
-                          {prov.rank1 > 0 && (
+                          {prov.rank1Count > 0 && (
                             <p className="text-xs text-yellow-600 mt-1 font-medium">
-                              🥇 อันดับ 1: {prov.rank1} ครั้ง
+                              🥇 อันดับ 1: {prov.rank1Count} ครั้ง
                             </p>
                           )}
                         </div>
@@ -424,7 +372,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
 
                 <div className="mt-5 bg-green-100 border border-green-300 rounded-lg p-4">
                   <p className="text-sm text-green-800">
-                    💡 <strong>ตอนนี้:</strong> {analysis.topProvinces[0].name} นำคะแนนอยู่ 
+                    💡 <strong>ตอนนี้:</strong> {analysis.topProvinces[0].place} นำคะแนนอยู่ 
                     {uniqueVoters < totalMembers && ' (อาจเปลี่ยนได้ถ้ามีคนโหวตเพิ่ม)'}
                   </p>
                 </div>
@@ -459,12 +407,12 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                         {analysis.bestRegion.region}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {analysis.bestRegion.explanation}
+                        ภูมิภาคนี้ได้คะแนนโหวตสูงสุดจากสมาชิกในทริป
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-3xl font-bold text-orange-700">
-                        {analysis.bestRegion.weightedScore}
+                        {analysis.bestRegion.totalScore}
                       </p>
                       <p className="text-xs text-orange-600">คะแนน</p>
                     </div>
@@ -477,12 +425,14 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                       </p>
                       <p className="text-xs text-yellow-600 font-medium">🥇 อันดับ 1</p>
                     </div>
+                    
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
                       <p className="text-2xl font-bold text-blue-700">
                         {analysis.bestRegion.totalScore}
                       </p>
                       <p className="text-xs text-blue-600 font-medium">คะแนนรวม</p>
                     </div>
+                    
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
                       <p className="text-2xl font-bold text-green-700">
                         {analysis.bestRegion.diversity}
@@ -499,7 +449,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                   </p>
                   {analysis.bestRegion.topProvinces.map((prov, idx) => (
                     <div
-                      key={prov.name}
+                      key={prov.place}
                       className="bg-white rounded-lg p-4 border-2 border-orange-200 flex items-center justify-between hover:shadow-md transition-all"
                     >
                       <div className="flex items-center gap-3">
@@ -507,12 +457,12 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                           {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
                         </span>
                         <span className="font-semibold text-gray-900 text-lg">
-                          {prov.name}
+                          {prov.place}
                         </span>
                       </div>
                       <div className="text-right">
                         <span className="text-xl font-bold text-orange-700">
-                          {prov.score}
+                          {prov.total_score}
                         </span>
                         <span className="text-xs text-gray-500 ml-1">คะแนน</span>
                       </div>
