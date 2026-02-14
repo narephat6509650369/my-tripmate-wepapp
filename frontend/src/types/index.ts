@@ -338,6 +338,67 @@ export interface LocationScores {
   [province: string]: number;
 }
 
+
+export interface LocationVoteResponse {
+  rows: Array<{
+    location_vote_id: string;
+    location_option_id: string;
+    user_id: string;
+    voted_at: string;
+    score: number;
+    province_name: string;
+  }>;
+  
+  analysis: {
+    hasWinner: boolean;
+    winner?: {
+      place: string;
+      region: string;
+      total_score: number;
+      voteCount: number;
+      rank1Count: number;
+    };
+    topProvinces?: Array<{
+      place: string;
+      region: string;
+      total_score: number;
+      voteCount: number;
+      rank1Count: number;
+    }>;
+    bestRegion?: {
+      region: string;
+      topProvinces: Array<{
+        place: string;
+        total_score: number;
+        rank1Count: number;
+      }>;
+      provinces: string[];
+      totalScore: number;
+      weightedScore: number;
+      rank1Count: number;
+      diversity: number;
+    };
+  } | null;
+  
+  locationVotesTotal: Array<{
+    place: string;
+    region: string;
+    total_score: number;
+    voteCount: number;
+    rank1Count: number;
+  }>;
+  
+  rowlog: Array<{
+    proposed_by: string;
+    province_name: string;
+    score: number;
+    proposed_at: string;
+    proposed_by_name: string;
+  }>;
+}
+
+export type LocationVoteResult = LocationVoteResponse['locationVotesTotal'][number];
+
 export interface DateMatchingResponse {
   rows: string[];
   countrows: number;
@@ -463,16 +524,16 @@ export const tripSummaryToCard = (trip: TripSummary): TripCard => {
 // Date Matching Result Types
 // ============================================================================
 // วันที่ที่มีคนว่างตรงกันทั้งหมด
-export interface DateIntersectionResult {
-  rows: boolean;
-  recommendation: null;
-  availability: never[];
-  summary: { totalMembers: number; totalAvailableDays: number; };
-  userAvailability: string[]; // วันที่ผู้ใช้คนนี้ว่าง
-  intersection: string[];
-  weighted: WeightedDateResult[];
-  totalMembers: number;
-}
+// export interface DateIntersectionResult {
+//   rows: boolean;
+//   recommendation: null;
+//   availability: never[];
+//   summary: { totalMembers: number; totalAvailableDays: number; };
+//   userAvailability: string[]; // วันที่ผู้ใช้คนนี้ว่าง
+//   intersection: string[];
+//   weighted: WeightedDateResult[];
+//   totalMembers: number;
+// }
 
 // คะแนนความนิยมของแต่ละวัน
 export interface WeightedDateResult {
