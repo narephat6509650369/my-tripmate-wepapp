@@ -278,7 +278,7 @@ const Dashboard: React.FC = () => {
                         cy="50%"
                         outerRadius={80}
                         label={({ name, value, percent }) => 
-                          `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
+                          `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
                         }
                       >
                         {myTripsChartData.map((entry, index) => (
@@ -356,7 +356,7 @@ const Dashboard: React.FC = () => {
                         cy="50%"
                         outerRadius={80}
                         label={({ name, value, percent }) => 
-                          `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
+                          `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
                         }
                       >
                         {joinedTripsChartData.map((entry, index) => (
