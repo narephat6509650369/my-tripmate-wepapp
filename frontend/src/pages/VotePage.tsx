@@ -74,17 +74,17 @@ const VotePage: React.FC = () => {
         setInviteCode(tripData.invitecode);
         setTrip(tripData);
         try {
-          // วันที่
+          // ========== วันที่ ==========
           const dateRes = await voteAPI.getDateMatchingResult(tripData.tripid);
-          if (dateRes?.data?.data?.userAvailability) {
-            setUserDates(dateRes.data.data.userAvailability);
+          if (dateRes?.data?.rows) {
+            setUserDates(dateRes.data.rows);
           }
 
-          // งบ
+          // ========== งบประมาณ ==========
           const budgetRes = await voteAPI.getBudgetVoting(tripData.tripid);
-          if (budgetRes?.data?.data?.budget_options) {
+          if (budgetRes?.data?.rows) {
             const b = { accommodation: 0, transport: 0, food: 0, other: 0 };
-            budgetRes.data.data.budget_options.forEach((item: any) => {
+            budgetRes.data.rows.forEach((item: any) => {
               if (item.category_name in b) {
                 b[item.category_name as keyof typeof b] = item.estimated_amount;
               }
@@ -92,10 +92,21 @@ const VotePage: React.FC = () => {
             setUserBudget(b);
           }
 
-          // จังหวัด
+          // ========== จังหวัด ==========
           const locRes = await voteAPI.getLocationVote(tripData.tripid);
-          if (locRes?.data?.data?.my_votes) {
-            setUserLocations(locRes.data.data.my_votes);
+
+          if (locRes?.data?.rowlog && user?.user_id) {
+            // กรองเฉพาะของ user คนนี้
+            const myVotes = locRes.data.rowlog
+              .filter((log: any) => log.proposed_by === user.user_id)
+              .map((log: any) => ({
+                place: log.province_name,
+                score: log.score
+              }));
+            
+            if (myVotes.length > 0) {
+              setUserLocations(myVotes);
+            }
           }
         } catch (e) {
           console.error('Load user input failed:', e);
