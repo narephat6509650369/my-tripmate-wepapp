@@ -376,13 +376,11 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
   const budgetOptions=`
     SELECT
       bo.category_name,
-      bo.estimated_amount,
-      bo.is_backup
+      bo.estimated_amount
     FROM budget_votings bvg
     JOIN budget_options bo
       ON bvg.budget_voting_id = bo.budget_voting_id
     WHERE bvg.trip_id = ?
-    ORDER BY bo.priority ASC
   `;
   
   const MemberAvailabilitys = `

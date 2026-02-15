@@ -23,7 +23,7 @@ export const auth = (req: Request,res: Response,next: NextFunction) => {
     req.user = decoded;
     next();
 
-    console.log("COOKIE TOKEN:", token);
+    //console.log("COOKIE TOKEN:", token);
 
     //console.log("VERIFY ACCESS_SECRET:", process.env.ACCESS_SECRET);
 

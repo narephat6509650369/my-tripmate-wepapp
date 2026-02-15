@@ -168,7 +168,7 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
     }
 
     const result = await voteService.getTripDateMatchingResult(tripId, userId);
-    console.log("Date matching:",result);
+    //console.log("Date matching:",result);
 
     //console.log("get tripmatching results:",result);
 

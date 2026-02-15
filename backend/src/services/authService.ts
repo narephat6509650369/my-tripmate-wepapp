@@ -48,7 +48,7 @@ export const googleLoginService = async (access_token: string): Promise<{
   );
 
   //console.log("SIGN ACCESS_SECRET:", process.env.ACCESS_SECRET);
-  console.log("SIGNED ACCESS TOKEN:", accessToken);
+  //console.log("SIGNED ACCESS TOKEN:", accessToken);
 
   return { accessToken, refreshToken, user };
 };

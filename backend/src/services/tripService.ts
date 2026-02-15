@@ -66,11 +66,22 @@ export const getUserTrips = async (user_id: string) => {
  *  
  */
 export const getTripDetail = async (tripCode: string) => {
-  
-  const trip = await tripModel.getTripDetail(tripCode);
+  try{
+    const trip = await tripModel.getTripDetail(tripCode);
 
-  return trip;
+    if (!trip) {
+      throw new Error("Trip not found");
+    }
+    
+    return trip;
+  }
+  
+  catch (error) {
+    console.error("Get trip detail error:", error instanceof Error ? error.message : error);
+    throw new Error(error instanceof Error ? error.message : "An error occurred while fetching trip details");
+  }
 }
+
 
 /**
  * ลบทริป (เฉพาะ Owner + สถานะต้องเป็น 'planning')

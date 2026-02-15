@@ -276,7 +276,6 @@ export const getTripBudgets = async (trip_id: string, user_id: string) => {
         bo.proposed_at,
         bo.category_name,
         bo.estimated_amount,
-        bo.priority,
         u.full_name AS proposed_by_name
       FROM budget_options bo
       JOIN budget_votings bvt ON bo.budget_voting_id = bvt.budget_voting_id
@@ -321,7 +320,6 @@ export const getBudgetVoting = async (trip_id: string, user_id: string) => {
         bo.proposed_at,
         bo.category_name,
         bo.estimated_amount,
-        bo.priority,
         u.full_name AS proposed_by_name
       FROM budget_options bo
       JOIN budget_votings bvt ON bo.budget_voting_id = bvt.budget_voting_id
@@ -408,9 +406,6 @@ export const updateBudget = async (trip_id: string, user_id: string, category: s
       INSERT INTO budget_options
         (budget_option_id, budget_voting_id, proposed_by, category_name, estimated_amount)
       VALUES (UUID(), ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        estimated_amount = VALUES(estimated_amount),
-        proposed_at = CURRENT_TIMESTAMP
       `,
       [budget_voting_id, user_id, category, amount]
     );
@@ -536,7 +531,7 @@ export const submitLocationVotes = async (trip_id: string,user_id: string,votes:
         );
       }
 
-      // 3.2 INSERT vote (มี province_name แล้ว ✅)
+      // 3.2 INSERT vote (มี province_name แล้ว )
       await connection.query(
         `INSERT INTO location_votes
          (location_vote_id, location_option_id, user_id, score, province_name)

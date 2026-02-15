@@ -354,6 +354,7 @@ export const getFullTripData = async (tripCode: string) => {
  * 5. อัปเดตงบประมาณ
  */
 export const updateBudget = async ( tripid: string,user_id: string,category: string,amount: number ) => {
+  try{
   // 1. Validate
   const validCategories = ['accommodation', 'transport', 'food', 'other'];
   if (!validCategories.includes(category)) {
@@ -393,6 +394,13 @@ export const updateBudget = async ( tripid: string,user_id: string,category: str
     success: true,
     message: "Budget updated successfully"
   };
+  } catch (error) {
+    console.error("Budget update error:", error instanceof Error ? error.message : error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "An error occurred while updating budget"
+    };
+  }
 };
 
 /*
