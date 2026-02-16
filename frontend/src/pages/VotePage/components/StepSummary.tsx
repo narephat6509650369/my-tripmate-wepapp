@@ -1,8 +1,10 @@
 // src/pages/VotePage/components/StepSummary.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Edit3, ArrowRight } from 'lucide-react';
 import type { TripCard, TripDetail } from '../../../types';
+import { use } from 'passport';
+import { tripAPI } from '../../../services/tripService';
 
 // ============== TYPES ==============
 interface UserInputSummary {
@@ -33,6 +35,19 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   canViewSummary 
 }) => {
   const navigate = useNavigate();
+  
+  useEffect(() => {
+    console.log("📊 Trip Summary Data:", trip.tripid);
+    const fetchTripSummary = async () => {
+      try {
+        const response = await tripAPI.getTripSummary(trip.tripid);
+        console.log("getTripSummary:",response)
+      } catch (error) {
+        console.error("Error fetching trip summary:", error);
+      }
+    };
+    fetchTripSummary();
+  }, [trip.tripid]);
 
   // ============== HANDLERS ==============
   const handleViewFullSummary = () => {

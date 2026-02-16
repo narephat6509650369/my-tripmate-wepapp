@@ -125,7 +125,7 @@ export const startVotingSession = async (trip_id: string, user_id: string) => {
   }
 };
 */
-export const getTripDateMatchingResult = async (tripId: string,userId: string) => {
+export const getvoteDate = async (tripId: string,userId: string) => {
 
   const trip = await tripModel.findTripById(tripId);
   if (!trip) throw new Error("Trip not found");
@@ -265,92 +265,6 @@ export const getTripDateMatchingResult = async (tripId: string,userId: string) =
 // ===================== BUDGET VOTING =====================
 
 /**
- * 4. ดึงข้อมูลทริปทั้งหมด (สำหรับหน้า Vote)
- */
-/*
-export const getFullTripData = async (tripCode: string) => {
-  // 1. หาทริปจาก invite_code
-  const trip = await tripModel.getTripByInviteCode(tripCode);
-  if (!trip) throw new Error("Trip not found");
-  if(!trip.user_id){
-    throw new Error("Trip owner ID not found");
-  }
-  const user_id = trip.user_id;
-  
-  const trip_id = trip.trip_id;
-  
-  // 2. ดึงข้อมูลทั้งหมด
-  const [members, budgets, locationScores, availabilities] = await Promise.all([
-    tripModel.getTripMembers(trip_id),
-    voteModel.getTripBudgets(trip_id),
-    voteModel.getLocationScores(trip_id),
-    voteModel.getTripAvailabilities(trip_id, user_id)
-  ]);
-
-  // 3. Transform Data ให้ตรงกับ Frontend Format
-  const formattedMembers = members.map((m: any) => {
-    // จัดกลุ่ม budget ตาม user_id
-    const userBudgets = budgets.filter((b: any) => b.user_id === m.user_id);
-    const budgetObj: any = {
-      accommodation: 0,
-      transport: 0,
-      food: 0,
-      other: 0,
-      lastUpdated: 0
-    };
-
-    userBudgets.forEach((b: any) => {
-      const category = b.category_name;
-      budgetObj[category] = Number(b.estimated_amount);
-      
-      const time = new Date(b.last_updated).getTime();
-      if (time > budgetObj.lastUpdated) {
-        budgetObj.lastUpdated = time;
-      }
-    });
-
-    // Mock availability (ต้องแปลงจาก DB -> Boolean Array ตาม Frontend)
-    // TODO: Implement proper mapping based on fixed date headers
-    const availabilityBools = Array(8).fill(false);
-
-    return {
-      id: m.user_id,
-      name: m.full_name || m.user_id,
-      gender: m.gender || 'ชาย',
-      availability: availabilityBools,
-      budget: budgetObj
-    };
-  });
-
-  // 4. Location scores
-  const voteOptions = locationScores.map((l: any) => l.province_name);
-  
-  const provinces = locationScores.map((l: any) => ({
-    name: l.province_name,
-    score: Number(l.total_score)
-  }));
-
-  return {
-    trip: {
-      trip_id: trip.trip_id,
-      trip_name: trip.trip_name,
-      inviteCode: trip.invite_code,
-      status: trip.status
-    },
-    members: formattedMembers,
-    budgets,
-    locationScores,
-    availabilities,
-    voteOptions,
-    voteResults: {
-      provinces,
-      dates: [] // TODO: Calculate from availabilities
-    }
-  };
-};
-*/
-
-/**
  * 5. อัปเดตงบประมาณ
  */
 export const updateBudget = async ( tripid: string,user_id: string,category: string,amount: number ) => {
@@ -406,7 +320,7 @@ export const updateBudget = async ( tripid: string,user_id: string,category: str
 /*
 * ดึงข้อมูลสำหรับอัปเดตงบประมาณของตัวเอง
 */
-export const getUserBudgetForTrip = async (tripid: string, user_id: string) => {
+export const getvoteBudget = async (tripid: string, user_id: string) => {
 
   const trip = await tripModel.findTripById(tripid);
   if (!trip) throw new Error("Trip not found");
@@ -637,7 +551,7 @@ export const voteLocation = async (tripid: string,user_id: string,votes: Locatio
 
 
 // get location vote
-export const getLocationVote = async (tripId: string, user_id: string) => {
+export const getvoteLocation = async (tripId: string, user_id: string) => {
   const { rows, rowlog, locationVotesTotal } = await voteModel.getVoteLocation(tripId, user_id);
 
   if (!Array.isArray(locationVotesTotal) || locationVotesTotal.length === 0) {

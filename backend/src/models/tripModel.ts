@@ -143,10 +143,6 @@ export interface TripSummaryMember extends RowDataPacket {
 export interface TripSummaryResult {
   trip: any;
   members: TripSummaryMember[];
-  budgetVoting: any;
-  budgetOptions: any[];
-  locationResult: any;
-  dateOptions: any[];
 }
 
 
@@ -551,7 +547,7 @@ export async function getTripSummaryById(tripId: string): Promise<TripSummaryRes
     [tripId]
   );
 
-  if ((tripRows as any[]).length === 0) return null;
+  if (tripRows.length === 0) return null; // ถ้าไม่เจอทริป ให้คืนค่า null
 
   /* 2. Members */
   const [memberRows] = await pool.query<TripSummaryMember[]>(
@@ -569,80 +565,9 @@ export async function getTripSummaryById(tripId: string): Promise<TripSummaryRes
     [tripId]
   );
 
-  /* 3. Budget voting */
-  const [budgetVotingRows] = await pool.query<RowDataPacket[]>(
-    `
-    SELECT 
-      budget_voting_id,
-      total_budget,
-      status,
-      closed_at
-    FROM budget_votings
-    WHERE trip_id = ?
-    `,
-    [tripId]
-  );
-
-  let budgetOptions: any[] = [];
-  if ((budgetVotingRows as any[]).length > 0) {
-    const votingId = (budgetVotingRows as any)[0].budget_voting_id;
-
-    const [optionRows] = await pool.query<RowDataPacket[]>(
-      `
-      SELECT 
-        category_name,
-        estimated_amount,
-        priority,
-        is_backup
-      FROM budget_options
-      WHERE budget_voting_id = ?
-      ORDER BY priority ASC
-      `,
-      [votingId]
-    );
-
-    budgetOptions = optionRows as any[];
-  }
-
-  /* 4. Location result */
-  const [locationRows] = await pool.query<RowDataPacket[]>(
-    `
-    SELECT 
-      lo.province_name,
-      COUNT(lv.location_vote_id) AS vote_count
-    FROM location_votings lvo
-    JOIN location_options lo ON lvo.location_voting_id = lo.location_voting_id
-    LEFT JOIN location_votes lv ON lo.location_option_id = lv.location_option_id
-    WHERE lvo.trip_id = ?
-    GROUP BY lo.location_option_id
-    ORDER BY vote_count DESC
-    LIMIT 1
-    `,
-    [tripId]
-  );
-
-  /* 5. Date result */
-  const [dateRows] = await pool.query<RowDataPacket[]>(
-    `
-    SELECT 
-      do.available_date
-    FROM date_votings dvt
-    JOIN date_options do ON do.date_voting_id = dvt.date_voting_id
-    JOIN date_votes dv ON dv.date_option_id = do.date_option_id
-    WHERE dvt.trip_id = ?
-    ORDER BY dv.voted_at DESC
-    LIMIT 1;
-    `,
-    [tripId]
-  );
-
   return {
-    trip: (tripRows as any)[0],
-    members: memberRows,
-    budgetVoting: (budgetVotingRows as any)[0] || null,
-    budgetOptions,
-    locationResult: (locationRows as any)[0] || null,
-    dateOptions: dateRows
+    trip: tripRows[0] || null,
+    members: memberRows
   };
 }
 

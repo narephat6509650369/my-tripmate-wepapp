@@ -167,7 +167,7 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
       });
     }
 
-    const result = await voteService.getTripDateMatchingResult(tripId, userId);
+    const result = await voteService.getvoteDate(tripId, userId);
     //console.log("Date matching:",result);
 
     //console.log("get tripmatching results:",result);
@@ -298,8 +298,8 @@ export const getBudgetVoteController = async (req: Request, res: Response) => {
       });
     }
 
-    const data = await voteService.getUserBudgetForTrip(tripId, userId);
-    console.log("budget vote:",data)
+    const data = await voteService.getvoteBudget(tripId, userId);
+    //console.log("budget vote:",data)
 
     return res.status(200).json({
       success: true,
@@ -410,7 +410,7 @@ export const getLocationVoteController = async (req: Request, res: Response) => 
       });
     }
 
-    const locationVotes = await voteService.getLocationVote(tripId, user_id);
+    const locationVotes = await voteService.getvoteLocation(tripId, user_id);
 
     return res.status(200).json({
       success: true,

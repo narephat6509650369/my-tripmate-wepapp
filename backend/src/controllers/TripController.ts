@@ -399,6 +399,7 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
     }
 
     const summary = await getTripSummaryService(tripId, userId);
+    console.log("Trip summary:", summary);
 
     return res.status(200).json({
       success: true,

@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as tripModel from '../models/tripModel.js';
 import { getTripSummaryById, type Trip } from '../models/tripModel.js';
+import * as voteService from '../services/voteService.js';
+
 
 /**
  * สร้างทริปใหม่ พร้อมเพิ่มผู้สร้างเป็นสมาชิกคนแรก (Owner)
@@ -189,6 +191,8 @@ export const findById = async (tripId: string) => {
 }
 
 export async function getTripSummaryService(tripId: string,userId: string) {
+  try{
+
   const summary = await getTripSummaryById(tripId);
 
   if (!summary) {
@@ -201,8 +205,22 @@ export async function getTripSummaryService(tripId: string,userId: string) {
   if (!isMember) {
     throw new Error("FORBIDDEN");
   }
+   
+  const budgetVotes = await voteService.getvoteBudget(tripId,userId);
+  const locationResult = await voteService.getvoteLocation(tripId,userId);
+  const dateOptions = await voteService.getvoteDate(tripId,userId);
 
-  return summary;
+  return { 
+    summary, 
+    budgetVotes, 
+    locationResult, 
+    dateOptions 
+  };
+
+  } catch (error) {
+    console.error("Get trip summary error:", error instanceof Error ? error.message : error);
+    throw new Error(error instanceof Error ? error.message : "An error occurred while fetching trip summary");
+  }
 }
 
 export default {

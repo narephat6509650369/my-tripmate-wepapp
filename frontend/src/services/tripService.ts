@@ -172,16 +172,10 @@ export const tripAPI = {
     }
 
     try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
 
       const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}/summary`, {
-        headers: getAuthHeaders()
+        method: "GET",
+        credentials: "include"
       });
 
       return await response.json();
@@ -245,6 +239,7 @@ export const tripAPI = {
   /**
    * DELETE /api/trips/:tripId
    */
+  /*
   deleteTrip: async (tripId: string): Promise<ApiResponse> => {
   if (CONFIG.USE_MOCK_DATA) {
     await mockDelay();
@@ -265,10 +260,11 @@ export const tripAPI = {
     return handleApiError(error);
   }
 },
-
+*/
   /**
    * DELETE /api/trips/:tripId/members/:memberId
    */
+  /*
   removeMember: async (tripId: string, memberId: string): Promise<ApiResponse> => {
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
@@ -297,7 +293,9 @@ export const tripAPI = {
       return handleApiError(error);
     }
   }
+    */
 };
+
 
 // ============================================================================
 // VOTE APIs - จัดเรียงตาม Step
