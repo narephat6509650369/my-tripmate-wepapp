@@ -17,11 +17,11 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LoginPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+
           <Route path="/join/:inviteCode" element={<JoinPage />} />
 
-          {/* Protected Routes */}
           <Route path="/homepage" element={
             <ProtectedRoute>
               <HomePage />

@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as tripModel from '../models/tripModel.js';
-import { getTripSummaryById, type Trip } from '../models/tripModel.js';
+import { closeTrip, getTripSummaryById, type Trip } from '../models/tripModel.js';
 import * as voteService from '../services/voteService.js';
 
 
@@ -48,28 +48,48 @@ export const addTrip = async (owner_id: string,trip_name: string,description: st
  * ดึงทริปทั้งหมดของ User (เจ้าของ + เข้าร่วม)
  */
 export const getUserTrips = async (user_id: string) => {
-  // ดึงทริปทั้งหมด
-  const allTrips = await tripModel.findAllTripsByUserId(user_id);
+  try{
+
+    await autoCloseEligibleTripsForUser(user_id);
+
+    // ดึงทริปทั้งหมด
+    const allTrips = await tripModel.findAllTripsByUserId(user_id);
   
-  // แยกตาม role
-  const owned = allTrips.filter(t => t.role === 'owner');
-  const joined = allTrips.filter(t => t.role === 'member');
+    // แยกตาม role
+    const owned = allTrips.filter(t => t.role === 'owner');
+    const joined = allTrips.filter(t => t.role === 'member');
   
-  return {
-    all: allTrips,
-    owned,
-    joined
-  };
+    return {
+      all: allTrips,
+      owned,
+      joined
+    };
+
+  } catch (error) {
+    console.error("Get user trips error:", error instanceof Error ? error.message : error);
+    throw new Error(error instanceof Error ? error.message : "An error occurred while fetching user trips");
+  }
 };
+
+export const autoCloseEligibleTripsForUser = async (userId: string) => {
+  const openTrips = await tripModel.findOpenTripsByUserId(userId);
+
+  for (const trip of openTrips) {
+    await closeTripService(trip.trip_id, "auto");
+  }
+};
+
 
 /**
  * 
  * ดึงทริป detail (เฉพาะทริปที่เป็นสมาชิกอยู่โดยข้อมูลทริปแบบละเอียดของทริปหนึ่ง)
  *  
  */
-export const getTripDetail = async (tripCode: string) => {
+export const getTripDetail = async (tripId: string) => {
   try{
-    const trip = await tripModel.getTripDetail(tripCode);
+    await closeTripService(tripId, "auto");
+
+    const trip = await tripModel.getTripDetail(tripId);
 
     if (!trip) {
       throw new Error("Trip not found");
@@ -110,37 +130,52 @@ export const deleteTripService = async (trip_id: string) => {
  * เข้าร่วมทริปด้วยรหัสเชิญ
  */
 export const joinTripByCode = async (invite_code: string, user_id: string) => {
+  try{
   const trip = await tripModel.getTripByInviteCode(invite_code);
 
   if (!trip) throw new Error("Invalid invite code");
 
-  if (trip.status === 'archived' || trip.status === 'completed') {
-    throw new Error("Trip closed");
+  if (trip.status === 'archived' || trip.status === 'completed'|| trip.status === 'confirmed') {
+    return {
+      success: false,
+      message: `ไม่สามารถเข้าร่วมทริปทีได้เนื่องจากทริปถูกปิดไปแล้ว (สถานะ: ${trip.status})`
+    };
   }
 
   const members = await tripModel.getTripMembers(trip.trip_id);
   const existingMember = members.find(m => m.user_id === user_id);
 
   if (existingMember && existingMember.is_active) {
-    throw new Error("You are already a member of this trip");
+    return {
+      success: false,
+      message: "คุณเป็นสมาชิกของทริปนี้อยู่แล้ว"
+    };
   }
 
   if (existingMember && !existingMember.is_active) {
     await tripModel.reactivateTripMember(trip.trip_id, user_id);
     return {
+      success: true,
       trip_id: trip.trip_id,
       trip_name: trip.trip_name,
-      rejoined: true
+      rejoined: true,
+      message: "เข้าร่วมทริปสำเร็จ ( rejoined )"
     };
   }
 
   await tripModel.addMemberIfNotExists(trip.trip_id, user_id);
 
   return {
+    success: true,
     trip_id: trip.trip_id,
     trip_name: trip.trip_name,
-    rejoined: false
+    rejoined: false,
+    message: "เข้าร่วมทริปสำเร็จ"
   };
+  } catch (error) {
+    console.error("Join trip error:", error instanceof Error ? error.message : error);
+    throw new Error(error instanceof Error ? error.message : "An error occurred while joining the trip");
+  }
 };
 
 
@@ -205,7 +240,20 @@ export async function getTripSummaryService(tripId: string,userId: string) {
   if (!isMember) {
     throw new Error("FORBIDDEN");
   }
+  //console.log("members:",summary.members);
    
+  const getVoteNumber = await tripModel.getStatusVoteResult(tripId);
+  
+
+  const tripStatus = summary.trip[0].status;
+  //console.log("Trip Status:", tripStatus);
+  //เช็คสถานะทริป ถ้าเป็น planning จะยังไม่แสดงผลโหวต จนกว่าคนจะโหวเสร็จ
+  if (tripStatus === 'planning' ) {
+    return {
+      summary,
+      getVoteNumber
+    }
+  }
   const budgetVotes = await voteService.getvoteBudget(tripId,userId);
   const locationResult = await voteService.getvoteLocation(tripId,userId);
   const dateOptions = await voteService.getvoteDate(tripId,userId);
@@ -223,6 +271,79 @@ export async function getTripSummaryService(tripId: string,userId: string) {
   }
 }
 
+export const closeTripService = async (tripId: string,type: string,user_id?: string) => {
+
+  const trip = await tripModel.findTripById(tripId);
+
+  if (!trip) {
+    return { success: false, message: "ไม่พบทริป" };
+  }
+
+  if (["archived", "completed", "confirmed"].includes(trip.status)) {
+    return { success: false, message: "ทริปถูกปิดไปแล้ว" };
+  }
+
+  const memberCount = await tripModel.getTripMemberCount(tripId);
+
+  if (type === "auto") {
+
+    //  ป้องกัน auto-close ถ้ามีสมาชิก <= 1
+    if (memberCount <= 1) {
+      return { success: false, message: "จำนวนสมาชิกไม่เพียงพอสำหรับการปิดอัตโนมัติ" };
+    }
+
+    // เช็คหมดอายุการเดินทาง
+    const isExpired = (createdAt: Date, days: number) => {
+    console.log("Created At:", createdAt);
+    const diffTime = Date.now() - new Date(createdAt).getTime();
+      return diffTime / (1000 * 3600 * 24) > days;
+    };
+
+    if (isExpired(trip.created_at, 7)) {
+      await closeTrip(tripId, "archived");
+    return {
+      success: true,
+      message: "ทริปถูกปิดอัตโนมัติเนื่องจากเปิดเกิน 7 วันแล้ว"
+    };
+    }
+
+
+    // ✅ 3️⃣ เช็คโหวตครบ
+    const votes = await tripModel.getStatusVoteResult(tripId);
+
+    const isVoteComplete =
+      votes.dateVoteNum === votes.totalMembers &&
+      votes.budgetVoteNum === votes.totalMembers &&
+      votes.locationVoteNum === votes.totalMembers;
+
+    if (isVoteComplete) {
+      await closeTrip(tripId, "completed");
+      return {
+        success: true,
+        message: "ทริปถูกปิดอัตโนมัติเนื่องจากสมาชิกโหวตครบทุกคนแล้ว"
+      };
+    }
+
+  } else if (type === "manual") {
+
+    const ownerId = await tripModel.getTripOwnerId(tripId);
+
+    if (user_id === ownerId) {
+      await closeTrip(tripId, "confirmed");
+      return { success: true, message: "ทริปถูกปิดโดยเจ้าของทริป" };
+    }
+
+    return {
+      success: false,
+      message: "เฉพาะเจ้าของทริปเท่านั้นที่สามารถปิดทริปได้"
+    };
+  }
+
+  return { success: false, message: "เงื่อนไขการปิดทริปยังไม่ครบถ้วน" };
+};
+
+
+
 export default {
   addTrip,
   getUserTrips,
@@ -233,5 +354,7 @@ export default {
   findById,
   getTripDetail,
   getTripSummaryService,
-  
+  closeTripService
 };
+
+

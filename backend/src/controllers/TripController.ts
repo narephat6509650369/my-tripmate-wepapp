@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
-import { getUserTrips, joinTripByCode, removeMemberService, deleteTripService, addTrip, getTripDetail, getTripSummaryService} from "../services/tripService.js";
+import { getUserTrips, joinTripByCode, removeMemberService, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService} from "../services/tripService.js";
+import voteService from "../services/voteService.js";
 
 //เพิ่มสมาชิก
 export const addTripController = async (req: Request, res: Response) => {
@@ -73,6 +74,7 @@ export const getMyTripsController = async (req: Request, res: Response) => {
     }
 
     const trips = await getUserTrips(userId);
+    console.log("User trips:", trips);
 
     return res.status(200).json({
       success: true,
@@ -130,6 +132,7 @@ export const joinTripController = async (req: Request, res: Response) => {
   try {
     const { invite_code } = req.body;
     const userId = req.user?.userId;
+    console.log("Join trip request - userId:", userId, "invite_code:", invite_code);
 
     if (!userId) {
       return res.status(401).json({
@@ -149,6 +152,17 @@ export const joinTripController = async (req: Request, res: Response) => {
     }
 
     const result = await joinTripByCode(invite_code, userId);
+    console.log("Join trip result:", result);
+    console.log("result.success:",result.success)
+
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        code: "TRIP_JOIN_FAILED",
+        message: result.message
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -264,6 +278,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
     }
 
     const trip = await getTripDetail(tripId);
+    console.log("Trip detail:", trip);
 
     if (!trip) {
       return res.status(404).json({
@@ -399,7 +414,7 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
     }
 
     const summary = await getTripSummaryService(tripId, userId);
-    console.log("Trip summary:", summary);
+    //console.log("Trip summary:", summary);
 
     return res.status(200).json({
       success: true,
@@ -435,5 +450,113 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
   }
 };
 
+/*
+export const autoCloseController = async (req: Request, res: Response) => {
+  try {
+    const { tripId } = req.params;
 
-export default {addTripController, deleteTripController, getMyTripsController, joinTripController, removeMemberController, getTripDetailController,getTripSummaryController};
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "tripId is required",
+        error: { field: "tripId" }
+      });
+    }
+
+    const result = await closeTripService(tripId, "auto");
+
+    if (!result || !result.success) {
+      return res.status(403).json({
+        success: false,
+        code: "AUTH_FORBIDDEN",
+        message: "Cannot close trip",
+        error: {
+          reason: result?.message || "Unknown error"
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      code: "TRIP_CLOSED",
+      message: "Trip closed successfully"
+    });
+  } catch (error) {
+    console.error("Close trip error:", error instanceof Error ? error.message : error);
+    return res.status(500).json({
+      success: false,
+      code: "INTERNAL_ERROR",
+      message: "Failed to close trip",
+      error: {
+        detail: error instanceof Error ? error.message : error
+      }
+    });
+}
+};
+*/
+
+export const manualCloseController = async (req: Request, res: Response) => {
+  try {
+    const { tripId } = req.params;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "Unauthorized"
+      });
+    }
+
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "tripId is required",
+        error: { field: "tripId" }
+      });
+    }
+
+    const checkstatus = await voteService.checkTripStatus(tripId);
+    
+    if (checkstatus === "confirmed"|| checkstatus === "completed" || checkstatus === "archived") {
+      return res.status(400).json({
+          success: false,
+          code: "TRIP_CLOSED",
+          message: "This trip is already closed"
+        });
+    }
+
+    const result = await closeTripService(tripId, "manual", userId);
+
+    if (!result || !result.success) {
+      return res.status(403).json({
+        success: false,
+        code: "AUTH_FORBIDDEN",
+        message: "Cannot close trip",
+        error: {
+          reason: result?.message || "Unknown error"
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      code: "TRIP_CLOSED",
+      message: "Trip closed successfully"
+    });
+  } catch (error) {
+    console.error("Close trip error:", error instanceof Error ? error.message : error);
+    return res.status(500).json({
+      success: false,
+      code: "INTERNAL_ERROR",
+      message: "Failed to close trip",
+      error: {
+        detail: error instanceof Error ? error.message : error
+      }
+    });
+}
+};
+
+
+export default {addTripController, deleteTripController, getMyTripsController, joinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController};

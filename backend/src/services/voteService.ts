@@ -21,6 +21,13 @@ type LocationVotePayload = {
   score: number;
 };
 
+export const checkTripStatus = async (tripId: string) => {
+  const trip = await tripModel.findTripById(tripId);
+  if (!trip) throw new Error("Trip not found");
+
+  return trip.status;
+};
+
 // ===================== DATE VOTING =====================
 /**
  * 1. บันทึกวันว่างของ User
@@ -729,12 +736,17 @@ export default {
   //getFullTripData,
   updateBudget,
   voteLocation,
+  getvoteDate,
+  getvoteBudget,
+  getvoteLocation,
+  checkTripStatus
   //closeTrip
 };
 
-export function getBudgetVoting(tripCode: string, userId: string) {
-  throw new Error('Function not implemented.');
-}
+
+
+
+
 
 
 

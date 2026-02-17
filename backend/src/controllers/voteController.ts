@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import * as voteService from '../services/voteService.js';
 import type { JwtPayload } from '../express.d.js';
+import { closeTripService } from '../services/tripService.js';
 
 // ================= DATE VOTING =================
 // post user ส่งวันว่างที่ตัวเองว่างมา
@@ -27,7 +28,18 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
       });
     }
 
+    const checkstatus = await voteService.checkTripStatus(trip_id);
+
+    if (checkstatus === "confirmed"|| checkstatus === "completed" || checkstatus === "archived") {
+      return res.status(400).json({
+        success: false,
+        code: "TRIP_CLOSED",
+        message: "Cannot vote on a closed trip"
+      });
+    }
+
     const result = await voteService.submitAvailability(trip_id, userId, ranges);
+    await closeTripService(trip_id, "auto");
 
     if (!result) {
       return res.status(500).json({
@@ -168,6 +180,7 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
     }
 
     const result = await voteService.getvoteDate(tripId, userId);
+
     //console.log("Date matching:",result);
 
     //console.log("get tripmatching results:",result);
@@ -248,7 +261,18 @@ export const submitBudgetVoteController = async (req: Request, res: Response) =>
       });
     }
 
+    const checkstatus = await voteService.checkTripStatus(tripId);
+
+    if (checkstatus === "confirmed"|| checkstatus === "completed" || checkstatus === "archived") {
+      return res.status(400).json({
+        success: false,
+        code: "TRIP_CLOSED",
+        message: "Cannot vote on a closed trip"
+      });
+    }
+
     const result = await voteService.updateBudget(tripId, userId, category, amount);
+    await closeTripService(tripId, "auto");
 
     return res.status(200).json({
       success: true,
@@ -352,8 +376,19 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
         error: { field: "tripid" }
       });
     }
+
+    const checkstatus = await voteService.checkTripStatus(tripid);
+
+    if (checkstatus === "confirmed"|| checkstatus === "completed" || checkstatus === "archived") {
+      return res.status(400).json({
+        success: false,
+        code: "TRIP_CLOSED",
+        message: "Cannot vote on a closed trip"
+      });
+    }
     
     const scores = await voteService.voteLocation(tripid, userId, votes);
+    await closeTripService(tripid, "auto");
     
     const data: Record<string, number> = {};
     scores.forEach((s: any) => {

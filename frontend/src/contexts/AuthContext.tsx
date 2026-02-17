@@ -2,7 +2,7 @@
 // ✅ Authentication Context สำหรับจัดการ User State ทั้งระบบ
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { redirect, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import type { ApiResponse } from '../types/index';
 
 // ============== TYPES ==============
@@ -15,13 +15,11 @@ export interface User {
 
 export interface AuthState {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
 
 export interface GoogleLoginResponse {
-  token: string;
   user: {
     user_id: string;
     email: string;
@@ -32,7 +30,6 @@ interface AuthContextType extends AuthState {
   login: (accessToken: string, redirectPath?: string) => Promise<void>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
-  checkAuth: () => boolean;
 }
 
 // ============== CONTEXT ==============
@@ -41,218 +38,113 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // ============== PROVIDER ==============
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
-  const queryParams = new URLSearchParams(window.location.search);
-  const pathname = window.location.pathname;
-  let inviteCode = queryParams.get("inviteCode");
-
-  // Handle path param `/join/:inviteCode`
-  const match = pathname.match(/^\/join\/([^\/]+)/);
-  if (!inviteCode && match) {
-    inviteCode = match[1];
-  }
-
   
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
-    token: null,
     isAuthenticated: false,
     isLoading: true
   });
 
   // ✅ Initialize auth state from localStorage
   useEffect(() => {
-    const initializeAuth = () => {
-      try {
-        const token = localStorage.getItem('jwtToken');
-        const userId = localStorage.getItem('userId');
-        const userEmail = localStorage.getItem('userEmail');
+  const initializeAuth = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
-        if (!token) {
-          console.warn('⚠️ No token found, redirecting to login');
-          if (pathname !== '/login') {
-          if (inviteCode) navigate(`/login?redirect=/join/${inviteCode}`);
-            else navigate('/login');
-          }
-          return;
-        }
+      const res = await fetch(`${API_URL}/auth/me`, {
+        method: "GET",
+        credentials: "include"
+      });
 
-        if (token && userId && userEmail) {
-          setAuthState({
-            user: {
-              user_id: userId,
-              email: userEmail,
-              full_name: localStorage.getItem('userName') || undefined,
-              avatar_url: localStorage.getItem('userAvatar') || null
-            },
-            token,
-            isAuthenticated: true,
-            isLoading: false
-          });
-        } else {
-          setAuthState({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false
-          });
-        }
-      } catch (error) {
-        console.error('Failed to initialize auth:', error);
+      if (!res.ok) {
         setAuthState({
           user: null,
-          token: null,
           isAuthenticated: false,
           isLoading: false
         });
-      }
-    };
-
-    initializeAuth();
-  }, []);
-
-  // ✅ Login with Google
-  const login = async (accessToken: string, redirectPath?: string): Promise<void> => {
-    try {
-      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-      const response = await fetch(`${API_URL}/auth/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include', 
-        body: JSON.stringify({
-          access_token: accessToken
-        })
-      });
-  
-      const result: ApiResponse<GoogleLoginResponse> = await response.json();
-  
-      if (!result.success || !result.data) {
-        throw new Error(result.message || 'Login failed');
-      }
-  
-      // ไม่ต้องเก็บ token แล้ว
-      // cookie จะถูก set อัตโนมัติ
-  
-      console.log('✅ Login successful:', result.data.user.email);
-      if (redirectPath) navigate(redirectPath);
-      else {
-        console.log('🔄 No redirect path, navigating to homepage');
-        navigate('/homepage');
-      }
-  
-    } catch (error) {
-      throw error;
-    }
-  }
-  /*
-  const login = useCallback(async (accessToken: string, redirectPath?: string) => {
-    try {
-      setAuthState(prev => ({ ...prev, isLoading: true }));
-
-      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-      
-      const response = await fetch(`${API_URL}/auth/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          access_token: accessToken
-        })
-      });
-
-      const result: ApiResponse<GoogleLoginResponse> = await response.json();
-
-      if (!result.success || !result.data) {
-        throw new Error(result.message || 'Login failed');
+        return;
       }
 
-      const { token, user } = result.data;
+      const result = await res.json();
 
-      // Save to localStorage
-      localStorage.setItem('jwtToken', token);
-      localStorage.setItem('userId', user.user_id);
-      localStorage.setItem('userEmail', user.email);
-
-      // Update state
       setAuthState({
-        user: {
-          user_id: user.user_id,
-          email: user.email
-        },
-        token,
+        user: result.data,
         isAuthenticated: true,
         isLoading: false
       });
 
-      console.log('✅ Login successful:', user.email);
-      if (redirectPath) navigate(redirectPath);
-      else {
-        console.log('🔄 No redirect path, navigating to homepage');
-        navigate('/homepage');
-      }
-
-    } catch (error: any) {
-      console.error('❌ Login failed:', error);
-      
+    } catch (err) {
       setAuthState({
         user: null,
-        token: null,
         isAuthenticated: false,
         isLoading: false
       });
-
-      throw error;
-    }
-  }, [navigate]);*/
-
-  // ✅ Logout
-  /*
-  const logout = useCallback(() => {
-    try {
-      // Clear localStorage
-      localStorage.removeItem('jwtToken');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('userEmail');
-      localStorage.removeItem('userName');
-      localStorage.removeItem('userAvatar');
-
-      // Clear state
-      setAuthState({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false
-      });
-
-      console.log('✅ Logout successful');
-
-      // Redirect to login
-      navigate('/');
-    } catch (error) {
-      console.error('❌ Logout error:', error);
-    }
-  }, [navigate]);*/
-
-  const logout = async (): Promise<void> => {
-    try {
-      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-      const result = await fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      if (!result.ok) {
-        throw new Error('Logout failed');
-      }
-      
-      console.log('✅ Logout successful:',result);
-      navigate('/');
-    } catch (error) {
-      console.error('❌ Logout error:', error);
     }
   };
+
+  initializeAuth();
+}, []);
+
+
+  // ✅ Login with Google
+  const login = async (accessToken: string,redirectPath?: string): Promise<void> => {
+    const API_URL = import.meta.env.VITE_API_BASE_URL ||"http://localhost:5000/api";
+    const response = await fetch(`${API_URL}/auth/google`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        access_token: accessToken
+      })
+    });
+
+  const result: ApiResponse<GoogleLoginResponse> =
+    await response.json();
+
+  if (!result.success || !result.data) {
+    throw new Error(result.message || "Login failed");
+  }
+
+  setAuthState({
+    user: {
+      user_id: result.data.user.user_id,
+      email: result.data.user.email
+    },
+    isAuthenticated: true,
+    isLoading: false
+  });
+
+  console.log("✅ Login successful:", result.data.user.email);
+
+  navigate(redirectPath || "/homepage");
+};
+
+const logout = async (): Promise<void> => {
+  try {
+    const API_URL =
+      import.meta.env.VITE_API_BASE_URL ||
+      "http://localhost:5000/api";
+
+    await fetch(`${API_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include"
+    });
+
+  } catch (error) {
+    console.error("Logout API error:", error);
+  }
+
+  setAuthState({
+    user: null,
+    isAuthenticated: false,
+    isLoading: false
+  });
+
+  navigate("/");
+};
+
 
 
   // ✅ Update user data
@@ -261,41 +153,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...prev,
       user: prev.user ? { ...prev.user, ...userData } : null
     }));
-
-    // Update localStorage
-    if (userData.full_name) {
-      localStorage.setItem('userName', userData.full_name);
-    }
-    if (userData.avatar_url !== undefined) {
-      if (userData.avatar_url) {
-        localStorage.setItem('userAvatar', userData.avatar_url);
-      } else {
-        localStorage.removeItem('userAvatar');
-      }
-    }
   }, []);
 
-  // ✅ Check if authenticated
-  const checkAuth = useCallback((): boolean => {
-    const token = localStorage.getItem('jwtToken');
-    const userId = localStorage.getItem('userId');
-    
-    const isValid = !!(token && userId);
-    
-    if (!isValid && authState.isAuthenticated) {
-      // Token หมดอายุหรือถูกลบ → logout
-      logout();
-    }
-    
-    return isValid;
-  }, [authState.isAuthenticated, logout]);
-
+ 
   const value: AuthContextType = {
     ...authState,
     login,
     logout,
     updateUser,
-    checkAuth
   };
 
   return (

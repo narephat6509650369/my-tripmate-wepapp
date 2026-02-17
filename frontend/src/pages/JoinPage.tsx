@@ -12,64 +12,61 @@ const JoinPage = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log("inviteCode:", inviteCode);
+    console.log("isLoading:", auth.isLoading);
+    console.log("isAuthenticated:", auth.isAuthenticated);
     if (!inviteCode) {
       setError("Invalid invite link");
       setLoading(false);
       return;
     }
 
-    // ถ้ายังไม่ได้ login → redirect ไป login พร้อม redirect กลับหลัง login
+    //รอ AuthContext โหลดก่อน
+    if (auth.isLoading) return;
+
+    //ถ้ายังไม่ login → redirect ไป login
     if (!auth.isAuthenticated) {
-      navigate(`/login?redirect=/join/${inviteCode}`);
+      const loginUrl = `/login?redirect=/join/${inviteCode}`;
+      console.log("Redirecting to:", loginUrl);
+      navigate(loginUrl);
       return;
     }
 
-    // login แล้ว → เริ่ม join trip
-    const doJoin = async () => {
-      try {
-        const res = await tripService.joinTrip(inviteCode);
 
-        if (res.success) {
-          const tripId = res.data?.trip_id;
-          if (tripId) {
-            navigate(`/trip/${tripId}`);
-            return;
-          }
-          navigate("/trips");
-          return;
-        }
+    //login แล้ว → เริ่ม join
+  const doJoin = async () => {
+  try {
+  const res = await tripService.joinTrip(inviteCode);
 
-        // ถ้า join ซ้ำ เช่น already joined หรือ member already exists
-        if (res.code === "ALREADY_JOINED" || res.code === "MEMBER_EXISTS") {
-          const tripId = res.data?.trip_id;
-          if (tripId) {
-            navigate(`/trip/${tripId}`);
-          } else {
-            navigate("/trips");
-          }
-          return;
-        }
-
-        // invalid code / expired / not found
-        setError(res.message || "Invite link invalid or expired");
-
-      } catch (err) {
-        console.error(err);
-        setError("Failed to join trip. Please try again later.");
-      } finally {
-        setLoading(false);
+  if (res.success) {
+    navigate("/homepage", {
+      state: { joinSuccess: true }
+    });
+  } else {
+    navigate("/homepage", {
+      state: {
+        joinError: res.message
       }
-    };
+    });
+  }
+
+} catch (err: any) {
+  navigate("/homepage", {
+    state: {
+      joinError: err?.response?.data?.message || "Cannot join trip"
+    }
+  });
+}
+
+};
+
 
     doJoin();
-  }, [auth.isAuthenticated, inviteCode, navigate]);
+
+  }, [auth.isLoading, auth.isAuthenticated, inviteCode, navigate]);
 
   if (loading) {
-    return (
-      <div style={{ padding: 20 }}>
-        Joining trip...
-      </div>
-    );
+    return <div style={{ padding: 20 }}>Joining trip...</div>;
   }
 
   if (error) {

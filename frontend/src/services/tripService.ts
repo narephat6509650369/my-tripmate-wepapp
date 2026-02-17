@@ -222,14 +222,25 @@ export const tripAPI = {
   try {
     const response = await fetchWithTimeout(`${API_URL}/trips/join`, {
       method: 'POST',
-      credentials: 'include', // 🔥 สำคัญมาก
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ invite_code: inviteCode })
     });
 
-    return await response.json();
+  const data = await response.json();
+
+  if (!response.ok) {
+    return {
+      success: false,
+      code: data.code || 'API_ERROR',
+      message: data.message || "Cannot join trip"
+    };
+  }
+
+return data;
+
   } catch (error) {
     return handleApiError(error);
   }
@@ -239,7 +250,7 @@ export const tripAPI = {
   /**
    * DELETE /api/trips/:tripId
    */
-  /*
+  
   deleteTrip: async (tripId: string): Promise<ApiResponse> => {
   if (CONFIG.USE_MOCK_DATA) {
     await mockDelay();
@@ -260,11 +271,11 @@ export const tripAPI = {
     return handleApiError(error);
   }
 },
-*/
+
   /**
    * DELETE /api/trips/:tripId/members/:memberId
    */
-  /*
+  
   removeMember: async (tripId: string, memberId: string): Promise<ApiResponse> => {
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
@@ -272,19 +283,12 @@ export const tripAPI = {
     }
 
     try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
 
       const response = await fetchWithTimeout(
         `${API_URL}/trips/${tripId}/members/${memberId}`,
         {
           method: 'DELETE',
-          headers: getAuthHeaders()
+          credentials: 'include'
         }
       );
 
@@ -293,7 +297,7 @@ export const tripAPI = {
       return handleApiError(error);
     }
   }
-    */
+    
 };
 
 
@@ -545,36 +549,28 @@ export const voteAPI = {
   // STEP 4: SUMMARY (Trip Close & Summary)
   // ============================================================================
 
-  /**
-   * POST /api/votes/:tripCode/close
-   */
-  closeTrip: async (tripCode: string): Promise<ApiResponse> => {
+  manualClose: async (tripId: string): Promise<ApiResponse> => {
     if (CONFIG.USE_MOCK_DATA) {
       await mockDelay();
-      return getMockCloseTrip(tripCode);
+      return getMockCloseTrip(tripId);
     }
 
     try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
 
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripCode}/close`, {
-        method: 'POST',
-        headers: getAuthHeaders()
+      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/manual-close`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        } 
       });
 
       return await response.json();
     } catch (error) {
       return handleApiError(error);
     }
-  }
-};
-
+    },
+  };
 // ============================================================================
 // EXPORTS
 // ============================================================================
