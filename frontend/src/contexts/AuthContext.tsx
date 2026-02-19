@@ -48,8 +48,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ✅ Initialize auth state from localStorage
   useEffect(() => {
   const initializeAuth = async () => {
+
+    if (authState.isAuthenticated) {
+      return;
+    }
+
     try {
-      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const API_URL =
+        import.meta.env.VITE_API_BASE_URL ||
+        'http://localhost:5000/api';
 
       const res = await fetch(`${API_URL}/auth/me`, {
         method: "GET",
@@ -73,7 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: false
       });
 
-    } catch (err) {
+    } catch {
       setAuthState({
         user: null,
         isAuthenticated: false,

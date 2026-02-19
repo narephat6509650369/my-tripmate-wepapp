@@ -570,10 +570,31 @@ export const voteAPI = {
       return handleApiError(error);
     }
     },
+
   };
 // ============================================================================
 // EXPORTS
 // ============================================================================
+
+export const notiApi = {
+  getNoti: async () => {
+    try{
+      /*
+      เพิ่ม mock ได้ เพราะจะได้ คล้าย format เดิม 
+      */
+      
+      const response = await fetchWithTimeout(`${API_URL}/noti/get-noti`,{
+        method: 'GET',
+        credentials: 'include',
+      }) 
+
+      return await response.json() ;
+      
+    } catch(error) {
+      return handleApiError(error);
+    }
+  }
+}
 
 export default {
   ...tripAPI,

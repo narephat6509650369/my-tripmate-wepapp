@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { googleLoginService } from "../services/authService.js";
+import type { AuthRequest } from "../middleware/validate.js";
 
 export const googleLogin = async (req: Request, res: Response) => {
   try {
@@ -75,5 +76,12 @@ export const logout = (req: Request, res: Response) => {
     success: true,
     code: "AUTH_LOGOUT_SUCCESS",
     message: "Logout successful"
+  });
+};
+
+export const getMe = async (req: AuthRequest, res: Response) => {
+  return res.status(200).json({
+    success: true,
+    data: req.user
   });
 };

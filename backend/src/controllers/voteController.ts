@@ -8,7 +8,7 @@ import { closeTripService } from '../services/tripService.js';
 export const submitAvailabilityController = async (req: Request, res: Response) => {
   try {
     const { trip_id, ranges } = req.body;
-    const userId = (req.user as JwtPayload)?.userId;
+    const user_id = (req.user as JwtPayload)?.user_id;
 
     if (!trip_id) {
       return res.status(400).json({
@@ -38,7 +38,7 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
       });
     }
 
-    const result = await voteService.submitAvailability(trip_id, userId, ranges);
+    const result = await voteService.submitAvailability(trip_id, user_id, ranges);
     await closeTripService(trip_id, "auto");
 
     if (!result) {
@@ -81,7 +81,7 @@ export const getTripHeatmapController = async (req: Request, res: Response) => {
       });
     }
 
-    const data = await voteService.getTripHeatmap(tripId, (req.user as JwtPayload)?.userId);
+    const data = await voteService.getTripHeatmap(tripId, (req.user as JwtPayload)?.user_id);
 
     return res.status(200).json({
       success: true,
@@ -107,7 +107,7 @@ export const getTripHeatmapController = async (req: Request, res: Response) => {
 export const startVotingController = async (req: Request, res: Response) => {
   try {
     const { trip_id } = req.body;
-    const userId = (req.user as JwtPayload)?.userId;
+    const user_id = (req.user as JwtPayload)?.user_id;
 
     if (!trip_id) {
       return res.status(400).json({
@@ -118,7 +118,7 @@ export const startVotingController = async (req: Request, res: Response) => {
       });
     }
 
-    const result = await voteService.startVotingSession(trip_id, userId);
+    const result = await voteService.startVotingSession(trip_id, user_id);
 
     return res.status(201).json({
       success: true,
@@ -160,7 +160,7 @@ export const startVotingController = async (req: Request, res: Response) => {
 export const getDateMatchingResultController = async (req: Request, res: Response) => {
   try {
     const { tripId} = req.params;
-    const userId = (req.user as JwtPayload).userId;
+    const user_id = (req.user as JwtPayload).user_id;
     
     if (!tripId) {
       return res.status(400).json({
@@ -170,16 +170,16 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
         error: { field: "tripId" }
       });
     }
-    if (!userId) {
+    if (!user_id) {
       return res.status(400).json({
         success: false,
         code: "MISSING_FIELD",
         message: "User ID is required",
-        error: { field: "userId" }
+        error: { field: "user_id" }
       });
     }
 
-    const result = await voteService.getvoteDate(tripId, userId);
+    const result = await voteService.getvoteDate(tripId, user_id);
 
     //console.log("Date matching:",result);
 
@@ -251,7 +251,7 @@ export const submitBudgetVoteController = async (req: Request, res: Response) =>
   try {
     const { tripId } = req.params;
     const { category, amount } = req.body;
-    const userId = (req.user as JwtPayload)?.userId;
+    const user_id = (req.user as JwtPayload)?.user_id;
 
     if (!tripId || !category || amount === undefined) {
       return res.status(400).json({
@@ -271,7 +271,7 @@ export const submitBudgetVoteController = async (req: Request, res: Response) =>
       });
     }
 
-    const result = await voteService.updateBudget(tripId, userId, category, amount);
+    const result = await voteService.updateBudget(tripId, user_id, category, amount);
     await closeTripService(tripId, "auto");
 
     return res.status(200).json({
@@ -310,7 +310,7 @@ export const submitBudgetVoteController = async (req: Request, res: Response) =>
 export const getBudgetVoteController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
-    const userId = (req.user as JwtPayload)?.userId;
+    const user_id = (req.user as JwtPayload)?.user_id;
     //console.log("BudgetVotingController ")
     //console.log("tripId:", tripId)
     if (!tripId) {
@@ -322,7 +322,7 @@ export const getBudgetVoteController = async (req: Request, res: Response) => {
       });
     }
 
-    const data = await voteService.getvoteBudget(tripId, userId);
+    const data = await voteService.getvoteBudget(tripId, user_id);
     //console.log("budget vote:",data)
 
     return res.status(200).json({
@@ -357,7 +357,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
   try {
     const { tripid } = req.params;
     const { votes } = req.body;
-    const userId = (req.user as JwtPayload)?.userId;
+    const user_id = (req.user as JwtPayload)?.user_id;
 
     if (!Array.isArray(votes) || votes.length !== 3) {
       return res.status(400).json({
@@ -387,7 +387,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
       });
     }
     
-    const scores = await voteService.voteLocation(tripid, userId, votes);
+    const scores = await voteService.voteLocation(tripid, user_id, votes);
     await closeTripService(tripid, "auto");
     
     const data: Record<string, number> = {};
@@ -425,7 +425,7 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
 export const getLocationVoteController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
-    const user_id = (req.user as JwtPayload)?.userId;
+    const user_id = (req.user as JwtPayload)?.user_id;
 
     if (!user_id) {
       return res.status(401).json({
@@ -480,7 +480,7 @@ export const getLocationVoteController = async (req: Request, res: Response) => 
 export const closeTripController = async (req: Request, res: Response) => {
   try {
     const { tripCode } = req.params;
-    const userId = (req.user as JwtPayload)?.userId;
+    const user_id = (req.user as JwtPayload)?.user_id;
 
     if (!tripCode) {
       return res.status(400).json({
@@ -491,7 +491,7 @@ export const closeTripController = async (req: Request, res: Response) => {
       });
     }
 
-    const result = await voteService.closeTrip(tripCode, userId);
+    const result = await voteService.closeTrip(tripCode, user_id);
 
     return res.status(200).json({
       success: true,

@@ -6,9 +6,9 @@ import voteService from "../services/voteService.js";
 export const addTripController = async (req: Request, res: Response) => {
   try {
     const { trip_name, description, num_days } = req.body;
-    const userId = req.user?.userId;
+    const user_id = req.user?.user_id;
 
-    if (!userId) {
+    if (!user_id) {
       return res.status(401).json({
         success: false,
         code: "AUTH_UNAUTHORIZED",
@@ -38,7 +38,7 @@ export const addTripController = async (req: Request, res: Response) => {
       });
     }
 
-    const trip = await addTrip(userId, trip_name, description, num_days);
+    const trip = await addTrip(user_id, trip_name, description, num_days);
 
     return res.status(201).json({
       success: true,
@@ -63,9 +63,9 @@ export const addTripController = async (req: Request, res: Response) => {
 //ดึงข้อมูล trip ทั้ง trip ที่เป็นสมาชิกอยู่ทั้งหมด
 export const getMyTripsController = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.userId;
+    const user_id = req.user?.user_id;
 
-    if (!userId) {
+    if (!user_id) {
       return res.status(401).json({
         success: false,
         code: "AUTH_UNAUTHORIZED",
@@ -73,8 +73,8 @@ export const getMyTripsController = async (req: Request, res: Response) => {
       });
     }
 
-    const trips = await getUserTrips(userId);
-    console.log("User trips:", trips);
+    const trips = await getUserTrips(user_id);
+    //console.log("User trips:", trips);
 
     return res.status(200).json({
       success: true,
@@ -94,7 +94,7 @@ export const getMyTripsController = async (req: Request, res: Response) => {
 };
 
 
-//delete trip โดย owner
+//delete trip โดย owner 
 export const deleteTripController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
@@ -131,10 +131,10 @@ export const deleteTripController = async (req: Request, res: Response) => {
 export const joinTripController = async (req: Request, res: Response) => {
   try {
     const { invite_code } = req.body;
-    const userId = req.user?.userId;
-    console.log("Join trip request - userId:", userId, "invite_code:", invite_code);
+    const user_id = req.user?.user_id;
+    //console.log("Join trip request - user_id:", user_id, "invite_code:", invite_code);
 
-    if (!userId) {
+    if (!user_id) {
       return res.status(401).json({
         success: false,
         code: "AUTH_UNAUTHORIZED",
@@ -151,9 +151,9 @@ export const joinTripController = async (req: Request, res: Response) => {
       });
     }
 
-    const result = await joinTripByCode(invite_code, userId);
-    console.log("Join trip result:", result);
-    console.log("result.success:",result.success)
+    const result = await joinTripByCode(invite_code, user_id);
+    //console.log("Join trip result:", result);
+    //console.log("result.success:",result.success)
 
 
     if (!result.success) {
@@ -201,7 +201,7 @@ export const joinTripController = async (req: Request, res: Response) => {
 export const removeMemberController = async (req: Request, res: Response) => {
   try {
     const { trip_id, member_id } = req.params;
-    const owner_id = req.user?.userId;
+    const owner_id = req.user?.user_id;
 
     if (!trip_id || !member_id) {
       return res.status(400).json({
@@ -258,9 +258,9 @@ export const removeMemberController = async (req: Request, res: Response) => {
 export const getTripDetailController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
-    const userId = req.user?.userId;
+    const user_id = req.user?.user_id;
 
-    if (!userId) {
+    if (!user_id) {
       return res.status(401).json({
         success: false,
         code: "AUTH_UNAUTHORIZED",
@@ -278,7 +278,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
     }
 
     const trip = await getTripDetail(tripId);
-    console.log("Trip detail:", trip);
+    //console.log("Trip detail:", trip);
 
     if (!trip) {
       return res.status(404).json({
@@ -289,7 +289,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
     }
 
     const isMember = trip.members?.some(
-      (m: any) => m.id === userId
+      (m: any) => m.id === user_id
     );
 
     if (!isMember) {
@@ -323,9 +323,9 @@ export const updateMemberBudgetController = async (req: Request, res: Response) 
   try {
     const { tripId } = req.params;
     const { accommodation, transport, food } = req.body;
-    const userId = req.user?.userId;
+    const user_id = req.user?.user_id;
 
-    if (!userId) {
+    if (!user_id) {
       return res.status(401).json({
         success: false,
         code: "AUTH_UNAUTHORIZED",
@@ -353,7 +353,7 @@ export const updateMemberBudgetController = async (req: Request, res: Response) 
     }
 
     const memberIndex = trip.members.findIndex(
-      (m: any) => m.userId.toString() === userId
+      (m: any) => m.user_id.toString() === user_id
     );
 
     if (memberIndex === -1) {
@@ -394,9 +394,9 @@ export const updateMemberBudgetController = async (req: Request, res: Response) 
 export const getTripSummaryController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
-    const userId = req.user?.userId;
+    const user_id = req.user?.user_id;
 
-    if (!userId) {
+    if (!user_id) {
       return res.status(401).json({
         success: false,
         code: "AUTH_UNAUTHORIZED",
@@ -413,7 +413,7 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
       });
     }
 
-    const summary = await getTripSummaryService(tripId, userId);
+    const summary = await getTripSummaryService(tripId, user_id);
     //console.log("Trip summary:", summary);
 
     return res.status(200).json({
@@ -499,8 +499,8 @@ export const autoCloseController = async (req: Request, res: Response) => {
 export const manualCloseController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
-    const userId = req.user?.userId;
-    if (!userId) {
+    const user_id = req.user?.user_id;
+    if (!user_id) {
       return res.status(401).json({
         success: false,
         code: "AUTH_UNAUTHORIZED",
@@ -527,7 +527,7 @@ export const manualCloseController = async (req: Request, res: Response) => {
         });
     }
 
-    const result = await closeTripService(tripId, "manual", userId);
+    const result = await closeTripService(tripId, "manual", user_id);
 
     if (!result || !result.success) {
       return res.status(403).json({

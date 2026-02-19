@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check, User } from "lucide-react";
 import { useAuth } from '../contexts/AuthContext';
-import { tripAPI } from '../services/tripService';
+import { tripAPI, notiApi } from '../services/tripService';
 import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils';
 import type { TripSummary } from '../types';
 
@@ -52,6 +52,9 @@ const HomePage: React.FC = () => {
   // ✅ โหลดทริปทั้งหมด
   useEffect(() => {
     loadTrips();
+    const noti = notiApi.getNoti();
+    console.log("Homepage");
+    console.log("GET NOTI:",noti);
   }, []);
 
   useEffect(() => {

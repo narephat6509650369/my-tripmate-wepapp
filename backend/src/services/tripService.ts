@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as tripModel from '../models/tripModel.js';
 import { closeTrip, getTripSummaryById, type Trip } from '../models/tripModel.js';
 import * as voteService from '../services/voteService.js';
+import notiService from './notiService.js';
 
 
 /**
@@ -71,8 +72,8 @@ export const getUserTrips = async (user_id: string) => {
   }
 };
 
-export const autoCloseEligibleTripsForUser = async (userId: string) => {
-  const openTrips = await tripModel.findOpenTripsByUserId(userId);
+export const autoCloseEligibleTripsForUser = async (user_id: string) => {
+  const openTrips = await tripModel.findOpenTripsByUserId(user_id);
 
   for (const trip of openTrips) {
     await closeTripService(trip.trip_id, "auto");
@@ -153,17 +154,23 @@ export const joinTripByCode = async (invite_code: string, user_id: string) => {
   }
 
   if (existingMember && !existingMember.is_active) {
-    await tripModel.reactivateTripMember(trip.trip_id, user_id);
-    return {
-      success: true,
-      trip_id: trip.trip_id,
-      trip_name: trip.trip_name,
-      rejoined: true,
-      message: "เข้าร่วมทริปสำเร็จ ( rejoined )"
-    };
+  await tripModel.reactivateTripMember(trip.trip_id, user_id);
+
+  await notiService.notifyMemberJoined(trip.trip_id, user_id);
+
+  return {
+    success: true,
+    trip_id: trip.trip_id,
+    trip_name: trip.trip_name,
+    rejoined: true,
+    message: "เข้าร่วมทริปสำเร็จ (rejoined)"
+  };
   }
 
+
   await tripModel.addMemberIfNotExists(trip.trip_id, user_id);
+
+  await notiService.notifyMemberJoined(trip.trip_id, user_id);
 
   return {
     success: true,
@@ -173,8 +180,11 @@ export const joinTripByCode = async (invite_code: string, user_id: string) => {
     message: "เข้าร่วมทริปสำเร็จ"
   };
   } catch (error) {
-    console.error("Join trip error:", error instanceof Error ? error.message : error);
-    throw new Error(error instanceof Error ? error.message : "An error occurred while joining the trip");
+    console.error("Join trip error:", error);
+    return {
+      success: false,
+      message: "An error occurred while joining the trip"
+    };
   }
 };
 
@@ -225,7 +235,7 @@ export const findById = async (tripId: string) => {
   return trip;
 }
 
-export async function getTripSummaryService(tripId: string,userId: string) {
+export async function getTripSummaryService(tripId: string,user_id: string) {
   try{
 
   const summary = await getTripSummaryById(tripId);
@@ -235,7 +245,7 @@ export async function getTripSummaryService(tripId: string,userId: string) {
   }
 
   // ตรวจสอบสิทธิ์: ต้องเป็นสมาชิก
-  const isMember = summary.members.some( (m: any) => m.user_id === userId );
+  const isMember = summary.members.some( (m: any) => m.user_id === user_id );
 
   if (!isMember) {
     throw new Error("FORBIDDEN");
@@ -254,9 +264,9 @@ export async function getTripSummaryService(tripId: string,userId: string) {
       getVoteNumber
     }
   }
-  const budgetVotes = await voteService.getvoteBudget(tripId,userId);
-  const locationResult = await voteService.getvoteLocation(tripId,userId);
-  const dateOptions = await voteService.getvoteDate(tripId,userId);
+  const budgetVotes = await voteService.getvoteBudget(tripId,user_id);
+  const locationResult = await voteService.getvoteLocation(tripId,user_id);
+  const dateOptions = await voteService.getvoteDate(tripId,user_id);
 
   return { 
     summary, 
@@ -285,30 +295,35 @@ export const closeTripService = async (tripId: string,type: string,user_id?: str
 
   const memberCount = await tripModel.getTripMemberCount(tripId);
 
+  // AUTO CLOSE 
   if (type === "auto") {
 
-    //  ป้องกัน auto-close ถ้ามีสมาชิก <= 1
     if (memberCount <= 1) {
-      return { success: false, message: "จำนวนสมาชิกไม่เพียงพอสำหรับการปิดอัตโนมัติ" };
+      return {
+        success: false,
+        message: "จำนวนสมาชิกไม่เพียงพอสำหรับการปิดอัตโนมัติ"
+      };
     }
 
-    // เช็คหมดอายุการเดินทาง
     const isExpired = (createdAt: Date, days: number) => {
-    console.log("Created At:", createdAt);
-    const diffTime = Date.now() - new Date(createdAt).getTime();
+      const diffTime = Date.now() - new Date(createdAt).getTime();
       return diffTime / (1000 * 3600 * 24) > days;
     };
 
+    // 1️ Expired → Archived
     if (isExpired(trip.created_at, 7)) {
       await closeTrip(tripId, "archived");
-    return {
-      success: true,
-      message: "ทริปถูกปิดอัตโนมัติเนื่องจากเปิดเกิน 7 วันแล้ว"
-    };
+
+      // notify archived
+      await notiService.notifyTripArchived?.(tripId);
+
+      return {
+        success: true,
+        message: "ทริปถูกปิดอัตโนมัติเนื่องจากเปิดเกิน 7 วันแล้ว"
+      };
     }
 
-
-    // ✅ 3️⃣ เช็คโหวตครบ
+    // 2 Vote Complete → Completed
     const votes = await tripModel.getStatusVoteResult(tripId);
 
     const isVoteComplete =
@@ -317,20 +332,36 @@ export const closeTripService = async (tripId: string,type: string,user_id?: str
       votes.locationVoteNum === votes.totalMembers;
 
     if (isVoteComplete) {
+
+      // notify voting closed (ตอนโหวตครบจริง)
+      await notiService.notifyTripCompleted(tripId);
+
       await closeTrip(tripId, "completed");
+
       return {
         success: true,
         message: "ทริปถูกปิดอัตโนมัติเนื่องจากสมาชิกโหวตครบทุกคนแล้ว"
       };
     }
 
-  } else if (type === "manual") {
+  }
+
+  // MANUAL CLOSE 
+  else if (type === "manual") {
 
     const ownerId = await tripModel.getTripOwnerId(tripId);
 
     if (user_id === ownerId) {
+
       await closeTrip(tripId, "confirmed");
-      return { success: true, message: "ทริปถูกปิดโดยเจ้าของทริป" };
+
+      // notify confirmed
+      await notiService.notifyTripConfirmed(tripId);
+
+      return {
+        success: true,
+        message: "ทริปถูกปิดโดยเจ้าของทริป"
+      };
     }
 
     return {
@@ -339,10 +370,11 @@ export const closeTripService = async (tripId: string,type: string,user_id?: str
     };
   }
 
-  return { success: false, message: "เงื่อนไขการปิดทริปยังไม่ครบถ้วน" };
+  return {
+    success: false,
+    message: "เงื่อนไขการปิดทริปยังไม่ครบถ้วน"
+  };
 };
-
-
 
 export default {
   addTrip,

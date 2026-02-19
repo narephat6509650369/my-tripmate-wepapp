@@ -47,6 +47,13 @@ export interface TripData {
 
 }
 
+interface TripMemberWithEmail extends RowDataPacket {
+  user_id: string;
+  email: string;
+  full_name: string;
+}
+
+
 export interface MemberTrip {
     id: string;
     name: string;
@@ -268,12 +275,12 @@ export const findTripByInviteCode = async (inviteCode: string) => {
   return (rows as any[])[0];
 };
 
-export const addMemberIfNotExists = async (tripId: string, userId: string) => {
+export const addMemberIfNotExists = async (tripId: string, user_id: string) => {
   try{
 
   const [rows] = await pool.execute(
     "SELECT * FROM trip_members WHERE trip_id = ? AND user_id = ?",
-    [tripId, userId]
+    [tripId, user_id]
   );
 
   if ((rows as any[]).length > 0) return (rows as any[])[0];
@@ -281,10 +288,10 @@ export const addMemberIfNotExists = async (tripId: string, userId: string) => {
   const role = "member";
   await pool.execute(
     `INSERT INTO trip_members (member_id, trip_id, user_id, role) VALUES (UUID(), ?, ?, ?)`,
-    [tripId, userId, role]
+    [tripId, user_id, role]
   );
 
-  return { trip_id: tripId, user_id: userId, role };
+  return { trip_id: tripId, user_id: user_id, role };
   } catch (error) {
     console.error("Add member error:", error instanceof Error ? error.message : error);
     throw new Error(error instanceof Error ? error.message : "An error occurred while adding member to the trip");
@@ -292,7 +299,7 @@ export const addMemberIfNotExists = async (tripId: string, userId: string) => {
 };
 
 //รายการทริปทั้งหมดที่ user เข้าร่วม + ถูกเชิญ + เป็นเจ้าของ
-export async function getMyTrips(userId: string): Promise<MyTrip[]> {
+export async function getMyTrips(user_id: string): Promise<MyTrip[]> {
     const sql = `
         SELECT 
             t.trip_id,
@@ -311,7 +318,7 @@ export async function getMyTrips(userId: string): Promise<MyTrip[]> {
         ORDER BY t.created_at DESC
     `;
 
-    const [rows] = await pool.query<RowDataPacket[]>(sql, [userId]);
+    const [rows] = await pool.query<RowDataPacket[]>(sql, [user_id]);
 
     return rows as MyTrip[];   
 }
@@ -430,7 +437,7 @@ return {
 } as TripDetail;
 }
 
-export async function findOpenTripsByUserId(userId: string): Promise<Trip[]> {
+export async function findOpenTripsByUserId(user_id: string): Promise<Trip[]> {
   const sql = `
     SELECT 
       t.trip_id,
@@ -441,7 +448,7 @@ export async function findOpenTripsByUserId(userId: string): Promise<Trip[]> {
       AND tm.is_active = 1
       AND t.status IN ('planning', 'voting')
   `;
-  const [rows] = await pool.query<RowDataPacket[]>(sql, [userId]);
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [user_id]);
   return rows as Trip[];
 }
 
@@ -489,6 +496,27 @@ export const getTripMembers = async (trip_id: string) => {
   );
   return rows;
 }
+
+export const getTripMembersWithEmail = async (trip_id: string) => {
+  const [rows] = await pool.query<TripMemberWithEmail[]>(
+    `
+    SELECT 
+      tm.user_id,
+      u.email,
+      u.full_name
+    FROM trip_members tm
+    JOIN users u ON tm.user_id = u.user_id
+    WHERE tm.trip_id = ?
+    AND tm.is_active = 1
+    AND u.is_active = 1
+    `,
+    [trip_id]
+  );
+
+  return rows;
+};
+
+
 // สมาชิกที่ออกจากทริปต้องไม่สามารถเข้าถึงข้อมูลโหวต/งบ/สถานที่ได้อีก
 export const removeMemberById = async (trip_id: string, member_id: string) => {
   const connection = await pool.getConnection(); // ขอ Connection แยกเพื่อทำ Transaction
@@ -727,6 +755,7 @@ export default {
     updateInviteInfo,
     getTripSummaryById,
     updateTripStatus,
+    getTripMembersWithEmail
 };
 /*
     getTripById,
