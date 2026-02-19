@@ -255,7 +255,7 @@ export async function getTripSummaryService(tripId: string,user_id: string) {
   const getVoteNumber = await tripModel.getStatusVoteResult(tripId);
   
 
-  const tripStatus = summary.trip[0].status;
+  const tripStatus = summary.trip.status;
   //console.log("Trip Status:", tripStatus);
   //เช็คสถานะทริป ถ้าเป็น planning จะยังไม่แสดงผลโหวต จนกว่าคนจะโหวเสร็จ
   if (tripStatus === 'planning' ) {

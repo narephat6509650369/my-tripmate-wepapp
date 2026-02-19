@@ -71,7 +71,7 @@ export const notifyTripConfirmed = async (trip_id: string) => {
       if (m.email) {
         await sendEmail(
           m.email,
-          "Trip Confirmed ",
+          "TripMate",
           "The trip owner has confirmed your trip successfully.",
           tripConfirmedTemplate(m.full_name)
         );
@@ -100,7 +100,7 @@ export const notifyTripArchived = async (trip_id: string) => {
         trip_id,
         m.user_id,
         "trip_archived",
-        "Trip archived ",
+        "TripMate",
         "This trip has been archived because it was inactive for 7 days."
       );
 
@@ -133,20 +133,18 @@ export const notifyTripCompleted = async (trip_id: string) => {
 
     for (const m of members) {
 
-      // 1️⃣ In-app notification
       await notiModel.createNotification(
         trip_id,
         m.user_id,
         "trip_completed",
-        "Voting completed ✅",
+        "Voting completed ",
         "All members have voted. The trip is now completed."
       );
 
-      // 2️⃣ Email
       if (m.email) {
         await sendEmail(
           m.email,
-          "Voting completed ✅",
+          "TripMate",
           "All members have voted. The trip is now completed.",
           tripConfirmedTemplate(m.full_name)
         );

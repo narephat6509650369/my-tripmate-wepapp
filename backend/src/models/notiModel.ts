@@ -48,10 +48,12 @@ export const createNotification = async (trip_id: string,user_id: string,type: s
 export const getNotificationsByUserId = async (user_id: string) => {
     const connection = await pool.getConnection();
     try {
+        
         const [rows] = await connection.query(
             `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC`,
             [user_id]
         );
+        //console.log("Notification rows:", rows);
 
         return {
             success: true,

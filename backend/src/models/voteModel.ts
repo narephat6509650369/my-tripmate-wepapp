@@ -96,43 +96,52 @@ export const clearUserAvailability = async (trip_id: string,user_id: string) => 
 };
 
 export const getTripAvailabilities = async (trip_id: string, user_id: string) => {
-  const connection = await pool.getConnection();
-  try{
-    const [rows] = await connection.query<RowDataPacket[]>(
-    `SELECT
-      dv.available_date
-    FROM date_votes dv
-    JOIN date_options do ON dv.date_option_id = do.date_option_id
-    JOIN date_votings dvt ON do.date_voting_id = dvt.date_voting_id
-    WHERE dvt.trip_id = ?
-      AND dv.user_id = ?
-    ORDER BY do.available_date
-    `,
-    [trip_id, user_id]
-  );
-  //เพื่อ return กลับไปแสดง log สถานะการเลือกของแต่ละคน
-  const [rowlog] = await connection.query(
-     `SELECT
+  try {
+
+    const userVoteSql = `
+      SELECT dv.available_date
+      FROM date_votes dv
+      JOIN date_options do 
+        ON dv.date_option_id = do.date_option_id
+      JOIN date_votings dvt 
+        ON do.date_voting_id = dvt.date_voting_id
+      WHERE dvt.trip_id = ?
+        AND dv.user_id = ?
+      ORDER BY do.available_date
+    `;
+
+    const logSql = `
+      SELECT
         do.available_date,
         do.proposed_at,
         do.proposed_by,
         u.full_name AS proposed_by_name
       FROM date_options do
-      JOIN date_votings dvt ON do.date_voting_id = dvt.date_voting_id
-      JOIN users u ON do.proposed_by = u.user_id
+      JOIN date_votings dvt 
+        ON do.date_voting_id = dvt.date_voting_id
+      JOIN users u 
+        ON do.proposed_by = u.user_id
       WHERE dvt.trip_id = ?
-      ORDER BY do.proposed_at ASC`,
-      [trip_id]
-  )
-  return {
-    rows: rows.map(r => r.available_date),
-    countrows: rows.length,
-    rowlog: rowlog
-  }
- } catch (err) {
+      ORDER BY do.proposed_at ASC
+    `;
+
+    const [userResult, logResult] = await Promise.all([
+      pool.query<RowDataPacket[]>(userVoteSql, [trip_id, user_id]),
+      pool.query<RowDataPacket[]>(logSql, [trip_id])
+    ]);
+
+    const rows = userResult[0];
+    const rowlog = logResult[0];
+
+    return {
+      rows: rows.map(r => r.available_date),
+      countrows: rows.length,
+      rowlog
+    };
+
+  } catch (err) {
+    console.error("❌ getTripAvailabilities ERROR:", err);
     throw err;
-  } finally {
-    connection.release();
   }
 };
 
@@ -295,42 +304,10 @@ export const getTripBudgets = async (trip_id: string, user_id: string) => {
 };
 */
 export const getBudgetVoting = async (trip_id: string, user_id: string) => {
-  const connection = await pool.getConnection();
-  try{
+  try {
 
-    const [rows] = await connection.query<RowDataPacket[]>(
-    `SELECT 
-      bv.user_id,
-      bv.category_name,
-      bv.estimated_amount,
-      bv.voted_at
-    FROM budget_votes bv
-    JOIN budget_options bo 
-      ON bv.budget_option_id = bo.budget_option_id
-    JOIN budget_votings bvt
-      ON bo.budget_voting_id = bvt.budget_voting_id
-    WHERE bvt.trip_id = ?
-      AND bv.user_id = ?`,
-    [trip_id, user_id]
-    );
-
-    const [rowlog] =await connection.query(
-     `SELECT
-        bo.proposed_by,
-        bo.proposed_at,
-        bo.category_name,
-        bo.estimated_amount,
-        u.full_name AS proposed_by_name
-      FROM budget_options bo
-      JOIN budget_votings bvt ON bo.budget_voting_id = bvt.budget_voting_id
-      JOIN users u ON bo.proposed_by = u.user_id
-      WHERE bvt.trip_id = ?
-      ORDER BY bo.proposed_at ASC`,
-      [trip_id]
-    );
-
-    const [budget] = await connection.query(
-      `SELECT 
+    const userVoteSql = `
+      SELECT 
         bv.user_id,
         bv.category_name,
         bv.estimated_amount,
@@ -340,12 +317,42 @@ export const getBudgetVoting = async (trip_id: string, user_id: string) => {
         ON bv.budget_option_id = bo.budget_option_id
       JOIN budget_votings bvt
         ON bo.budget_voting_id = bvt.budget_voting_id
-      WHERE bvt.trip_id = ?`,
-      [trip_id]
-    );
+      WHERE bvt.trip_id = ?
+        AND bv.user_id = ?
+    `;
 
-    const [budgetcount] =  await connection.query(
-      `SELECT
+    const logSql = `
+      SELECT
+        bo.proposed_by,
+        bo.proposed_at,
+        bo.category_name,
+        bo.estimated_amount,
+        u.full_name AS proposed_by_name
+      FROM budget_options bo
+      JOIN budget_votings bvt 
+        ON bo.budget_voting_id = bvt.budget_voting_id
+      JOIN users u 
+        ON bo.proposed_by = u.user_id
+      WHERE bvt.trip_id = ?
+      ORDER BY bo.proposed_at ASC
+    `;
+
+    const allVotesSql = `
+      SELECT 
+        bv.user_id,
+        bv.category_name,
+        bv.estimated_amount,
+        bv.voted_at
+      FROM budget_votes bv
+      JOIN budget_options bo 
+        ON bv.budget_option_id = bo.budget_option_id
+      JOIN budget_votings bvt
+        ON bo.budget_voting_id = bvt.budget_voting_id
+      WHERE bvt.trip_id = ?
+    `;
+
+    const summarySql = `
+      SELECT
         bv.category_name,
         COUNT(bv.user_id) AS num_votes,
         SUM(bv.estimated_amount) AS total_amount,
@@ -353,23 +360,36 @@ export const getBudgetVoting = async (trip_id: string, user_id: string) => {
         MIN(bv.estimated_amount) AS min_amount,
         MAX(bv.estimated_amount) AS max_amount
       FROM budget_votes bv
-      JOIN budget_options bo ON bv.budget_option_id = bo.budget_option_id
-      JOIN budget_votings bvt ON bo.budget_voting_id = bvt.budget_voting_id
+      JOIN budget_options bo 
+        ON bv.budget_option_id = bo.budget_option_id
+      JOIN budget_votings bvt 
+        ON bo.budget_voting_id = bvt.budget_voting_id
       WHERE bvt.trip_id = ?
       GROUP BY bv.category_name
-      `,
-      [trip_id]
-    );
+    `;
+
+    const [
+      userVoteResult,
+      logResult,
+      allVotesResult,
+      summaryResult
+    ] = await Promise.all([
+      pool.query<RowDataPacket[]>(userVoteSql, [trip_id, user_id]),
+      pool.query<RowDataPacket[]>(logSql, [trip_id]),
+      pool.query<RowDataPacket[]>(allVotesSql, [trip_id]),
+      pool.query<RowDataPacket[]>(summarySql, [trip_id])
+    ]);
+
     return {
-      rows,
-      rowlog,
-      budget,
-      budgetcount: budgetcount
+      rows: userVoteResult[0],
+      rowlog: logResult[0],
+      budget: allVotesResult[0],
+      budgetcount: summaryResult[0]
     };
-  } catch(err) {
-    console.log("ERROR:",err);
-  }  finally {
-    connection.release();
+
+  } catch (err) {
+    console.error("❌ getBudgetVoting ERROR:", err);
+    throw err; 
   }
 };
 
@@ -589,11 +609,10 @@ export const clearLocation = async (trip_id: string, user_id: string) => {
   await pool.query(sql, [trip_id, user_id]);
 };
 
-export const getVoteLocation = async (tripId:string, user_id: string) => {
-  const connection = await pool.getConnection();
-  try{
-    const [rows] = await connection.query (
-      `
+export const getVoteLocation = async (tripId: string, user_id: string) => {
+  try {
+
+    const userVoteSql = `
       SELECT 
         lv.location_vote_id,
         lv.location_option_id,
@@ -601,66 +620,70 @@ export const getVoteLocation = async (tripId:string, user_id: string) => {
         lv.voted_at,
         lv.score
       FROM location_votes lv
-      JOIN location_options lo ON lv.location_option_id = lo.location_option_id
-      JOIN location_votings lvt ON lo.location_voting_id = lvt.location_voting_id
-      WHERE lvt.trip_id = ? AND lv.user_id = ?
-      `,
-      [tripId, user_id]
-    );
+      JOIN location_options lo 
+        ON lv.location_option_id = lo.location_option_id
+      JOIN location_votings lvt 
+        ON lo.location_voting_id = lvt.location_voting_id
+      WHERE lvt.trip_id = ? 
+        AND lv.user_id = ?
+    `;
 
-  const [locationVotesTotal] = await connection.query(
-  `
-    SELECT 
-      lo.province_name AS place,
+    const totalVoteSql = `
+      SELECT 
+        lo.province_name AS place,
         SUM(lv.score) AS total_score,
         COUNT(lv.location_vote_id) AS vote_count,
         SUM(CASE WHEN lv.score = 3 THEN 1 ELSE 0 END) AS rank_1,
         SUM(CASE WHEN lv.score = 2 THEN 1 ELSE 0 END) AS rank_2,
         SUM(CASE WHEN lv.score = 1 THEN 1 ELSE 0 END) AS rank_3
       FROM location_votes lv
-      JOIN location_options lo ON lv.location_option_id = lo.location_option_id
-      JOIN location_votings lvt ON lo.location_voting_id = lvt.location_voting_id
+      JOIN location_options lo 
+        ON lv.location_option_id = lo.location_option_id
+      JOIN location_votings lvt 
+        ON lo.location_voting_id = lvt.location_voting_id
       WHERE lvt.trip_id = ?
       GROUP BY lo.province_name
-      ORDER BY total_score DESC;
+      ORDER BY total_score DESC
+    `;
 
-  `,
-  [tripId]
-  );
+    const logSql = `
+      SELECT
+        lo.proposed_by,
+        lo.province_name,
+        lo.score,
+        lo.proposed_at,
+        u.full_name AS proposed_by_name
+      FROM location_options lo
+      JOIN location_votings lvt 
+        ON lo.location_voting_id = lvt.location_voting_id
+      JOIN users u 
+        ON lo.proposed_by = u.user_id
+      WHERE lvt.trip_id = ?
+    `;
 
-  const [rowlog] = await connection.query(
-    `
-    SELECT
-      lo.proposed_by,
-      lo.province_name,
-      lo.score,
-      lo.proposed_at,
-      u.full_name AS proposed_by_name
-    FROM location_options lo
-    JOIN location_votings lvt ON lo.location_voting_id = lvt.location_voting_id
-    JOIN users u ON lo.proposed_by = u.user_id
-    WHERE lvt.trip_id = ?
-    `,
-    [tripId]
-  )
+    const [
+      userVoteResult,
+      totalVoteResult,
+      logResult
+    ] = await Promise.all([
+      pool.query<any[]>(userVoteSql, [tripId, user_id]),
+      pool.query<any[]>(totalVoteSql, [tripId]),
+      pool.query<any[]>(logSql, [tripId])
+    ]);
+
     return {
-      rows,
-      locationVotesTotal,
-      rowlog
-     };
+      rows: userVoteResult[0],
+      locationVotesTotal: totalVoteResult[0],
+      rowlog: logResult[0]
+    };
+
   } catch (err) {
-    console.log("ERROR:",err);
+    console.error(" getVoteLocation ERROR:", err);
     throw err;
-  } finally {
-    
-    connection.release();
   }
-}
+};
 
 // ================= TRIP STATUS =================
-
-
-
 export const closeAllVotings = async (trip_id: string) => {
   const connection = await pool.getConnection();
   try {
