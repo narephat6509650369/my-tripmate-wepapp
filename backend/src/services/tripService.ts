@@ -93,7 +93,7 @@ export const getTripDetail = async (tripId: string) => {
 
     const trip = await tripModel.getTripDetail(tripId);
 
-    console.log("getTripDetail",trip)
+    //console.log("getTripDetail",trip)
 
     if (!trip) {
       throw new Error("Trip not found");
@@ -238,66 +238,75 @@ export const findById = async (tripId: string) => {
   return trip;
 }
 
-export async function getTripSummaryService(tripId: string,user_id: string) {
-  try{
+export async function getTripSummaryService(tripId: string, user_id: string) {
+  try {
+    const summary = await getTripSummaryById(tripId);
 
-  const summary = await getTripSummaryById(tripId);
+    if (!summary) {
+      throw new Error("Trip not found");
+    }
 
-  if (!summary) {
-    throw new Error("Trip not found");
-  }
+    // ตรวจสอบสิทธิ์: ต้องเป็นสมาชิก
+    const isMember = summary.members.some((m: any) => m.user_id === user_id);
+    if (!isMember) {
+      throw new Error("FORBIDDEN");
+    }
 
-  // ตรวจสอบสิทธิ์: ต้องเป็นสมาชิก
-  const isMember = summary.members.some( (m: any) => m.user_id === user_id );
+    const getVoteNumber = await tripModel.getStatusVoteResult(tripId);
+    const tripStatus = summary.trip.status;
 
-  if (!isMember) {
-    throw new Error("FORBIDDEN");
-  }
-  //console.log("members:",summary.members);
-   
-  const getVoteNumber = await tripModel.getStatusVoteResult(tripId);
-  
+    // ถ้ายังอยู่ระหว่างโหวต ยังไม่ต้องเรียก AI
+    if (tripStatus === "planning") {
+      return { summary, getVoteNumber };
+    }
 
-  const tripStatus = summary.trip.status;
-  //console.log("Trip Status:", tripStatus);
-  //เช็คสถานะทริป ถ้าเป็น planning จะยังไม่แสดงผลโหวต จนกว่าคนจะโหวเสร็จ
-  if (tripStatus === 'planning' ) {
+    // ดึงผลโหวตทั้งหมด
+    const [budgetVotes, locationResult, dateOptions] = await Promise.all([
+      voteService.getvoteBudget(tripId, user_id),
+      voteService.getvoteLocation(tripId, user_id),
+      voteService.getvoteDate(tripId, user_id),
+    ]);
+
+    // เรียก PromptService พร้อมข้อมูลครบ
+    const { result, metadata } = await PromptService.generate(
+      {
+        trip: summary.trip,
+        members: summary.members,
+        locationResult,
+        budgetResult: budgetVotes,
+        dateResult: dateOptions,   
+      },
+      {
+        template: "comprehensive",
+        model: "gpt-4o-mini",      
+        structured: true,
+        includeCOT: true,
+      }
+    );
+
+    console.log("result",result);
+    console.log("meta",metadata)
+
     return {
       summary,
-      getVoteNumber
-    }
-  }
-  const budgetVotes = await voteService.getvoteBudget(tripId,user_id);
-  const locationResult = await voteService.getvoteLocation(tripId,user_id);
-  const dateOptions = await voteService.getvoteDate(tripId,user_id);
-
-  const { result, metadata } =
-  await PromptService.generate(
-    {
-      trip: summary.trip,
-      members: summary.members,
+      getVoteNumber,
+      budgetVotes,
       locationResult,
-      budgetResult: budgetVotes, 
-    },
-    {
-      template: "comprehensive",
-      model: "gpt-4",
-      structured: true,
-    }
-  );
-
-  return { 
-    summary, 
-    budgetVotes, 
-    locationResult, 
-    dateOptions,
-    aiSummary: result,
-    aiMeta: metadata, 
-  };
+      dateOptions,
+      aiSummary: result,
+      aiMeta: metadata,
+    };
 
   } catch (error) {
-    console.error("Get trip summary error:", error instanceof Error ? error.message : error);
-    throw new Error(error instanceof Error ? error.message : "An error occurred while fetching trip summary");
+    console.error(
+      "Get trip summary error:",
+      error instanceof Error ? error.message : error
+    );
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "An error occurred while fetching trip summary"
+    );
   }
 }
 
