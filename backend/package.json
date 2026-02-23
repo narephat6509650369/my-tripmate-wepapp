@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "node --loader ts-node/esm src/server.ts",
+    "dev": "tsx src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "testuser": "node --loader ts-node/esm src/test/testDelete.ts",
@@ -29,6 +29,7 @@
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
     "google-auth-library": "^10.5.0",
     "mysql2": "^3.15.3",
     "nodemailer": "^8.0.1",
+    "openai": "^6.22.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "swagger-jsdoc": "^6.2.8",

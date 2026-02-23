@@ -3,6 +3,7 @@ import * as tripModel from '../models/tripModel.js';
 import { closeTrip, getTripSummaryById, type Trip } from '../models/tripModel.js';
 import * as voteService from '../services/voteService.js';
 import notiService from './notiService.js';
+import { PromptService } from "./promptService.js";
 
 
 /**
@@ -91,6 +92,8 @@ export const getTripDetail = async (tripId: string) => {
     await closeTripService(tripId, "auto");
 
     const trip = await tripModel.getTripDetail(tripId);
+
+    console.log("getTripDetail",trip)
 
     if (!trip) {
       throw new Error("Trip not found");
@@ -268,11 +271,28 @@ export async function getTripSummaryService(tripId: string,user_id: string) {
   const locationResult = await voteService.getvoteLocation(tripId,user_id);
   const dateOptions = await voteService.getvoteDate(tripId,user_id);
 
+  const { result, metadata } =
+  await PromptService.generate(
+    {
+      trip: summary.trip,
+      members: summary.members,
+      locationResult,
+      budgetResult: budgetVotes, 
+    },
+    {
+      template: "comprehensive",
+      model: "gpt-4",
+      structured: true,
+    }
+  );
+
   return { 
     summary, 
     budgetVotes, 
     locationResult, 
-    dateOptions 
+    dateOptions,
+    aiSummary: result,
+    aiMeta: metadata, 
   };
 
   } catch (error) {

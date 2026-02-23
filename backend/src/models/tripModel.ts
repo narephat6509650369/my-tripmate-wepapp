@@ -361,12 +361,16 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
 
     const dateRangeSql = `
       SELECT
-        availability_id AS id,
-        user_id,
-        available_date,
-        created_at
-      FROM trip_user_availabilities
-      WHERE trip_id = ?
+        dv.date_vote_id,
+        dv.user_id,
+        dv.available_date,
+        dv.voted_at
+      FROM date_votes dv
+      JOIN date_options do 
+        ON dv.date_option_id = do.date_option_id
+      JOIN date_votings dvt
+        ON do.date_voting_id = dvt.date_voting_id
+      WHERE dvt.trip_id = ?
     `;
 
     const provinceVotesSql = `
@@ -395,14 +399,19 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
 
     const memberAvailabilitySql = `
       SELECT
-        tua.availability_id AS id,
-        tua.user_id,
-        u.full_name AS full_name,
-        tua.available_date,
-        tua.created_at
-      FROM trip_user_availabilities tua
-      JOIN users u ON tua.user_id = u.user_id
-      WHERE tua.trip_id = ?
+        dv.date_vote_id AS id,
+        dv.user_id,
+        u.full_name,
+        dv.available_date,
+        dv.voted_at
+      FROM date_votes dv
+      JOIN users u
+        ON dv.user_id = u.user_id
+      JOIN date_options do
+        ON dv.date_option_id = do.date_option_id
+      JOIN date_votings dvt
+        ON do.date_voting_id = dvt.date_voting_id
+      WHERE dvt.trip_id = ?
     `;
 
     /** STEP 1: Trip */
@@ -432,6 +441,12 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
     const provinceRows = provinceResult[0];
     const budgetRows = budgetResult[0];
     const memberAvailabilityRows = memberAvailabilityResult[0];
+
+    //console.log("members:",memberRows);
+    //console.log("dateRanges:",dateRows);
+    //console.log("provinceVotes:",provinceRows);
+    //console.log("budgetOptions:",budgetRows);
+    //console.log("memberAvailabilitys:",memberAvailabilityRows);
 
     return {
       tripid: tripRows[0].trip_id,
@@ -563,11 +578,7 @@ export const removeMemberById = async (trip_id: string, member_id: string) => {
       [trip_id, member_id]
     );
 
-    // 3. ลบ Availability (ใช้ user_id ที่หามาได้จากข้อ 1)
-    await connection.query(
-       `DELETE FROM trip_user_availabilities WHERE trip_id = ? AND user_id = ?`,
-       [trip_id, user_id]
-    );
+    
 
     await connection.commit(); // บันทึกทุกอย่าง
     return { success: true, message: "Member removed and availability cleared" };
