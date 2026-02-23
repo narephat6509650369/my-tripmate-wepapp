@@ -12,7 +12,7 @@ async function bootstrap() {
     const app = express();
 
     app.use(cors({
-      origin: "http://localhost:5173",
+      origin: process.env.FRONTEND_URL || "http://localhost:5173",
       credentials: true
     }));
 
@@ -24,11 +24,13 @@ async function bootstrap() {
     const authRoutes = (await import("./routes/user.js")).default;
     const tripRoutes = (await import("./routes/trip.js")).default;
     const voteRoutes = (await import("./routes/vote.js")).default;
+    const notiRoutes = (await import("./routes/noti.js")).default;
     const { setupSwagger } = await import("./config/swagger.js");
 
     app.use("/api/auth", authRoutes);
     app.use("/api/trips", tripRoutes);
     app.use("/api/votes", voteRoutes);
+    app.use("/api/noti", notiRoutes);
 
     setupSwagger(app);
 

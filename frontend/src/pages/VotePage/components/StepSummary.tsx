@@ -1,23 +1,10 @@
 // src/pages/VotePage/components/StepSummary.tsx
-import React, { useEffect, useState } from 'react';
-import {
-  Loader2, Copy, Check, Calendar, DollarSign, MapPin,
-  Sparkles, Brain, Target, Settings, ChevronDown, ChevronUp,
-  Code, Download, Share2, TrendingUp
-} from 'lucide-react';
-import { voteAPI } from '../../../services/tripService';
-import { formatCurrency } from '../../../utils';
-import type { TripDetail } from '../../../types';
-import {
-  PromptEngineering,
-  MODEL_CONFIGS,
-  type AIModel,
-  type PromptTemplate,
-  type PromptConfig
-} from '../../../utils/promptEngineering';
-
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import { Edit3, ArrowRight } from 'lucide-react';
+import type { TripCard, TripDetail } from '../../../types';
+import { use } from 'passport';
+import { tripAPI } from '../../../services/tripService';
 // ============== TYPES ==============
 
 interface StepSummaryProps {
@@ -27,12 +14,29 @@ interface StepSummaryProps {
   canViewSummary?: boolean;
 }
 
-interface SummaryData {
-  bestDates: string[];
-  avgBudget: { accommodation: number; transport: number; food: number; other: number };
-  topLocations: { place: string; total_score: number }[];
-  progress: { dates: number; budget: number; location: number };
-}
+// ============== COMPONENT ==============
+export const StepSummary: React.FC<StepSummaryProps> = ({ 
+  trip, 
+  onNavigateToStep,
+  userInput,   
+  isOwner,         
+  canViewSummary 
+}) => {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    console.log("📊 Trip Summary Data:", trip.tripid);
+    const fetchTripSummary = async () => {
+      try {
+        const response = await tripAPI.getTripSummary(trip.tripid);
+        console.log("getTripSummary:",response)
+      } catch (error) {
+        console.error("Error fetching trip summary:", error);
+      }
+    };
+    fetchTripSummary();
+  }, [trip.tripid]);
+
 
 // ============== AI CONSTANTS ==============
 

@@ -29,7 +29,7 @@ export const googleLoginService = async (access_token: string): Promise<{
   // Access Token (สั้น)
   const accessToken = jwt.sign(
     {
-      userId: user.user_id,
+      user_id: user.user_id,
       email: user.email,
       jti: randomUUID()
     },

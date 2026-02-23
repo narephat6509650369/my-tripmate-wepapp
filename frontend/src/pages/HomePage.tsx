@@ -1,10 +1,10 @@
 // src/pages/HomePage.tsx
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check, User } from "lucide-react";
 import { useAuth } from '../contexts/AuthContext';
-import { tripAPI } from '../services/tripService';
+import { tripAPI, notiApi } from '../services/tripService';
 import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils';
 import type { TripSummary } from '../types';
 
@@ -31,6 +31,9 @@ const HomePage: React.FC = () => {
   const [myTrips, setMyTrips] = useState<TripCard[]>([]);
   const [invitedTrips, setInvitedTrips] = useState<TripCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const [dialogMessage, setDialogMessage] = useState<string | null>(null);
+  
 
   // ✅ Helper: แปลง TripSummary → TripCard
   const formatTripSummary = (trip: TripSummary): TripCard => {
@@ -49,7 +52,25 @@ const HomePage: React.FC = () => {
   // ✅ โหลดทริปทั้งหมด
   useEffect(() => {
     loadTrips();
+    const noti = notiApi.getNoti();
+    console.log("Homepage");
+    console.log("GET NOTI:",noti);
   }, []);
+
+  useEffect(() => {
+  const state = location.state as any;
+
+  if (state?.joinError) {
+    setDialogMessage(state.joinError);
+    navigate(location.pathname, { replace: true });
+  }
+
+  if (state?.joinSuccess) {
+    setDialogMessage("เข้าร่วมห้องสำเร็จ 🎉");
+    navigate(location.pathname, { replace: true });
+  }
+}, [location]);
+
 
   const loadTrips = async () => {
     try {
@@ -161,6 +182,7 @@ const HomePage: React.FC = () => {
   };
 
   return (
+    
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       <Header onLogout={handleLogout} />
 
@@ -355,7 +377,26 @@ const HomePage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* ✅ Join Result Dialog */}
+      {dialogMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-11/12 max-w-sm text-center">
+            <p className="mb-4 text-blue-900 font-medium">
+              {dialogMessage}
+            </p>
+
+            <button
+              onClick={() => setDialogMessage(null)}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
+    
   );
 };
 

@@ -3,45 +3,49 @@ import React, { useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import bgImage from '../assets/login-bg.jpg';
+import { redirect, useLocation } from 'react-router-dom';
 
 function LoginPage() {
   const { login } = useAuth();
+  const location = useLocation(); 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const query = new URLSearchParams(location.search);
-  const redirect = query.get("redirect") || undefined;
+  const params = new URLSearchParams(location.search);
+  const redirectPath = params.get("redirect") || "/homepage";
+
+  console.log("Redirect param:", redirectPath);
 
   // ✅ ใช้ useAuth hook แทนการ call API โดยตรง
   const handleGoogleLogin = useGoogleLogin({
-    flow: 'implicit',
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      setError('');
-      
-      try {
-        console.log('🔐 Attempting Google login...');
-        
-        // ✅ ใช้ login จาก AuthContext
-        await login(tokenResponse.access_token, redirect);
-        
+  flow: 'implicit',
+  onSuccess: async (tokenResponse) => {
+    setLoading(true);
+    setError('');
 
-        
-        // AuthContext จะจัดการ navigate ให้เอง
-        console.log('✅ Login successful');
-        
-      } catch (err: any) {
-        console.error('❌ Login failed:', err);
-        setError(`เข้าสู่ระบบไม่สำเร็จ: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    },
-    
-    onError: () => {
-      console.error('❌ Google login error');
-      setError('การเข้าสู่ระบบด้วย Google ล้มเหลว กรุณาลองใหม่อีกครั้ง');
-    },
-  });
+    try {
+      console.log('🔐 Attempting Google login...');
+      console.log("Redirect param:", redirectPath);
+
+      // ✅ เรียก login จาก AuthContext
+      await login(tokenResponse.access_token, redirectPath);
+
+      console.log('✅ Login successful');
+
+    } catch (err: any) {
+      console.error('❌ Login failed:', err);
+      setError(`เข้าสู่ระบบไม่สำเร็จ: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  },
+
+  onError: () => {
+    console.error('❌ Google login error');
+    setError('การเข้าสู่ระบบด้วย Google ล้มเหลว กรุณาลองใหม่อีกครั้ง');
+  },
+});
+
 
   return (
     <div className="wrap-login100">

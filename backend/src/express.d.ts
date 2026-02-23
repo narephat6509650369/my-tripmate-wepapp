@@ -1,7 +1,7 @@
 import "express";
 
 export interface JwtPayload {
-  userId: string;
+  user_id: string;
   email: string;
   jti?: string;
 }
@@ -9,7 +9,7 @@ export interface JwtPayload {
 declare global {
   namespace Express {
     interface User {
-      userId: string;
+      user_id: string;
       email: string;
       jti?: string;
     }
