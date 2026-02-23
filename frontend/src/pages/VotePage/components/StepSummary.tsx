@@ -1,10 +1,54 @@
 // src/pages/VotePage/components/StepSummary.tsx
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Edit3, ArrowRight } from 'lucide-react';
-import type { TripCard, TripDetail } from '../../../types';
-import { use } from 'passport';
-import { tripAPI } from '../../../services/tripService';
+import React, { useEffect, useState } from 'react';
+import { Calendar, DollarSign, MapPin, Sparkles, Brain, Settings,
+         Check, ChevronDown, ChevronUp, Loader2, Copy, Code } from 'lucide-react';
+import type { TripDetail } from '../../../types';
+import { voteAPI } from '../../../services/tripService';
+
+// ── Local Types ──
+type AIModel = 'gpt-4' | 'gpt-3.5-turbo' | 'claude-3-opus' | 'claude-3-sonnet' | 'gemini-pro';
+type PromptTemplate = 'comprehensive' | 'itinerary' | 'budget' | 'activities' | 'accommodation' | 'optimization';
+
+interface PromptConfig {
+  model: AIModel;
+  template: PromptTemplate;
+  temperature: number;
+  maxTokens: number;
+  includeCOT: boolean;
+  includeExamples: boolean;
+  structured: boolean;
+}
+
+interface SummaryData {
+  bestDates: string[];
+  avgBudget: { accommodation: number; transport: number; food: number; other: number };
+  topLocations: { place: string; total_score: number }[];
+  progress: { dates: number; budget: number; location: number };
+}
+
+// ── Local Utilities ──
+const formatCurrency = (n: number) => n.toLocaleString('th-TH');
+
+const MODEL_CONFIGS: Record<AIModel, { name: string; provider: string; costPer1kTokens: { input: number } }> = {
+  'gpt-4':          { name: 'GPT-4',          provider: 'OpenAI',    costPer1kTokens: { input: 0.03 } },
+  'gpt-3.5-turbo':  { name: 'GPT-3.5 Turbo',  provider: 'OpenAI',    costPer1kTokens: { input: 0.001 } },
+  'claude-3-opus':  { name: 'Claude 3 Opus',   provider: 'Anthropic', costPer1kTokens: { input: 0.015 } },
+  'claude-3-sonnet':{ name: 'Claude 3 Sonnet', provider: 'Anthropic', costPer1kTokens: { input: 0.003 } },
+  'gemini-pro':     { name: 'Gemini Pro',       provider: 'Google',    costPer1kTokens: { input: 0.0005 } },
+};
+
+const PromptEngineering = {
+  generatePromptWithMetadata: (data: any, config: PromptConfig) => {
+    const prompt = `วางแผนทริป: ${JSON.stringify(data, null, 2)}`;
+    const estimatedTokens = Math.ceil(prompt.length / 4);
+    const estimatedCost = (estimatedTokens / 1000) * MODEL_CONFIGS[config.model].costPer1kTokens.input;
+    return {
+      prompt,
+      metadata: { estimatedTokens, estimatedCost, model: config.model, version: '1.0.0', timestamp: new Date().toISOString() }
+    };
+  }
+};
+
 // ============== TYPES ==============
 
 interface StepSummaryProps {
@@ -13,30 +57,6 @@ interface StepSummaryProps {
   isOwner?: boolean;
   canViewSummary?: boolean;
 }
-
-// ============== COMPONENT ==============
-export const StepSummary: React.FC<StepSummaryProps> = ({ 
-  trip, 
-  onNavigateToStep,
-  userInput,   
-  isOwner,         
-  canViewSummary 
-}) => {
-  const navigate = useNavigate();
-  
-  useEffect(() => {
-    console.log("📊 Trip Summary Data:", trip.tripid);
-    const fetchTripSummary = async () => {
-      try {
-        const response = await tripAPI.getTripSummary(trip.tripid);
-        console.log("getTripSummary:",response)
-      } catch (error) {
-        console.error("Error fetching trip summary:", error);
-      }
-    };
-    fetchTripSummary();
-  }, [trip.tripid]);
-
 
 // ============== AI CONSTANTS ==============
 
