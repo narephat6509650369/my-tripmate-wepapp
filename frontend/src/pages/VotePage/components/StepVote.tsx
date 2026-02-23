@@ -113,25 +113,14 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
 
     try {
       setLoading(true);
-
       if (!trip.tripid || !trip.ownerid) {
         alert("ไม่พบข้อมูลทริปหรือผู้ใช้");
         return;
       }
-
-      await voteAPI.submitAvailability({
-        trip_id: trip.tripid,
-        user_id: trip.ownerid,
-        ranges: selectedDates.sort(),
-      });
-
-      console.log("Selected Dates:", selectedDates);
       setJustSaved(true);
-
       if (onSave) {
         await onSave(selectedDates);
       }
-
     } catch (err: any) {
       console.error(err);
       alert(err?.response?.data?.message || "บันทึกไม่สำเร็จ");

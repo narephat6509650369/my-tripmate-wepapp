@@ -9,7 +9,6 @@ import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import Dashboard from './pages/Dashboard';
 import VotePage from './pages/VotePage';
-import SummaryPage from './pages/SummaryPage';
 import JoinPage from './pages/JoinPage';
 
 function App() {
@@ -37,12 +36,6 @@ function App() {
           <Route path="/votepage/:tripCode" element={
             <ProtectedRoute>
               <VotePage />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/summary/:tripCode" element={
-            <ProtectedRoute>
-              <SummaryPage />
             </ProtectedRoute>
           } />
 

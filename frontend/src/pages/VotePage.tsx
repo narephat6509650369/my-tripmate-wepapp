@@ -186,6 +186,7 @@ const VotePage: React.FC = () => {
       
       if (response.success) {
         console.log('✅ บันทึกวันที่สำเร็จ');
+        setUserDates(dates);
       } else {
         throw new Error(response.message);
       }
@@ -208,6 +209,7 @@ const VotePage: React.FC = () => {
       
       if (response.success) {
         console.log('บันทึกงบประมาณสำเร็จ');
+        setUserBudget(prev => ({ ...prev, [category]: amount }));
       } else {
         throw new Error(response.message);
       }
@@ -226,6 +228,11 @@ const VotePage: React.FC = () => {
       console.log("submitLocationVote", response);
       if (response.success) {
         console.log('โหวตสำเร็จ');
+        const updatedLocations = votes.map(v => ({
+        place: v.place,
+        score: v.score
+      }));
+      setUserLocations(updatedLocations);
       } else {
         throw new Error(response.message);
       }
@@ -415,8 +422,7 @@ const VotePage: React.FC = () => {
               trip={trip}
               onNavigateToStep={setStep}
               isOwner={trip.ownerid === user?.user_id}
-              canViewSummary={trip.ownerid === user?.user_id || isSummaryUnlocked(trip)}
-              userInput={getUserInput()} 
+              canViewSummary={isSummaryUnlocked(trip)}
             />
           )}
         </div>

@@ -2,8 +2,7 @@ import React, { useState } from "react";
 import { MapPin, Bell, Menu, X, ChevronDown, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Users, Vote, CheckCircle } from "lucide-react";
-
-// ✅ แก้ไข imports
+import { useAuth } from "../contexts/AuthContext";
 import { formatRelativeTime } from "../utils";
 
 // ============================================================================
@@ -12,11 +11,6 @@ import { formatRelativeTime } from "../utils";
 
 interface HeaderProps {
   onLogout?: () => void;
-}
-
-interface UserInfo {
-  name: string;
-  email: string;
 }
 
 // ✅ เพิ่ม Type Definition
@@ -41,6 +35,17 @@ interface Notification {
 // ============================================================================
 
 const Header: React.FC<HeaderProps> = ({ onLogout }) => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const getInitial = () => {
+    if (user?.full_name) return user.full_name.charAt(0).toUpperCase();
+    if (user?.email) return user.email.charAt(0).toUpperCase();
+    return "U";
+  };
+
+  const getDisplayName = () =>
+    user?.full_name || user?.email?.split("@")[0] || "User";
   
   // Mock Notifications with different types
   const [notifications, setNotifications] = useState<Notification[]>([
@@ -99,13 +104,8 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
     }
   };
 
-  const navigate = useNavigate();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const user: UserInfo = {
-    name: "User",
-    email: "user@example.com"
-  };
   const [notiOpen, setNotiOpen] = useState(false);
   const notiRef = React.useRef<HTMLDivElement>(null);
   const profileRef = React.useRef<HTMLDivElement>(null);
@@ -132,7 +132,8 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
   const handleLogout = () => {
     if (onLogout) onLogout();
-    console.log("Logged out");
+    logout();
+    console.log("User logged out");
   };
 
   const markAllAsRead = () => {
@@ -192,6 +193,29 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   };
   
   const MAX_BADGE_COUNT = 9;
+
+  const AvatarDisplay = ({ size = "md" }: { size?: "sm" | "md" | "lg" }) => {
+    const sizeClass = {
+      sm: "w-9 h-9 text-sm",
+      md: "w-10 h-10 text-sm",
+      lg: "w-12 h-12 text-lg",
+    }[size];
+
+    if (user?.avatar_url) {
+      return (
+        <img
+          src={user.avatar_url}
+          alt={getDisplayName()}
+          className={`${sizeClass} rounded-full border-2 border-white shadow-md object-cover`}
+        />
+      );
+    }
+    return (
+      <div className={`${sizeClass} bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md`}>
+        {getInitial()}
+      </div>
+    );
+  };
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50 w-full">
@@ -313,28 +337,56 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
           <div className="relative hidden md:block" ref={profileRef}>
             <button
               onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-              className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="flex items-center gap-3 hover:bg-gray-100 rounded-full p-1 pr-3 transition-all duration-200"
               aria-label="เมนูโปรไฟล์"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
-                {user?.name.charAt(0).toUpperCase()}
+              {/* Avatar with initial */}
+              <div className="relative">
+                <AvatarDisplay size="md" />
+                {/* <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full" /> */}
               </div>
+
+              {/* User Info */}
+              {/* <div className="text-left">
+                <p className="font-medium text-sm text-gray-900 leading-tight max-w-[150px] truncate">
+                  {user?.name}
+                </p>
+                <p className="text-xs text-gray-500 max-w-[150px] truncate">
+                  {user?.email}
+                </p>
+              </div> */}
+
+              {/* Chevron */}
               <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${profileMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {profileMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-xl py-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="px-4 py-2 border-b">
-                  <p className="font-medium text-gray-900 text-sm">{user?.name}</p>
-                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* User Info in Dropdown */}
+                <div className="p-4 border-b border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+                  <div className="flex items-center gap-3">
+                    <AvatarDisplay size="lg" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800 text-sm truncate">
+                        {getDisplayName()}
+                      </p>
+                      <p className="text-xs text-gray-600 truncate">
+                        {user?.email}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-red-50 hover:text-red-600 w-full text-left transition-colors mt-1"
-                >
-                  <LogOut className="w-4 h-4" />
-                  ออกจากระบบ
-                </button>
+
+                {/* Menu Items */}
+                <div className="py-2">
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left transition-colors font-medium"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    ออกจากระบบ
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -355,11 +407,9 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
         <div className="md:hidden bg-white border-t shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="px-4 py-3 border-b bg-gray-50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
-                {user?.name.charAt(0).toUpperCase()}
-              </div>
+              <AvatarDisplay size="md" />
               <div>
-                <p className="font-medium text-gray-900">{user?.name}</p>
+                <p className="font-medium text-gray-900">{getDisplayName()}</p>
                 <p className="text-xs text-gray-500 truncate">{user?.email}</p>
               </div>
             </div>

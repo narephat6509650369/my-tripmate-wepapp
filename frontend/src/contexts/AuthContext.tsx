@@ -60,9 +60,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   // ✅ Initialize auth state from localStorage
+  // useEffect(() => {
+  //   const initializeAuth = () => {
+  //     try {
+  //       const token = localStorage.getItem('jwtToken');
+  //       const userId = localStorage.getItem('userId');
+  //       const userEmail = localStorage.getItem('userEmail');
+
+  //       if (!token) {
+  //         console.warn('⚠️ No token found, redirecting to login');
+  //         if (pathname !== '/login') {
+  //         if (inviteCode) navigate(`/login?redirect=/join/${inviteCode}`);
+  //           else navigate('/login');
+  //         }
+  //         return;
+  //       }
+
+  //       if (token && userId && userEmail) {
+  //         setAuthState({
+  //           user: {
+  //             user_id: userId,
+  //             email: userEmail,
+  //             full_name: localStorage.getItem('userName') || undefined,
+  //             avatar_url: localStorage.getItem('userAvatar') || null
+  //           },
+  //           token,
+  //           isAuthenticated: true,
+  //           isLoading: false
+  //         });
+  //       } else {
+  //         setAuthState({
+  //           user: null,
+  //           token: null,
+  //           isAuthenticated: false,
+  //           isLoading: false
+  //         });
+  //       }
+  //     } catch (error) {
+  //       console.error('Failed to initialize auth:', error);
+  //       setAuthState({
+  //         user: null,
+  //         token: null,
+  //         isAuthenticated: false,
+  //         isLoading: false
+  //       });
+  //     }
+  //   };
+
+  //   initializeAuth();
+  // }, []);
+
   useEffect(() => {
     const initializeAuth = () => {
       try {
+        // 🔥 สำหรับ development: ข้าม auth check
+        setAuthState({
+          user: {
+            user_id: 'mock-user-123',
+            email: 'mock@example.com',
+            full_name: 'Mock User',
+            avatar_url: null
+          },
+          token: 'mock-token',
+          isAuthenticated: true,
+          isLoading: false
+        });
+        
+        console.log('✅ Mock auth initialized');
+
+        /* 
+        // โค้ดเดิม - comment ไว้ก่อน
         const token = localStorage.getItem('jwtToken');
         const userId = localStorage.getItem('userId');
         const userEmail = localStorage.getItem('userEmail');
@@ -70,40 +137,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!token) {
           console.warn('⚠️ No token found, redirecting to login');
           if (pathname !== '/login') {
-          if (inviteCode) navigate(`/login?redirect=/join/${inviteCode}`);
+            if (inviteCode) navigate(`/login?redirect=/join/${inviteCode}`);
             else navigate('/login');
           }
           return;
         }
+        */
 
-        if (token && userId && userEmail) {
-          setAuthState({
-            user: {
-              user_id: userId,
-              email: userEmail,
-              full_name: localStorage.getItem('userName') || undefined,
-              avatar_url: localStorage.getItem('userAvatar') || null
-            },
-            token,
-            isAuthenticated: true,
-            isLoading: false
-          });
-        } else {
-          setAuthState({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false
-          });
-        }
       } catch (error) {
         console.error('Failed to initialize auth:', error);
-        setAuthState({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          isLoading: false
-        });
       }
     };
 
@@ -362,3 +404,37 @@ export const useRequireAuth = () => {
 };
 
 export default AuthContext;
+
+// ============== AUTH UTILITIES ==============
+
+const isTokenExpired = (): boolean => {
+  const token = localStorage.getItem('jwtToken');
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (!payload.exp) return false;
+    return Math.floor(Date.now() / 1000) >= payload.exp;
+  } catch {
+    return true;
+  }
+};
+
+export const getAuthHeader = (): string => {
+  const token = localStorage.getItem('jwtToken');
+  return token ? `Bearer ${token}` : '';
+};
+
+export const getAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem('jwtToken');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+};
+
+export const validateEmail = (email: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+export const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/[<>]/g, '').slice(0, 255);
+};
