@@ -165,24 +165,27 @@ export const tripAPI = {
   /**
    * GET /api/trips/:tripId/summary
    */
-  getTripSummary: async (tripId: string): Promise<ApiResponse<TripSummaryResult>> => {
-    if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
-      return getMockTripSummary(tripId);
-    }
+  getTripSummary: async (tripId: string,template: string = "comprehensive"): Promise<ApiResponse<TripSummaryResult>> => {
 
-    try {
+  if (CONFIG.USE_MOCK_DATA) {
+    await mockDelay();
+    return getMockTripSummary(tripId);
+  }
 
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}/summary`, {
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}/trips/${tripId}/summary?template=${template}`,
+      {
         method: "GET",
         credentials: "include"
-      });
+      }
+    );
 
-      return await response.json();
-    } catch (error) {
-      return handleApiError(error);
-    }
-  },
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
+},
 
   /**
    * POST /api/trips/AddTrip

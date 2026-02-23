@@ -115,6 +115,7 @@ export const estimateCost = (text: string, model: string): number => {
 // ============== HELPER ==============
 
 function getRegionFromProvince(province: string): string {
+if (!province) return "ไม่ระบุ"; 
   const regions: Record<string, string[]> = {
     ภาคเหนือ: ["เชียงใหม่", "เชียงราย", "ลำปาง", "ลำพูน", "แม่ฮ่องสอน"],
     ภาคกลาง: ["กรุงเทพ", "นนทบุรี", "ปทุมธานี", "สมุทรปราการ"],
@@ -141,7 +142,7 @@ const DEFAULT_SYSTEM_PROMPT =
   "You are an expert travel planning assistant specializing in Thailand. Provide detailed, actionable recommendations.";
 
 // ============== PROMPT BUILDERS ==============
-
+//สร้าง prompt ใหญ่แบบครบทุกอย่าง
 function buildComprehensivePrompt(data: any, config: PromptConfig): string {
   const { trip, members = [], locationResult, dateResult, budgetResult } = data;
 
@@ -178,7 +179,7 @@ function buildComprehensivePrompt(data: any, config: PromptConfig): string {
             members.length,
         }
       : null,
-    destination: locationResult
+    destination: locationResult?.province_name 
       ? {
           province: locationResult.province_name,
           score: locationResult.vote_count,
@@ -252,6 +253,7 @@ function buildComprehensivePrompt(data: any, config: PromptConfig): string {
   return prompt;
 }
 
+//สร้าง prompt เน้นตารางทริป
 function buildItineraryPrompt(data: any, config: PromptConfig): string {
   const { trip, members = [], locationResult, dateResult } = data;
 
@@ -291,6 +293,7 @@ function buildItineraryPrompt(data: any, config: PromptConfig): string {
   return prompt;
 }
 
+//วิเคราะห์งบ
 function buildBudgetPrompt(data: any, config: PromptConfig): string {
   const { trip, members = [], budgetResult, locationResult } = data;
 
@@ -338,6 +341,7 @@ function buildBudgetPrompt(data: any, config: PromptConfig): string {
   return prompt;
 }
 
+//แนะนำกิจกรรม
 function buildActivitiesPrompt(data: any, config: PromptConfig): string {
   const { trip, members = [], locationResult, budgetResult } = data;
 
@@ -416,7 +420,7 @@ function buildAccommodationPrompt(data: any, config: PromptConfig): string {
 }
 
 // ============== PROMPT GENERATOR ==============
-
+//แนะนำที่พัก
 function buildPrompt(data: any, config: PromptConfig): string {
   switch (config.template) {
     case "itinerary":
@@ -434,61 +438,12 @@ function buildPrompt(data: any, config: PromptConfig): string {
   }
 }
 
-function getSystemPrompt(model: string): string {
-  return SYSTEM_PROMPTS[model] ?? DEFAULT_SYSTEM_PROMPT;
-}
 
 // ============== SERVICE ==============
 
 export class PromptService {
   /**
-   * Generate AI travel planning response
-   */
-  static async generate(
-    data: any,
-    config?: PromptConfig
-  ): Promise<{ result: string | null; metadata: PromptMetadata }> {
-    const template = config?.template ?? "comprehensive";
-    const model = config?.model ?? "gpt-4o-mini";
-    const temperature = config?.temperature ?? 0.4;
-    const maxTokens = config?.maxTokens ?? 4000;
-
-    const resolvedConfig: PromptConfig = {
-      ...config,
-      template,
-      model,
-      temperature,
-      maxTokens,
-    };
-
-    const prompt = buildPrompt(data, resolvedConfig);
-    const systemPrompt = getSystemPrompt(model);
-
-    const response = await openai.chat.completions.create({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: prompt },
-      ],
-      temperature,
-      max_tokens: maxTokens,
-    });
-
-    const content = response.choices?.[0]?.message?.content ?? null;
-
-    const metadata: PromptMetadata = {
-      estimatedTokens: estimateTokens(prompt),
-      estimatedCost: estimateCost(prompt, model),
-      model,
-      version: "2.0.0",
-      timestamp: new Date().toISOString(),
-    };
-
-    return { result: content, metadata };
-  }
-
-  /**
-   * Generate only the prompt string (without calling OpenAI)
+   * Generate only the prompt string (no AI call)
    */
   static buildPromptOnly(data: any, config?: PromptConfig): string {
     const resolvedConfig: PromptConfig = {
@@ -500,18 +455,20 @@ export class PromptService {
   }
 
   /**
-   * Get prompt + metadata without calling OpenAI
+   * Get prompt + metadata (no AI call)
    */
   static buildPromptWithMetadata(
     data: any,
     config?: PromptConfig
-  ): { prompt: string; metadata: Omit<PromptMetadata, "timestamp"> & { timestamp: string } } {
+  ) {
     const resolvedConfig: PromptConfig = {
       template: "comprehensive",
       model: "gpt-4o-mini",
       ...config,
     };
+
     const prompt = buildPrompt(data, resolvedConfig);
+
     return {
       prompt,
       metadata: {

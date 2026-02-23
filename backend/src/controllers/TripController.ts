@@ -394,6 +394,7 @@ export const updateMemberBudgetController = async (req: Request, res: Response) 
 export const getTripSummaryController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
+    const { template } = req.query;
     const user_id = req.user?.user_id;
 
     if (!user_id) {
@@ -413,7 +414,7 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
       });
     }
 
-    const summary = await getTripSummaryService(tripId, user_id);
+    const summary = await getTripSummaryService(tripId, user_id,template as string );
     console.log("Trip summary:", summary);
 
     return res.status(200).json({

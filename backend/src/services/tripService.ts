@@ -238,7 +238,7 @@ export const findById = async (tripId: string) => {
   return trip;
 }
 
-export async function getTripSummaryService(tripId: string, user_id: string) {
+export async function getTripSummaryService(tripId: string, user_id: string, template?: string) {
   try {
     const summary = await getTripSummaryById(tripId);
 
@@ -261,41 +261,62 @@ export async function getTripSummaryService(tripId: string, user_id: string) {
     }
 
     // ดึงผลโหวตทั้งหมด
-    const [budgetVotes, locationResult, dateOptions] = await Promise.all([
-      voteService.getvoteBudget(tripId, user_id),
-      voteService.getvoteLocation(tripId, user_id),
-      voteService.getvoteDate(tripId, user_id),
-    ]);
+const [budgetVotes, locationResult, dateOptions] = await Promise.all([
+  voteService.getvoteBudget(tripId, user_id),
+  voteService.getvoteLocation(tripId, user_id),
+  voteService.getvoteDate(tripId, user_id),
+]);
 
-    // เรียก PromptService พร้อมข้อมูลครบ
-    const { result, metadata } = await PromptService.generate(
-      {
-        trip: summary.trip,
-        members: summary.members,
-        locationResult,
-        budgetResult: budgetVotes,
-        dateResult: dateOptions,   
-      },
-      {
-        template: "comprehensive",
-        model: "gpt-4o-mini",      
-        structured: true,
-        includeCOT: true,
-      }
-    );
+// Map โครงสร้างให้ตรงกับที่ PromptService คาดหวัง
+const mappedLocation = locationResult?.analysis?.winner
+  ? {
+      province_name: locationResult.analysis.winner.place,
+      vote_count: locationResult.analysis.winner.total_score,
+    }
+  : null;
 
-    console.log("result",result);
-    console.log("meta",metadata)
+const mappedBudget = budgetVotes?.stats
+  ? {
+      accommodation: budgetVotes.stats.accommodation?.q2 ?? 0,
+      transport:     budgetVotes.stats.transport?.q2     ?? 0,
+      food:          budgetVotes.stats.food?.q2          ?? 0,
+      other:         0,
+    }
+  : null;
 
-    return {
-      summary,
-      getVoteNumber,
-      budgetVotes,
-      locationResult,
-      dateOptions,
-      aiSummary: result,
-      aiMeta: metadata,
-    };
+const mappedDate = dateOptions?.recommendation
+  ? {
+      final_dates:  dateOptions.recommendation.dates ?? [],
+      voter_count:  dateOptions.summary?.totalMembers ?? 0,
+    }
+  : null;
+
+// เรียก PromptService ด้วย mapped data
+const { prompt, metadata } = PromptService.buildPromptWithMetadata(
+  {
+    trip:           summary.trip,
+    members:        summary.members,
+    locationResult: mappedLocation,
+    budgetResult:   mappedBudget,
+    dateResult:     mappedDate,
+  },
+  {
+    template:   "comprehensive",
+    model:      "gpt-4o-mini",
+    structured: true,
+    includeCOT: true,
+  }
+);
+
+return {
+  summary,
+  getVoteNumber,
+  budgetVotes,
+  locationResult,
+  dateOptions,
+  aiSummary: prompt,  
+  aiMeta:    metadata,
+};
 
   } catch (error) {
     console.error(
