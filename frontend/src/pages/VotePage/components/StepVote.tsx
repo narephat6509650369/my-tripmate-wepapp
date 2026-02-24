@@ -1,99 +1,49 @@
 // src/pages/VotePage/components/StepVote.tsx
 import React, { useEffect, useState } from 'react';
-import { voteAPI } from '../../../services/tripService';
-import type { TripDetail } from '../../../types';
+import type { TripDetail, DateMatchingResponse } from '../../../types';
 import { useAuth } from '../../../contexts/AuthContext';
+
+type MatchingData = Pick<DateMatchingResponse, 'availability' | 'recommendation' | 'summary'>;
 
 interface StepVoteProps {
   trip: TripDetail;
+  matchingData?: MatchingData | null;
+  initialDates?: string[];
   onSave?: (dates: string[]) => Promise<void>;
   onManualNext?: () => void;
+  isLocked?: boolean;
 }
 
-export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }) => {
+export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialDates, onSave, onManualNext, isLocked }) => {
   const { user } = useAuth();
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   
-   const [matchingInfo, setMatchingInfo] = useState<{
-    availability: { date: string; count: number; percentage: number }[];
-    recommendation: {
-      dates: string[];
-      avgPeople: number;
-      percentage: number;
-      score: number;
-      isConsecutive: boolean;
-    } | null;
-    summary: {
-      totalMembers: number;
-      totalAvailableDays: number;
-    };
-  } | null>(null);
+  const [matchingInfo, setMatchingInfo] = useState<MatchingData | null>(null);
 
   // State สำหรับ Smart Toast & Modal
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
-  
-  // ✅ เพิ่ม loading และ error states
-  const [matchingLoading, setMatchingLoading] = useState(false);
-  const [matchingError, setMatchingError] = useState<string | null>(null);
 
   const tripDuration = trip.numdays;
 
+  const prevDatesRef = React.useRef<string>("");
+
   useEffect(() => {
-    if (!trip.tripid) return;
-
-    setMatchingLoading(true);
-    setMatchingError(null);
-
-    voteAPI.getDateMatchingResult(trip.tripid)
-      .then((res) => {
-      if (!res.success || !res.data) {
-        setMatchingError(res.message || 'ไม่สามารถโหลดข้อมูลได้');
-        return;
+    if (matchingData) {
+      setMatchingInfo(matchingData);
     }
+  }, [matchingData]);
 
-    const data = res.data;
-
-    setMatchingInfo({
-      availability: data.availability || [],
-      recommendation: data.recommendation || null,
-      summary: data.summary || { totalMembers: 0, totalAvailableDays: 0 }
-    });
-
-    if (data.rows?.length > 0) {
-      setSelectedDates(data.rows);
+  useEffect(() => {
+    const newDatesStr = JSON.stringify([...(initialDates || [])].sort());
+    if (initialDates?.length && newDatesStr !== prevDatesRef.current) {
+      prevDatesRef.current = newDatesStr;
+      setSelectedDates(initialDates);
     }
-
-        console.log("✅ Matching Info from Backend:", data);
-      })
-      .catch((err) => {
-        console.error("❌ Load date matching failed", err);
-        setMatchingError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
-        setMatchingInfo({
-          availability: [],
-          recommendation: null,
-          summary: { totalMembers: 0, totalAvailableDays: 0 }
-        });
-      })
-      .finally(() => {
-        setMatchingLoading(false);
-      });
-  }, [trip.tripid, tripDuration]);
-
-  // ✅ เก็บไว้ - ใช้แสดงจำนวนคนว่างใน UI
-  const getAvailableCount = (dateRange: string[]): number => {
-    if (!matchingInfo?.availability) return 0;
-    
-    // หาจำนวนคนน้อยที่สุดในช่วงนั้น
-    const counts = dateRange.map(date => {
-      const found = matchingInfo.availability.find(a => a.date === date);
-      return found?.count || 0;
-    });
-    return Math.min(...counts);
-  };
+  }, [initialDates]);
 
   // ================= HANDLERS =================
 
@@ -157,7 +107,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
           </div>
 
           {/* Content */}
-          <div className="p-6 custom-scrollbar">
+          <div className="p-6 space-y-6">
             {/* ความคืบหน้า */}
             <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800 mb-2 font-semibold">📊 ความคืบหน้าการกรอก</p>
@@ -167,13 +117,13 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
                     className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all"
                     style={{ 
                       width: `${summary.totalMembers > 0 
-                        ? (availability.length / summary.totalMembers * 100) 
+                        ? Math.min(100, (availability.length / summary.totalMembers * 100))
                         : 0}%` 
                     }}
                   />
                 </div>
                 <span className="text-sm font-semibold text-blue-900">
-                  {summary.totalAvailableDays}/{summary.totalMembers} คน
+                  {availability.length}/{summary.totalMembers} คน
                 </span>
               </div>
             </div>
@@ -324,7 +274,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
         <button
           key={day}
           onClick={() => !isPast && toggleDate(dateStr)}
-          disabled={isPast}
+          disabled={isPast || isLocked}
           className={`
             h-10 sm:h-12 
             rounded-lg font-semibold 
@@ -352,21 +302,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
   // ============== RENDER ==============
   return (
     <>
-        <div className="space-y-6">
-        {/* ✅ เพิ่ม Loading State */}
-        {matchingLoading && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-            <span className="text-blue-700">กำลังโหลดข้อมูล...</span>
-          </div>
-        )}
-
-        {/* ✅ เพิ่ม Error State */}
-        {matchingError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">⚠️ {matchingError}</p>
-          </div>
-        )}
-        
+        <div className="space-y-6">        
         {/* คำอธิบาย */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
           <button
@@ -458,7 +394,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
           </div>
         </div>
 
-        {selectedDates.length > 0 && (
+        {/* {selectedDates.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="font-bold text-lg mb-2">
             📅 เลือกแล้ว {selectedDates.length} วัน
@@ -468,12 +404,12 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
             <p>ระบบจะวิเคราะห์ช่วงวันที่เหมาะสมหลังจากบันทึก</p>
           </div>
         </div>
-      )}
+      )} */}
 
         {/* ปุ่มบันทึก */}
         <button
           onClick={handleSave}
-          disabled={selectedDates.length === 0 || loading}
+          disabled={selectedDates.length === 0 || loading || isLocked}
           className={`
             w-full px-6 py-3 font-bold rounded-xl transition shadow-lg
             ${selectedDates.length === 0 || loading
@@ -484,7 +420,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, onSave, onManualNext }
         >
           {loading 
             ? "กำลังบันทึก..." 
-            : `บันทึกวันที่ (${selectedDates.length} วัน)`
+            : isLocked ? '🔒 ปิดการโหวตแล้ว' : `บันทึกวันที่ (${selectedDates.length} วัน)`
           }
         </button>
 

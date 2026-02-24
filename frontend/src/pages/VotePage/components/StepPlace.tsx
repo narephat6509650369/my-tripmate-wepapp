@@ -12,9 +12,11 @@ const WEIGHTS = [3, 2, 1] as const;
 interface StepPlaceProps {
   trip: TripDetail;
   initialVotes?: { place: string; score: number }[];
+  initialVotingResults?: { place: string; score: number }[];
   onVote: (votes: LocationVote[]) => Promise<void>;
   onManualNext?: () => void;
   onInputChange?: () => void;
+  isLocked?: boolean;
 }
 
 type AnalysisResult = NonNullable<LocationVoteResponse['analysis']>;
@@ -29,16 +31,18 @@ const calculateUniqueVoters = (results: LocationVoteResult[]): number => {
 export const StepPlace: React.FC<StepPlaceProps> = ({
   trip,
   initialVotes = [],
+  initialVotingResults = [],
   onVote,
   onManualNext,
-  onInputChange
+  onInputChange,
+  isLocked = false
 }) => {
   // ============== STATE ==============
   const [myVote, setMyVote] = useState<[string, string, string]>(["", "", ""]);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [votingResults, setVotingResults] = useState<LocationVoteResult[]>([]);
+  const [isLoading, setIsLoading] = useState(initialVotingResults.length === 0);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -84,16 +88,20 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   // Dev auto-fill
   useEffect(() => {
     if (import.meta.env.DEV && initialVotes.length === 0) {
-      const timer = setTimeout(() => {
+    const timer = setTimeout(() => {
+      if (trip.tripid === 'trip-003') {
+        setMyVote(['อุบลราชธานี', 'ขอนแก่น', 'นครราชสีมา']);
+      } else {
         setMyVote(['เชียงใหม่', 'ภูเก็ต', 'กระบี่']);
-      }, 100);
+      }
+    }, 100);
       return () => clearTimeout(timer);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load voting results
   useEffect(() => {
+    if (initialVotingResults.length > 0) return;
     const loadVotingResults = async () => {
       if (!trip?.tripid) return;
 
@@ -547,7 +555,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
             </div>
             
             {/* Action Buttons */}
-            <div className="flex gap-2">
+            {/* <div className="flex gap-2">
               {votingResults.length > 0 && (
                 <>
                   <button
@@ -560,7 +568,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                   </button>
                 </>
               )}
-            </div>
+            </div> */}
           </div>
 
           {/* Borda Count Explanation */}
@@ -595,7 +603,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                 <select
                   value={myVote[i]}
                   onChange={e => handleSelect(i, e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isLocked}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none transition disabled:bg-gray-100 disabled:cursor-not-allowed text-lg"
                 >
                   <option value="">-- เลือกจังหวัด --</option>
@@ -616,7 +624,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
           {/* Submit Button */}
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || myVote.includes("")}
+            disabled={isSubmitting || myVote.includes("") || isLocked}
             className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white font-bold text-lg rounded-xl transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0"
           >
             {isSubmitting ? (
@@ -625,7 +633,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                 กำลังส่งคะแนน...
               </span>
             ) : (
-              '✓ ส่งคะแนนโหวต'
+              <span>{isLocked ? '🔒 ปิดการโหวตแล้ว' : '✓ ส่งคะแนนโหวต'}</span>
             )}
           </button>
 
@@ -658,7 +666,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-500 p-5 rounded-lg shadow-md">
           <p className="text-sm text-purple-900">
             <span className="font-bold">💡 เคล็ดลับ:</span> ลองดูผลโหวตของเพื่อนๆ 
-            เพื่อช่วยในการตัดสินใจ {votingResults.length > 0 && '(คลิกปุ่ม "ดูผลโหวต" ด้านบน)'}
+            เพื่อช่วยในการตัดสินใจ
           </p>
         </div>
       </div>

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Calendar, DollarSign, MapPin, Sparkles, Brain, Settings,
          Check, ChevronDown, ChevronUp, Loader2, Copy, Code } from 'lucide-react';
-import type { TripDetail } from '../../../types';
+import type { TripDetail, DateMatchingResponse, BudgetVotingResponse } from '../../../types';
 import { voteAPI } from '../../../services/tripService';
 
 // ── Local Types ──
@@ -53,9 +53,15 @@ const PromptEngineering = {
 
 interface StepSummaryProps {
   trip: TripDetail;
+  initialSummaryData?: {
+    matchingData: Pick<DateMatchingResponse, 'availability' | 'recommendation' | 'summary'> | null;
+    budgetInfo: Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers'> | null;
+    userLocations: { place: string; score: number }[];
+  };
   onNavigateToStep?: (step: number) => void;
   isOwner?: boolean;
   canViewSummary?: boolean;
+  onClosed?: () => void;
 }
 
 // ============== AI CONSTANTS ==============
@@ -87,9 +93,11 @@ const MODEL_ICON_MAP: Record<AIModel, string> = {
 
 export const StepSummary: React.FC<StepSummaryProps> = ({
   trip,
+  initialSummaryData,
   onNavigateToStep,
   isOwner,
   canViewSummary,
+  onClosed,
 }) => {
 
   // ── Summary data ──
@@ -112,6 +120,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState<'templates' | 'models'>('templates');
   const [copied, setCopied] = useState<Record<string, boolean>>({});
+  const [isClosing, setIsClosing] = useState(false);
 
   // ── Sync config ──
   useEffect(() => {
@@ -121,6 +130,8 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   // ── Fetch summary data ──
   useEffect(() => {
     if (!trip?.tripid) return;
+
+    // fallback fetch ถ้าไม่มี initialSummaryData
     const fetchAll = async () => {
       try {
         setIsLoading(true);
@@ -129,29 +140,27 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
           voteAPI.getBudgetVoting(trip.tripid),
           voteAPI.getLocationVote(trip.tripid),
         ]);
-
+        // console.log('dateRes.data.summary:', dateRes?.data?.summary);
         const bestDates = dateRes?.data?.recommendation?.dates || [];
-        const dateVoters = dateRes?.data?.summary?.totalAvailableDays || 0;
-
         const stats = budgetRes?.data?.stats || {};
         const avgBudget = {
           accommodation: Math.round(stats.accommodation?.q2 || 0),
-          transport: Math.round(stats.transport?.q2 || 0),
-          food: Math.round(stats.food?.q2 || 0),
-          other: Math.round(stats.other?.q2 || 0),
+          transport:     Math.round(stats.transport?.q2 || 0),
+          food:          Math.round(stats.food?.q2 || 0),
+          other:         Math.round(stats.other?.q2 || 0),
         };
-        const budgetVoters = budgetRes?.data?.filledMembers || 0;
-
         const rawLoc = locRes?.data?.locationVotesTotal || [];
-        const topLocations = rawLoc.slice(0, 3).map((r: any) => ({
-          place: r.place,
-          total_score: r.total_score,
-        }));
-        const locationVoters = rawLoc.length > 0
-          ? Math.max(...rawLoc.map((r: any) => r.voteCount || 0))
-          : 0;
-
-        setSummaryData({ bestDates, avgBudget, topLocations, progress: { dates: dateVoters, budget: budgetVoters, location: locationVoters } });
+        const topLocations = rawLoc.slice(0, 3).map((r: any) => ({ place: r.place, total_score: r.total_score }));
+        setSummaryData({
+          bestDates,
+          avgBudget,
+          topLocations,
+          progress: {
+            dates: dateRes?.data?.summary?.totalMembers || 0,
+            budget:   budgetRes?.data?.filledMembers || 0,
+            location: rawLoc.length > 0 ? Math.max(...rawLoc.map((r: any) => r.voteCount || 0)) : 0,
+          },
+        });
       } catch (err) {
         console.error('Failed to load summary', err);
       } finally {
@@ -171,6 +180,20 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
     navigator.clipboard.writeText(text);
     setCopied(prev => ({ ...prev, [key]: true }));
     setTimeout(() => setCopied(prev => ({ ...prev, [key]: false })), 2000);
+  };
+
+  const handleCloseVoting = async () => {
+    if (!confirm('ยืนยันปิดการโหวต? สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก')) return;
+    try {
+      setIsClosing(true);
+      await voteAPI.manualClose(trip.tripid);
+      onClosed?.();
+    } catch (err) {
+      console.error(err);
+      alert('ปิดการโหวตไม่สำเร็จ');
+    } finally {
+      setIsClosing(false);
+    }
   };
 
   // Build a minimal TripSummaryResult-like object for PromptEngineering
@@ -567,7 +590,23 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
       )}
 
       {/* ── Action Button ── */}
-      {!canViewSummary && !isOwner && (
+      {isOwner && !canViewSummary && (
+        <button
+          onClick={handleCloseVoting}
+          disabled={isClosing}
+          className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg transition"
+        >
+          {isClosing ? '⏳ กำลังปิดการโหวต...' : '🔐 ปิดการโหวตและดูผลสรุป →'}
+        </button>
+      )}
+
+      {isOwner && canViewSummary && (
+        <div className="w-full py-4 bg-green-50 border border-green-200 rounded-xl text-center text-green-700 font-semibold">
+          ✅ การโหวตปิดแล้ว
+        </div>
+      )}
+
+      {!isOwner && !canViewSummary && (
         <div className="w-full py-4 bg-gray-100 rounded-xl text-center text-gray-400 text-sm">
           🔒 รอเจ้าของทริปปิดการโหวต หรือรอครบ 7 วัน
         </div>

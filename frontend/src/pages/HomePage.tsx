@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
-import { Plus, Check, User } from "lucide-react";
+import { Plus, Check, User, Trash2 } from "lucide-react";
 import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, notiApi } from '../services/tripService';
 import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils';
@@ -33,10 +33,11 @@ const HomePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const location = useLocation();
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
+  const [tripToDelete, setTripToDelete] = useState<TripCard | null>(null);
   
-
   // ✅ Helper: แปลง TripSummary → TripCard
   const formatTripSummary = (trip: TripSummary): TripCard => {
+    console.log('Trip status:', trip.trip_id, trip.status);
     const isCompleted = trip.status === 'completed' || trip.status === 'archived';
 
     return {
@@ -76,6 +77,12 @@ const HomePage: React.FC = () => {
     try {
       setLoading(true);
       const response = await tripAPI.getMyTrips();
+      console.log('getMyTrips response:', response);
+
+      if (!response.success && response.code === 'AUTH_UNAUTHORIZED') {
+        navigate('/login');
+        return;
+      }
 
       if (!response.success || !response.data) {
         throw new Error(response.message || "ไม่สามารถโหลดข้อมูลได้");
@@ -95,6 +102,22 @@ const HomePage: React.FC = () => {
       alert("ไม่สามารถโหลดข้อมูลทริปได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteTrip = async () => {
+    if (!tripToDelete) return;
+    try {
+      const response = await tripAPI.deleteTrip(tripToDelete.id);
+      if (response.success) {
+        setTripToDelete(null);
+        loadTrips();
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      console.error('Delete trip failed:', error);
+      alert('ลบทริปไม่สำเร็จ กรุณาลองใหม่');
     }
   };
 
@@ -274,6 +297,17 @@ const HomePage: React.FC = () => {
                           <User className="w-4 h-4" />
                           <span>{trip.people} คน</span>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTripToDelete(trip);
+                          }}
+                          className="absolute bottom-3 right-3 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="ลบทริป"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+
                       </div>
                     ))
                   )}
@@ -312,6 +346,7 @@ const HomePage: React.FC = () => {
                 </div>
               </div>
             </>
+          
           )}
         </div>
       </main>
@@ -372,6 +407,42 @@ const HomePage: React.FC = () => {
                 className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
               >
                 สร้างทริป
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {tripToDelete && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4"
+          onClick={() => setTripToDelete(null)}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="text-center mb-4">
+              <div className="text-5xl mb-3">🗑️</div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">ลบทริปนี้?</h3>
+              <p className="text-sm text-gray-600">
+                ทริป <strong>"{tripToDelete.name}"</strong> จะถูกลบถาวร<br />
+                ไม่สามารถกู้คืนได้
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setTripToDelete(null)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={() => handleDeleteTrip()}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition"
+              >
+                ลบทริป
               </button>
             </div>
           </div>

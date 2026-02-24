@@ -1,7 +1,7 @@
 // src/pages/VotePage.tsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, AlertCircle, Copy, Clock } from "lucide-react";
+import { Loader2, AlertCircle, Copy, Trash2} from "lucide-react";
 
 // Components
 import Header from "../components/Header";
@@ -13,7 +13,9 @@ import StepSummary from './VotePage/components/StepSummary';
 // Hooks & Utils
 import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, voteAPI } from '../services/tripService';
-import type { TripDetail, DateRange, LocationVote } from '../types';
+import type { TripDetail, LocationVote, DateMatchingResponse, BudgetVotingResponse } from '../types';
+type MatchingData = Pick<DateMatchingResponse, 'availability' | 'recommendation' | 'summary'>;
+type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers'>;
 
 // ============== MAIN COMPONENT ==============
 const VotePage: React.FC = () => {
@@ -31,24 +33,19 @@ const VotePage: React.FC = () => {
   const [copied, setCopied] = useState<string | null>(null);
 
   const [userDates, setUserDates] = useState<string[]>([]);
-  const [userBudget, setUserBudget] = useState({ accommodation: 0, transport: 0, food: 0, other: 0 });
+  const [matchingData, setMatchingData] = useState<MatchingData | null>(null);
+  const [budgetInfo, setBudgetInfo] = useState<BudgetInfo | null>(null); 
   const [userLocations, setUserLocations] = useState<{ place: string; score: number }[]>([]);
 
   const displayCode = inviteCode || tripCode;
+  const isClosed = trip?.status === 'completed' || trip?.status === 'archived';
 
   const isSummaryUnlocked = (tripData: TripDetail): boolean => {
+    if (tripData.status === 'completed' || tripData.status === 'archived') return true;
     if (!tripData.createdat) return false;
-    const createdAt = new Date(tripData.createdat);
-    const now = new Date();
-    const diffDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+    const diffDays = (new Date().getTime() - new Date(tripData.createdat).getTime()) / (1000 * 60 * 60 * 24);
     return diffDays >= 7;
   };
-
-  const getUserInput = () => ({
-    dates: userDates,
-    budget: userBudget,
-    locations: userLocations
-  });
 
   // ============== LOAD TRIP DATA ==============
   useEffect(() => {
@@ -73,41 +70,46 @@ const VotePage: React.FC = () => {
         
         setInviteCode(tripData.invitecode);
         setTrip(tripData);
+ 
         try {
           // ========== วันที่ ==========
           const dateRes = await voteAPI.getDateMatchingResult(tripData.tripid);
-          if (dateRes?.data?.rows) {
-            setUserDates(dateRes.data.rows);
+          if (dateRes?.data) {
+            setMatchingData({
+              availability: dateRes.data.availability || [],
+              recommendation: dateRes.data.recommendation || null,
+              summary: dateRes.data.summary || { totalMembers: 0, totalAvailableDays: 0 }
+            });
           }
+          if (dateRes?.data?.rows) setUserDates(dateRes.data.rows);
+          const hasDates = dateRes?.data?.rowlog?.some(
+            (r: any) => r.proposed_by === user?.user_id
+          );
 
           // ========== งบประมาณ ==========
           const budgetRes = await voteAPI.getBudgetVoting(tripData.tripid);
-          if (budgetRes?.data?.rows) {
-            const b = { accommodation: 0, transport: 0, food: 0, other: 0 };
-            budgetRes.data.rows.forEach((item: any) => {
-              if (item.category_name in b) {
-                b[item.category_name as keyof typeof b] = item.estimated_amount;
-              }
-            });
-            setUserBudget(b);
-          }
+          if (budgetRes?.data) setBudgetInfo(budgetRes.data);
+          const hasBudget = budgetRes?.data?.rows?.some(
+            (r: any) => r.user_id === user?.user_id
+          );
 
           // ========== จังหวัด ==========
           const locRes = await voteAPI.getLocationVote(tripData.tripid);
-
+          const hasPlace = locRes?.data?.rowlog?.some(
+            (r: any) => r.proposed_by === user?.user_id
+          );
           if (locRes?.data?.rowlog && user?.user_id) {
-            // กรองเฉพาะของ user คนนี้
             const myVotes = locRes.data.rowlog
               .filter((log: any) => log.proposed_by === user.user_id)
-              .map((log: any) => ({
-                place: log.province_name,
-                score: log.score
-              }));
-            
-            if (myVotes.length > 0) {
-              setUserLocations(myVotes);
-            }
+              .map((log: any) => ({ place: log.province_name, score: log.score }));
+            if (myVotes.length > 0) setUserLocations(myVotes);
           }
+
+          const isCompleted = tripData.status === 'completed' || tripData.status === 'archived';
+          if (isCompleted || (hasDates && hasBudget && hasPlace)) {
+            setStep(5);
+          }
+          
         } catch (e) {
           console.error('Load user input failed:', e);
         }
@@ -128,12 +130,8 @@ const VotePage: React.FC = () => {
 
             if (joinRes.success) {
               console.log("Auto join success → reload trip");
-              // reload trip detail
-              const detail = await tripAPI.getTripDetail(tripCode);
-              setTrip(detail?.data || null);
-              setInviteCode(detail?.data?.invitecode ?? detail?.data?.invitecode ?? "");
-              setLoading(false);
-            return;
+              await loadTripData();   // ← ให้ทำงานใหม่ทั้งหมด รวม fetch วัน/งบ/จังหวัด
+              return;
             }
         } catch (e) {
           console.error("Join failed → fallback redirect");
@@ -156,13 +154,6 @@ const VotePage: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-  };
-
-  // ✅ Manual Navigation (สำหรับ Smart Toast)
-  const handleManualNext = () => {
-    if (step < 5) {
-      setStep(step + 1);
-    }
   };
 
   // ✅ Save Dates (มี Auto-navigation)
@@ -209,7 +200,6 @@ const VotePage: React.FC = () => {
       
       if (response.success) {
         console.log('บันทึกงบประมาณสำเร็จ');
-        setUserBudget(prev => ({ ...prev, [category]: amount }));
       } else {
         throw new Error(response.message);
       }
@@ -255,6 +245,23 @@ const VotePage: React.FC = () => {
 
   const back = () => { 
     if (step > 2) setStep(step - 1); 
+  };
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDeleteTrip = async () => {
+    if (!trip) return;
+    try {
+      const response = await tripAPI.deleteTrip(trip.tripid);
+      if (response.success) {
+        navigate('/homepage');
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      console.error('Delete trip failed:', error);
+      alert('ลบทริปไม่สำเร็จ กรุณาลองใหม่');
+    }
   };
 
   // ============== LOADING & ERROR STATES ==============
@@ -334,6 +341,17 @@ const VotePage: React.FC = () => {
               <span className="sm:hidden">แชร์</span>
               <Copy className="w-4 h-4" />
             </button>
+            {/* ปุ่มลบทริป - เฉพาะ Owner */}
+            {/* {trip?.ownerid === user?.user_id && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 bg-red-100 hover:bg-red-200 text-red-700 transition-all text-sm min-w-[44px] min-h-[44px]"
+                title="ลบทริป"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">ลบทริป</span>
+              </button>
+            )} */}
           </div>
         </div>
       </div>
@@ -398,15 +416,21 @@ const VotePage: React.FC = () => {
           {step === 2 && (
             <StepVote 
               trip={trip}
+              matchingData= {matchingData}
+              initialDates={userDates}
               onSave={handleSaveDates}
-              onManualNext={handleManualNext}
+              onManualNext={next}
+              isLocked={isClosed}  
             />
           )}
 
           {step === 3 && (
             <StepBudget 
               trip={trip}
+              budgetInfo={budgetInfo}
               onSave={handleSaveBudget}
+              onManualNext={next}
+              isLocked={isClosed}
             />
           )}
 
@@ -414,24 +438,32 @@ const VotePage: React.FC = () => {
             <StepPlace 
               trip={trip}
               onVote={handleVoteLocation}
+              initialVotes={userLocations}
+              initialVotingResults={userLocations}
+              isLocked={isClosed}
             />
           )}
 
           {step === 5 && (
-            <StepSummary 
-              trip={trip}
-              onNavigateToStep={setStep}
-              isOwner={trip.ownerid === user?.user_id}
-              canViewSummary={isSummaryUnlocked(trip)}
-            />
-          )}
+          <StepSummary 
+            trip={trip}
+            initialSummaryData={{ matchingData, budgetInfo, userLocations }}
+            onNavigateToStep={setStep}
+            isOwner={trip.ownerid === user?.user_id}
+            canViewSummary={isSummaryUnlocked(trip)}
+            onClosed={async () => {         // ← เพิ่ม
+              const res = await tripAPI.getTripDetail(tripCode);
+              if (res.data) setTrip(res.data);
+            }}
+          />
+        )}
         </div>
 
         {/* Navigation Buttons */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <button 
             onClick={back}
-            disabled={step === 2}
+            disabled={step === 2 || isClosed}
             className="bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-gray-700 font-semibold text-sm sm:text-base border-2 border-gray-200 hover:border-gray-300 transition-all shadow-sm min-h-[48px]"
           >
             <span className="hidden sm:inline">← ย้อนกลับ</span>
@@ -439,7 +471,7 @@ const VotePage: React.FC = () => {
           </button>
           <button 
             onClick={next}
-            disabled={step === stepLabels.length}
+            disabled={step === stepLabels.length || isClosed}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-white font-semibold text-sm sm:text-base transition-all shadow-lg hover:shadow-xl min-h-[48px]"
           >
             <span className="hidden sm:inline">หน้าถัดไป →</span>
@@ -447,6 +479,44 @@ const VotePage: React.FC = () => {
           </button>
         </div>
       </main>
+      {/* Delete Confirm Modal */}
+      {showDeleteConfirm && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="text-center mb-4">
+              <div className="text-5xl mb-3">🗑️</div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">ลบทริปนี้?</h3>
+              <p className="text-sm text-gray-600">
+                ทริป <strong>"{trip?.tripname}"</strong> จะถูกลบถาวร<br />
+                ไม่สามารถกู้คืนได้
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  handleDeleteTrip();
+                }}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition"
+              >
+                ลบทริป
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
