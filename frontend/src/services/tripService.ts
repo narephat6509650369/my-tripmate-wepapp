@@ -41,7 +41,8 @@ import {
   getMockCloseTrip,
   mockDelay,
   getMockGetBudgetVoting,
-  getMockDateMatchingResult 
+  getMockDateMatchingResult,
+  getMockNotifications
 } from '../data/mockData';
 
 // ============================================================================
@@ -254,25 +255,25 @@ return data;
    */
   
   deleteTrip: async (tripId: string): Promise<ApiResponse> => {
-  if (CONFIG.USE_MOCK_DATA) {
-    await mockDelay();
-    return getMockDeleteTrip(tripId);
-  }
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      return getMockDeleteTrip(tripId);
+    }
 
-  try {
-    const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}`, {
-      method: 'DELETE',
-      credentials: 'include', 
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    try {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}`, { // ← tripId ใน URL
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-    return await response.json();
-  } catch (error) {
-    return handleApiError(error);
-  }
-},
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 
   /**
    * DELETE /api/trips/:tripId/members/:memberId
@@ -395,7 +396,8 @@ export const voteAPI = {
 
       const response = await fetchWithTimeout(`${API_URL}/votes/start-voting`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trip_id: tripId })
       });
 
@@ -559,7 +561,7 @@ export const voteAPI = {
 
     try {
 
-      const response = await fetchWithTimeout(`${API_URL}/votes/${tripId}/manual-close`, {
+      const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}/manual-close`, {
         method: 'PATCH',
         credentials: 'include',
         headers: {
@@ -580,23 +582,57 @@ export const voteAPI = {
 
 export const notiApi = {
   getNoti: async () => {
-    try{
-      /*
-      เพิ่ม mock ได้ เพราะจะได้ คล้าย format เดิม 
-      */
-      
-      const response = await fetchWithTimeout(`${API_URL}/noti/get-noti`,{
+    if (CONFIG.USE_MOCK_DATA) {  // ← เพิ่ม mock path
+      await mockDelay();
+      return getMockNotifications("mock-user-id");
+    }
+    try {
+      const response = await fetchWithTimeout(`${API_URL}/noti/get-noti`, {
         method: 'GET',
         credentials: 'include',
-      }) 
+      });
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 
-      return await response.json() ;
-      
-    } catch(error) {
+  markAsRead: async (notificationId: string) => {
+    try {
+      const response = await fetchWithTimeout(`${API_URL}/noti/${notificationId}/read`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  markAllAsRead: async () => {
+    try {
+      const response = await fetchWithTimeout(`${API_URL}/noti/read-all`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  deleteNoti: async (notificationId: string) => {
+    try {
+      const response = await fetchWithTimeout(`${API_URL}/noti/notifications/${notificationId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      return await response.json();
+    } catch (error) {
       return handleApiError(error);
     }
   }
-}
+};
 
 export default {
   ...tripAPI,

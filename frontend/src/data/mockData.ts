@@ -463,6 +463,53 @@ export const getMockLocationVote = (tripId: string): ApiResponse => {
   };
 };
 
+/**
+ * GET /api/noti/get-noti
+ */
+export const getMockNotifications = (userId: string): ApiResponse => {
+  return {
+    success: true,
+    code: 'OK',
+    message: 'Notifications loaded',
+    data: {
+      notifications: [
+        {
+          notification_id: "mock-1",
+          notification_type: "trip_invitation",
+          message: "คุณถูกเชิญเข้าทริป 'พัทยา 2 วัน 1 คืน'",
+          is_read: 0,
+          created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+          trip_id: "trip123"
+        },
+        {
+          notification_id: "mock-2",
+          notification_type: "new_voting_session",
+          message: "เปิดรอบโหวตใหม่ในทริป 'เชียงใหม่ 4 วัน 3 คืน'",
+          is_read: 0,
+          created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+          trip_id: "trip124"
+        },
+        {
+          notification_id: "mock-3",
+          notification_type: "voting_closed",
+          message: "ผลโหวตเสร็จสิ้นแล้ว พร้อมยืนยันทริป 'ภูเก็ต 5 วัน 4 คืน'!",
+          is_read: 0,
+          created_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+          trip_id: "trip125"
+        },
+        {
+          notification_id: "mock-4",
+          notification_type: "trip_confirmed",
+          message: "ทริป 'กรุงเทพ 2 วัน 1 คืน' ได้รับการยืนยันแล้ว!",
+          is_read: 1,
+          created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+          trip_id: "trip126"
+        }
+      ]
+    }
+  };
+};
+
 /*
  * GET /api/votes/:tripId/date-matching-result
  */
@@ -750,5 +797,6 @@ export default {
   getMockCloseTrip,
   getMockLocationVote,
   getMockGetBudgetVoting,
-  getMockDateMatchingResult
+  getMockDateMatchingResult,
+  getMockNotifications
 };  

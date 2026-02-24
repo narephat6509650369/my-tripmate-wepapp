@@ -188,20 +188,28 @@ export interface DateOption {
 }
 
 export interface TripSummaryResult {
-  trip: {
-    trip_id: string;
-    trip_name: string;
-    description: string | null;
-    num_days: number;
-    status: string;
-    confirmed_at: string | null;
-    created_at: string;
+  summary: {
+    trip: any;
+    members: TripSummaryMember[];
+    totalmembers?: number;
   };
-  members: TripSummaryMember[];
-  budgetVoting: BudgetVoting | null;
-  budgetOptions: BudgetOption[];
-  locationResult: LocationResult | null;
-  dateOptions: DateOption[];
+  getVoteNumber?: {
+    totalMembers: number;
+    dateVoteNum: number;
+    budgetVoteNum: number;
+    locationVoteNum: number;
+  };
+  budgetVotes?: any;
+  locationResult?: any;
+  dateOptions?: any;
+  aiSummary?: string;   // prompt ที่ backend สร้างให้
+  aiMeta?: {
+    estimatedTokens: number;
+    estimatedCost: number;
+    model: string;
+    version: string;
+    timestamp: string;
+  };
 }
 
 // ============================================================================
@@ -408,7 +416,7 @@ export interface DateMatchingResponse {
   };
   availability: Array<{
     date: string;
-    count: number;
+    count: number;  
     percentage: number;
   }>;
   recommendation: {

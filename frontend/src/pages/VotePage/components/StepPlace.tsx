@@ -44,34 +44,10 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   const [votingResults, setVotingResults] = useState<LocationVoteResult[]>([]);
   const [isLoading, setIsLoading] = useState(initialVotingResults.length === 0);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-  const [justSaved, setJustSaved] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
 
   // ============== EFFECTS ==============
-  
-  // Auto-dismiss toast after 5 seconds
-  useEffect(() => {
-    if (justSaved) {
-      const timer = setTimeout(() => setJustSaved(false), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [justSaved]);
-
-  // Keyboard accessibility (ESC to close modals)
-  useEffect(() => {
-    const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (showAnalysisModal) {
-          setShowAnalysisModal(false);
-        } else if (justSaved) {
-          setJustSaved(false);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleEscapeKey);
-    return () => window.removeEventListener('keydown', handleEscapeKey);
-  }, [showAnalysisModal, justSaved]);
 
   // Load initial votes
   useEffect(() => {
@@ -200,8 +176,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
       } else if (elapsed < 300) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
-      setJustSaved(true);
+      setHasSaved(true);
 
       // Retry to get updated results
       let retries = 0;
@@ -239,278 +214,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // ============== RENDER: ANALYSIS MODAL ==============
-  const renderAnalysisModal = () => {
-    if (!showAnalysisModal) return null;
-
-    const analysis = analysisResult;
-
-    if (!analysis) {
-      return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
-            <div className="text-6xl mb-4">📊</div>
-            <p className="text-xl font-semibold text-gray-800 mb-2">ยังไม่มีข้อมูลการโหวต</p>
-            <p className="text-gray-600 mb-6">รอให้สมาชิกในทริปเริ่มโหวตก่อนนะ</p>
-            <button
-              onClick={() => setShowAnalysisModal(false)} 
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-            >
-              ปิด
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    const totalMembers = trip.members?.length || 0;
-    const uniqueVoters = calculateUniqueVoters(votingResults);
-    const progressPercentage = totalMembers > 0 ? Math.min(100, (uniqueVoters / totalMembers) * 100) : 0;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold mb-1">🗺️ ผลโหวตปัจจุบัน</h3>
-                <span className="inline-block text-xs bg-white/20 px-3 py-1 rounded-full">
-                  ⚡ อัปเดตแบบเรียลไทม์
-                </span>
-              </div>
-              <button
-                onClick={() => setShowAnalysisModal(false)}
-                className="text-white hover:text-gray-200 text-2xl font-bold w-10 h-10 flex items-center justify-center transition rounded-lg hover:bg-white/10"
-                aria-label="ปิด"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* Progress Section */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm text-blue-900 font-bold">📊 ความคืบหน้าการโหวต</p>
-                {uniqueVoters < totalMembers && (
-                  <span className="text-xs text-orange-700 bg-orange-100 px-3 py-1 rounded-full animate-pulse font-medium">
-                    ⏳ รอเพื่อนโหวต
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
-                  <div
-                    className="bg-gradient-to-r from-purple-500 via-pink-500 to-pink-600 h-4 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progressPercentage}%` }}
-                  />
-                </div>
-                <span className="text-sm font-bold text-blue-900 min-w-[4rem] text-right">
-                  {uniqueVoters}/{totalMembers} คน
-                </span>
-              </div>
-              <p className="text-xs text-blue-700 mt-3">
-                💡 ผลนี้จะเปลี่ยนเมื่อมีคนโหวตเพิ่ม
-              </p>
-            </div>
-
-            {/* CASE 1: Clear Winner */}
-            {analysis.hasWinner && analysis.topProvinces && (
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-6 shadow-lg">
-                <div className="flex items-start justify-between mb-5">
-                  <div className="flex items-start gap-3">
-                    <span className="text-4xl">🎉</span>
-                    <div>
-                      <p className="font-bold text-green-900 text-xl mb-1">
-                        พบจังหวัดที่คะแนนนำ!
-                      </p>
-                      <p className="text-sm text-green-700">
-                        มีจังหวัดที่ได้คะแนนโหวตสูงกว่าคู่แข่ง
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1.5 rounded-full border border-yellow-300 font-medium whitespace-nowrap">
-                    📊 ข้อมูลชั่วคราว
-                  </span>
-                </div>
-
-                {/* Top 3 Provinces */}
-                <div className="space-y-3">
-                  {analysis.topProvinces.map((prov, idx) => (
-                    <div
-                      key={prov.place}
-                      className={`bg-white rounded-xl p-4 border-2 transition-all hover:shadow-md ${
-                        idx === 0 ? 'border-yellow-400 shadow-lg' :
-                        idx === 1 ? 'border-gray-300' :
-                        'border-orange-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-4xl">
-                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                          </span>
-                          <div>
-                            <p className="font-bold text-lg text-gray-900">
-                              {prov.place}
-                            </p>
-                            <p className="text-xs text-gray-500">{prov.region}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-3xl font-bold text-purple-600">
-                            {prov.total_score}
-                          </p>
-                          <p className="text-xs text-gray-500">คะแนน</p>
-                          {prov.rank1Count > 0 && (
-                            <p className="text-xs text-yellow-600 mt-1 font-medium">
-                              🥇 อันดับ 1: {prov.rank1Count} ครั้ง
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 bg-green-100 border border-green-300 rounded-lg p-4">
-                  <p className="text-sm text-green-800">
-                    💡 <strong>ตอนนี้:</strong> {analysis.topProvinces[0].place} นำคะแนนอยู่ 
-                    {uniqueVoters < totalMembers && ' (อาจเปลี่ยนได้ถ้ามีคนโหวตเพิ่ม)'}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* CASE 2: Regional Winner */}
-            {!analysis.hasWinner && analysis.bestRegion && (
-              <div className="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-400 rounded-xl p-6 shadow-lg">
-                <div className="flex items-start justify-between mb-5">
-                  <div className="flex items-start gap-3">
-                    <span className="text-4xl">🎯</span>
-                    <div>
-                      <p className="font-bold text-orange-900 text-xl mb-1">
-                        คะแนนกระจายทั่วไป - วิเคราะห์ตามภูมิภาค
-                      </p>
-                      <p className="text-sm text-orange-700">
-                        ยังไม่มีจังหวัดที่ชัดเจน เราแนะนำตามภูมิภาคแทน
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1.5 rounded-full border border-yellow-300 font-medium whitespace-nowrap">
-                    📊 ข้อมูลชั่วคราว
-                  </span>
-                </div>
-
-                {/* Best Region Card */}
-                <div className="bg-white rounded-xl p-5 border-2 border-orange-300 mb-4 shadow-md">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="font-bold text-3xl text-orange-800 mb-1">
-                        {analysis.bestRegion.region}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        ภูมิภาคนี้ได้คะแนนโหวตสูงสุดจากสมาชิกในทริป
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-3xl font-bold text-orange-700">
-                        {analysis.bestRegion.totalScore}
-                      </p>
-                      <p className="text-xs text-orange-600">คะแนน</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-yellow-700">
-                        {analysis.bestRegion.rank1Count}
-                      </p>
-                      <p className="text-xs text-yellow-600 font-medium">🥇 อันดับ 1</p>
-                    </div>
-                    
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-blue-700">
-                        {analysis.bestRegion.totalScore}
-                      </p>
-                      <p className="text-xs text-blue-600 font-medium">คะแนนรวม</p>
-                    </div>
-                    
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-green-700">
-                        {analysis.bestRegion.diversity}
-                      </p>
-                      <p className="text-xs text-green-600 font-medium">จังหวัด</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Top 3 Provinces in Region */}
-                <div className="space-y-3">
-                  <p className="text-sm font-bold text-orange-900 mb-2">
-                    🏆 จังหวัดยอดนิยมใน{analysis.bestRegion.region}:
-                  </p>
-                  {analysis.bestRegion.topProvinces.map((prov, idx) => (
-                    <div
-                      key={prov.place}
-                      className="bg-white rounded-lg p-4 border-2 border-orange-200 flex items-center justify-between hover:shadow-md transition-all"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">
-                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                        </span>
-                        <span className="font-semibold text-gray-900 text-lg">
-                          {prov.place}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xl font-bold text-orange-700">
-                          {prov.total_score}
-                        </span>
-                        <span className="text-xs text-gray-500 ml-1">คะแนน</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 bg-orange-100 border border-orange-300 rounded-lg p-4">
-                  <p className="text-sm text-orange-800">
-                    💡 <strong>คำแนะนำ:</strong> พิจารณาเลือกจังหวัดใน{analysis.bestRegion.region} 
-                    เพื่อให้ทุกคนพอใจ
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="border-t bg-gray-50 p-4 flex gap-3">
-            <button
-              onClick={() => setShowAnalysisModal(false)}
-              className="flex-1 px-5 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-100 transition"
-            >
-              ปิด
-            </button>
-            {onManualNext && (
-              <button
-                onClick={() => {
-                  setShowAnalysisModal(false);
-                  onManualNext();
-                }}
-                className="flex-1 px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 shadow-lg transition"
-              >
-                ไปหน้าถัดไป →
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
   };
 
   // ============== LOADING STATE ==============
@@ -571,28 +274,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
             </div> */}
           </div>
 
-          {/* Borda Count Explanation */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 p-4 mb-6 rounded-lg">
-            <p className="font-bold text-blue-900 mb-2">วิธีคำนวณคะแนน (Borda Count):</p>
-            <div className="grid grid-cols-3 gap-3 text-sm">
-              <div className="bg-white rounded-lg p-2 text-center border border-blue-200">
-                <span className="text-lg">🥇</span>
-                <p className="font-semibold text-blue-800">อันดับ 1</p>
-                <p className="text-blue-600">3 คะแนน</p>
-              </div>
-              <div className="bg-white rounded-lg p-2 text-center border border-blue-200">
-                <span className="text-lg">🥈</span>
-                <p className="font-semibold text-blue-800">อันดับ 2</p>
-                <p className="text-blue-600">2 คะแนน</p>
-              </div>
-              <div className="bg-white rounded-lg p-2 text-center border border-blue-200">
-                <span className="text-lg">🥉</span>
-                <p className="font-semibold text-blue-800">อันดับ 3</p>
-                <p className="text-blue-600">1 คะแนน</p>
-              </div>
-            </div>
-          </div>
-
           {/* Vote Selectors */}
           <div className="space-y-4 mb-6">
             {[0, 1, 2].map(i => (
@@ -625,111 +306,115 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || myVote.includes("") || isLocked}
-            className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white font-bold text-lg rounded-xl transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0"
-          >
+            className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl transition shadow-lg">
             {isSubmitting ? (
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                กำลังส่งคะแนน...
+                กำลังบันทึก...
               </span>
             ) : (
-              <span>{isLocked ? '🔒 ปิดการโหวตแล้ว' : '✓ ส่งคะแนนโหวต'}</span>
+              <span>{isLocked ? '🔒 ปิดการโหวตแล้ว' : 'บันทึกจังหวัด'}</span>
             )}
           </button>
+        </div>
 
-          {/* Vote Preview */}
-          {myVote.some(v => v !== "") && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg">
-              <p className="font-bold text-green-900 mb-2">การโหวตของคุณ:</p>
-              <div className="space-y-1.5">
-                {myVote[0] && (
-                  <p className="text-green-800 font-medium">
-                    🥇 อันดับ 1: <span className="font-bold">{myVote[0]}</span> (3 คะแนน)
-                  </p>
-                )}
-                {myVote[1] && (
-                  <p className="text-green-800 font-medium">
-                    🥈 อันดับ 2: <span className="font-bold">{myVote[1]}</span> (2 คะแนน)
-                  </p>
-                )}
-                {myVote[2] && (
-                  <p className="text-green-800 font-medium">
-                    🥉 อันดับ 3: <span className="font-bold">{myVote[2]}</span> (1 คะแนน)
-                  </p>
-                )}
+        {/* ── ผลการวิเคราะห์ (แสดงหลังบันทึก) ── */}
+        {hasSaved && (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+
+            {/* Header — กดเพื่อพับ/ขยาย */}
+            <button
+              onClick={() => setIsAnalysisOpen(prev => !prev)}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition border-b border-gray-100"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🗺️</span>
+                <span className="font-bold text-gray-800 text-sm">ผลการวิเคราะห์สถานที่</span>
               </div>
+              <span className="text-gray-400 text-sm">{isAnalysisOpen ? '▲ ซ่อน' : '▼ ดูผล'}</span>
+            </button>
+
+            {/* Content — แสดงเมื่อ isAnalysisOpen */}
+            {isAnalysisOpen && (
+            <div className="p-4 space-y-4">
+
+              {/* Progress bar */}
+              {(() => {
+                const totalMembers = trip.members?.length || 0;
+                const uniqueVoters = calculateUniqueVoters(votingResults);
+                return (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-3 mb-1">
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-gradient-to-r from-purple-500 to-pink-600 h-2 rounded-full transition-all"
+                          style={{ width: `${totalMembers > 0 ? Math.min(100, (uniqueVoters / totalMembers) * 100) : 0}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold text-blue-900 whitespace-nowrap">
+                        {uniqueVoters}/{totalMembers} คน
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-700">
+                      {uniqueVoters >= totalMembers ? '✅ ทุกคนโหวตแล้ว' : '⏳ รอสมาชิกคนอื่นโหวต'}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* ✅ มีผลวิเคราะห์ */}
+              {analysisResult ? (
+                <>
+                  {analysisResult.hasWinner && analysisResult.topProvinces && (
+                    <div className="bg-green-50 border border-green-300 rounded-lg p-4">
+                      <p className="font-semibold text-green-800 mb-3">🎉 จังหวัดที่คะแนนนำ</p>
+                      <div className="space-y-2">
+                        {analysisResult.topProvinces.map((prov, idx) => (
+                          <div key={prov.place} className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200">
+                            <div className="flex items-center gap-2">
+                              <span>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
+                              <span className="font-semibold text-gray-900">{prov.place}</span>
+                              <span className="text-xs text-gray-500">{prov.region}</span>
+                            </div>
+                            <span className="font-bold text-purple-600">{prov.total_score} คะแนน</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {!analysisResult.hasWinner && analysisResult.bestRegion && (
+                    <div className="bg-orange-50 border border-orange-300 rounded-lg p-4">
+                      <p className="font-semibold text-orange-800 mb-1">🎯 ภูมิภาคยอดนิยม: {analysisResult.bestRegion.region}</p>
+                      <p className="text-xs text-orange-600 mb-3">คะแนนกระจาย แนะนำตามภูมิภาค</p>
+                      <div className="space-y-2">
+                        {analysisResult.bestRegion.topProvinces.map((prov, idx) => (
+                          <div key={prov.place} className="flex items-center justify-between bg-white rounded-lg p-3 border border-orange-200">
+                            <div className="flex items-center gap-2">
+                              <span>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
+                              <span className="font-semibold text-gray-900">{prov.place}</span>
+                            </div>
+                            <span className="font-bold text-orange-600">{prov.total_score} คะแนน</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // ✅ ยังไม่มีผลวิเคราะห์ (คนโหวตคนแรก)
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <p className="text-gray-500 text-sm text-center">
+                    💭 บันทึกเรียบร้อยแล้ว รอสมาชิกคนอื่นโหวตเพื่อดูผลเปรียบเทียบ
+                  </p>
+                </div>
+              )}
+
             </div>
           )}
-        </div>
-
-        {/* Tip Section */}
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-500 p-5 rounded-lg shadow-md">
-          <p className="text-sm text-purple-900">
-            <span className="font-bold">💡 เคล็ดลับ:</span> ลองดูผลโหวตของเพื่อนๆ 
-            เพื่อช่วยในการตัดสินใจ
-          </p>
-        </div>
-      </div>
-
-      {/* Success Toast */}
-      {justSaved && (
-        <>
-          <div
-            className="fixed inset-0 bg-black bg-opacity-40 z-50 animate-backdrop-fade-in"
-            onClick={() => setJustSaved(false)}
-          />
-
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-toast-pop-up w-full max-w-md px-4">
-            <div className="bg-white rounded-2xl shadow-2xl border-2 border-green-500 p-5">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 text-4xl">✅</div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-bold text-gray-900 text-lg">โหวตสำเร็จ!</p>
-                    <button
-                      onClick={() => setJustSaved(false)}
-                      className="text-gray-400 hover:text-gray-600 transition"
-                      aria-label="ปิด"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    🗳️ บันทึกการโหวตเรียบร้อยแล้ว
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setJustSaved(false);
-                        setShowAnalysisModal(true);
-                      }}
-                      className="flex-1 px-4 py-2.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-bold hover:bg-purple-200 transition"
-                    >
-                      🔍 ดูผลการโหวต
-                    </button>
-                    {onManualNext && (
-                      <button
-                        onClick={() => {
-                          setJustSaved(false);
-                          onManualNext();
-                        }}
-                        className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition shadow-lg"
-                      >
-                        ไปหน้าถัดไป →
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
-        </>
-      )}
-
-      {/* Analysis Modal */}
-      {renderAnalysisModal()}
+        )}
+      </div>
     </>
   );
 };

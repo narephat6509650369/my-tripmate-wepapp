@@ -50,12 +50,14 @@ const HomePage: React.FC = () => {
     };
   };
 
-  // ✅ โหลดทริปทั้งหมด
+  // ================= EFFECTS =================
   useEffect(() => {
     loadTrips();
-    const noti = notiApi.getNoti();
-    console.log("Homepage");
-    console.log("GET NOTI:",noti);
+    const fetchNoti = async () => {
+      const noti = await notiApi.getNoti();
+      console.log("GET NOTI:", noti);
+    };
+    fetchNoti();
   }, []);
 
   useEffect(() => {

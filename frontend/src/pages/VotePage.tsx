@@ -435,7 +435,7 @@ const VotePage: React.FC = () => {
           )}
 
           {step === 4 && (
-            <StepPlace 
+            <StepPlace
               trip={trip}
               onVote={handleVoteLocation}
               initialVotes={userLocations}

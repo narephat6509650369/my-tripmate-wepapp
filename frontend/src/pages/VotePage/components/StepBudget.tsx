@@ -63,7 +63,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     other: 0
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // ✅ เพิ่ม loading state
+  const [isLoading, setIsLoading] = useState(true);
   const [budgetStats, setBudgetStats] = useState<BudgetStatsMap | null>(null);
   const [totalBudgetInfo, setTotalBudgetInfo] = useState<{
     budgetTotal: number;
@@ -72,7 +72,9 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     filledMembers: number;
   } | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-  const [justSaved, setJustSaved] = useState(false);
+  // ✅ เปลี่ยนจาก justSaved เป็น hasSaved + isAnalysisOpen เหมือน StepVote
+  const [hasSaved, setHasSaved] = useState(false);
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // ✅ useRef สำหรับจัดการ timeout
@@ -94,23 +96,18 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
   );
 
   const filledBudgetMembers = totalBudgetInfo?.filledMembers || 0;
+  const tripDuration = trip.numdays;
 
-  /**
-   * ✅ เพิ่ม validation function
-   */
   const validateBudget = useCallback((amount: number): { valid: boolean; error?: string } => {
     if (!Number.isFinite(amount)) {
       return { valid: false, error: 'ตัวเลขไม่ถูกต้อง' };
     }
-    
     if (amount < MIN_BUDGET) {
       return { valid: false, error: 'จำนวนเงินต้องมากกว่าหรือเท่ากับ 0' };
     }
-    
     if (amount > MAX_BUDGET) {
       return { valid: false, error: `งบประมาณสูงสุด ฿${formatCurrency(MAX_BUDGET)}` };
     }
-    
     return { valid: true };
   }, []);
 
@@ -155,20 +152,14 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
   }, [budgetInfo]);
 
   // ============== HANDLERS ==============
-  
-  /**
-   * ✅ ปรับปรุง: เพิ่ม validation และ error handling
-   */
+
   const handleSaveCategory = useCallback(async (category: keyof BudgetState) => {
     const amount = budget[category];
-    
-    // Validate
     const validation = validateBudget(amount);
     if (!validation.valid) {
       alert(validation.error);
       return;
     }
-
     if (amount === 0) {
       alert('กรุณากรอกจำนวนเงินที่มากกว่า 0');
       return;
@@ -176,15 +167,12 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
 
     setIsSaving(true);
     setError(null);
-    
     try {
       await onSave(category, amount);
       console.log(`✅ บันทึก ${category} สำเร็จ: ฿${amount}`);
     } catch (error) {
       console.error(`Error saving ${category}:`, error);
-      const errorMsg = error instanceof Error 
-        ? error.message 
-        : 'ไม่สามารถบันทึกได้';
+      const errorMsg = error instanceof Error ? error.message : 'ไม่สามารถบันทึกได้';
       setError(`ไม่สามารถบันทึก ${category} ได้: ${errorMsg}`);
       alert(`❌ บันทึกไม่สำเร็จ: ${errorMsg}`);
     } finally {
@@ -192,29 +180,21 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     }
   }, [budget, validateBudget, onSave]);
 
-  /**
-   * ✅ ปรับปรุง: เพิ่ม validation
-   */
   const handleBudgetChange = useCallback((key: keyof BudgetState, value: number) => {
     const validation = validateBudget(value);
-    
     if (!validation.valid) {
       alert(`❌ ${validation.error}`);
       return;
     }
-    
     setBudget(prev => ({ ...prev, [key]: value }));
   }, [validateBudget]);
 
-  /**
-   * ✅ ปรับปรุง: ใช้ useCallback และจัดการ timeout ให้ดีขึ้น
-   */
   const handleSaveAll = useCallback(async () => {
-    const hasRequiredBudget = 
+    const hasRequiredBudget =
       budget.accommodation > 0 &&
       budget.transport > 0 &&
       budget.food > 0;
-    
+
     if (!hasRequiredBudget) {
       alert('กรุณากรอกงบประมาณที่จำเป็น (ที่พัก, เดินทาง, อาหาร)');
       return;
@@ -222,39 +202,29 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
 
     setIsSaving(true);
     setError(null);
-    
+
     try {
       const savePromises = BUDGET_CATEGORIES
         .filter(category => budget[category.key] > 0)
-        .map(category => 
+        .map(category =>
           onSave(category.key, budget[category.key])
             .catch(err => {
               console.error(`Failed to save ${category.key}:`, err);
               return { error: err, category: category.key };
             })
         );
-      
+
       const results = await Promise.all(savePromises);
-      
       const failures = results.filter(r => r && 'error' in r);
-      
+
       if (failures.length > 0) {
         const failedCategories = failures.map((f: any) => f.category).join(', ');
         setError(`บันทึกไม่สำเร็จสำหรับ: ${failedCategories}`);
         alert(`⚠️ บันทึกสำเร็จบางส่วน (${results.length - failures.length}/${results.length} หมวด)`);
       } else {
-        setJustSaved(true);
-        
-        // ✅ ใช้ ref เพื่อจัดการ timeout
-        if (toastTimeoutRef.current) {
-          clearTimeout(toastTimeoutRef.current);
-        }
-        
-        toastTimeoutRef.current = setTimeout(() => {
-          setJustSaved(false);
-        }, 8000);
+        // ✅ เปลี่ยนจาก setJustSaved(true) เป็น setHasSaved(true) เหมือน StepVote
+        setHasSaved(true);
       }
-      
     } catch (error) {
       console.error('Error saving budget:', error);
       setError('เกิดข้อผิดพลาดในการบันทึก');
@@ -277,41 +247,20 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
 
     const hasRealStats = (() => {
       const voterCount = totalBudgetInfo?.filledMembers || 0;
-      
-      console.log('🔍 Checking real stats...');
-      console.log('  Voter count:', voterCount);
-      console.log('  Budget stats:', budgetStats);
-      
-      if (voterCount < 2) {
-        console.log('  ❌ Not enough voters');
-        return false;
-      }
-      
-      const hasValidVariation = Object.values(budgetStats).some(s => {
-        if (s.avg === 0 && s.min === 0 && s.max === 0) {
-          console.log('  ❌ All zeros for a category');
-          return false;
-        }
-        if (voterCount === 2) {
-          const hasVariation = s.min !== s.max;
-          console.log(`  ✅ 2 voters - variation: ${hasVariation}`);
-          return hasVariation;
-        }
-        const hasMedian = s.median !== undefined && s.median > 0;
-        console.log(`  ✅ Has median: ${hasMedian}`);
-        return hasMedian;
+      if (voterCount < 2) return false;
+      return Object.values(budgetStats).some(s => {
+        if (s.avg === 0 && s.min === 0 && s.max === 0) return false;
+        if (voterCount === 2) return s.min !== s.max;
+        return s.median !== undefined && s.median > 0;
       });
-      
-      console.log('  Final result:', hasValidVariation);
-      return hasValidVariation;
     })();
 
     return (
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 animate-backdrop-fade-in"
         onClick={() => setShowAnalysisModal(false)}
       >
-        <div 
+        <div
           className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-y-auto animate-modal-scale-in"
           onClick={(e) => e.stopPropagation()}
         >
@@ -333,7 +282,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
               <p className="text-sm text-blue-800 mb-2 font-semibold">📊 ความคืบหน้าการกรอก</p>
               <div className="flex items-center gap-3">
                 <div className="flex-1 bg-gray-200 rounded-full h-3">
-                  <div 
+                  <div
                     className="bg-gradient-to-r from-green-500 to-emerald-600 h-3 rounded-full transition-all"
                     style={{
                       width: `${Math.min(
@@ -347,26 +296,22 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                   {filledBudgetMembers}/{trip.members?.length || 1} คน
                 </span>
               </div>
-              
               <p className="text-xs text-blue-700 mt-2">
-                {hasRealStats 
-                  ? '✅ มีข้อมูลเปรียบเทียบจากสมาชิกหลายคนแล้ว' 
+                {hasRealStats
+                  ? '✅ มีข้อมูลเปรียบเทียบจากสมาชิกหลายคนแล้ว'
                   : '⏳ รอสมาชิกคนอื่นกรอกเพื่อเปรียบเทียบ'
                 }
               </p>
             </div>
 
-            {/* เตือนถ้ายังใช้ข้อมูลตัวเองเท่านั้น */}
             {!hasRealStats && (
               <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">⚠️</span>
                   <div>
-                    <p className="font-semibold text-yellow-900 mb-1">
-                      ข้อมูลเบื้องต้น
-                    </p>
+                    <p className="font-semibold text-yellow-900 mb-1">ข้อมูลเบื้องต้น</p>
                     <p className="text-sm text-yellow-800">
-                      ขณะนี้แสดงเฉพาะงบประมาณของคุณ เมื่อมีสมาชิกคนอื่นกรอกงบเพิ่มเติม 
+                      ขณะนี้แสดงเฉพาะงบประมาณของคุณ เมื่อมีสมาชิกคนอื่นกรอกงบเพิ่มเติม
                       ระบบจะแสดงการเปรียบเทียบแบบเต็มรูปแบบ
                     </p>
                   </div>
@@ -383,7 +328,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                   if (!stat || stat.myValue === 0) return null;
 
                   const range = stat.max - stat.min;
-                  const position = range > 0 
+                  const position = range > 0
                     ? Math.max(5, Math.min(95, ((stat.myValue - stat.min) / range) * 100))
                     : 50;
 
@@ -396,51 +341,37 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
 
                       {hasRealStats ? (
                         <div className="space-y-3">
-                          {/* Card แสดงงบของคุณ */}
                           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border-2 border-blue-200">
                             <p className="text-xs text-gray-600 mb-1">งบของคุณ</p>
                             <p className="text-2xl font-bold" style={{ color }}>
                               ฿{formatCurrency(stat.myValue)}
                             </p>
-                            
-                            {/* แสดงเปรียบเทียบ */}
                             {(() => {
                               const diffFromAvg = stat.myValue - stat.avg;
-                              const diffPercent = stat.avg > 0 
-                                ? Math.round((diffFromAvg / stat.avg) * 100) 
+                              const diffPercent = stat.avg > 0
+                                ? Math.round((diffFromAvg / stat.avg) * 100)
                                 : 0;
-                              
                               return (
                                 <div className="mt-2 pt-2 border-t border-blue-200">
                                   {diffFromAvg === 0 ? (
                                     <div className="flex items-center gap-2">
                                       <span className="text-lg">✓</span>
-                                      <span className="text-sm text-green-700 font-semibold">
-                                        ตรงกับค่าเฉลี่ย
-                                      </span>
+                                      <span className="text-sm text-green-700 font-semibold">ตรงกับค่าเฉลี่ย</span>
                                     </div>
                                   ) : diffFromAvg > 0 ? (
                                     <div className="flex items-center gap-2">
                                       <span className="text-lg text-orange-600">↑</span>
                                       <div className="flex-1">
-                                        <span className="text-sm text-orange-700 font-semibold block">
-                                          สูงกว่าค่าเฉลี่ย
-                                        </span>
-                                        <span className="text-xs text-orange-600">
-                                          +{Math.abs(diffPercent)}% (฿{formatCurrency(Math.abs(diffFromAvg))})
-                                        </span>
+                                        <span className="text-sm text-orange-700 font-semibold block">สูงกว่าค่าเฉลี่ย</span>
+                                        <span className="text-xs text-orange-600">+{Math.abs(diffPercent)}% (฿{formatCurrency(Math.abs(diffFromAvg))})</span>
                                       </div>
                                     </div>
                                   ) : (
                                     <div className="flex items-center gap-2">
                                       <span className="text-lg text-green-600">↓</span>
                                       <div className="flex-1">
-                                        <span className="text-sm text-green-700 font-semibold block">
-                                          ต่ำกว่าค่าเฉลี่ย
-                                        </span>
-                                        <span className="text-xs text-green-600">
-                                          -{Math.abs(diffPercent)}% (฿{formatCurrency(Math.abs(diffFromAvg))})
-                                        </span>
+                                        <span className="text-sm text-green-700 font-semibold block">ต่ำกว่าค่าเฉลี่ย</span>
+                                        <span className="text-xs text-green-600">-{Math.abs(diffPercent)}% (฿{formatCurrency(Math.abs(diffFromAvg))})</span>
                                       </div>
                                     </div>
                                   )}
@@ -449,67 +380,36 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                             })()}
                           </div>
 
-                          {/* Horizontal Bar */}
                           <div className="space-y-2">
-                            <p className="text-xs text-gray-600 mb-3">
-                              ตำแหน่งของคุณเทียบกับทุกคน (เอาเมาส์ชี้ที่จุดเพื่อดูรายละเอียด)
-                            </p>
-                            
+                            <p className="text-xs text-gray-600 mb-3">ตำแหน่งของคุณเทียบกับทุกคน</p>
                             <div className="relative py-2">
                               <div className="h-3 bg-gradient-to-r from-green-100 via-yellow-100 to-red-100 rounded-full relative">
                                 {(() => {
-                                  const avgPosition = stat.avg > 0 && stat.min !== stat.max 
-                                    ? ((stat.avg - stat.min) / range) * 100 
+                                  const avgPosition = stat.avg > 0 && stat.min !== stat.max
+                                    ? ((stat.avg - stat.min) / range) * 100
                                     : null;
-                                  
                                   const isTooClose = avgPosition !== null && Math.abs(position - avgPosition) < 15;
-                                  
                                   return (
                                     <>
-                                      {/* จุดของคุณ */}
-                                      <div 
-                                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 group cursor-pointer"
-                                        style={{ left: `${position}%` }}
-                                      >
-                                        <div 
-                                          className="w-3 h-3 rounded-full border-3 border-white shadow-lg group-hover:scale-125 transition-transform duration-200"
-                                          style={{ backgroundColor: color }}
-                                        />
-                                        
-                                        {/* Tooltip */}
+                                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 group cursor-pointer" style={{ left: `${position}%` }}>
+                                        <div className="w-3 h-3 rounded-full border-3 border-white shadow-lg group-hover:scale-125 transition-transform duration-200" style={{ backgroundColor: color }} />
                                         <div className="absolute -top-16 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 z-50 transition-opacity duration-200 pointer-events-none">
                                           <div className="bg-gray-900 text-white px-3 py-2 rounded-lg shadow-xl text-xs whitespace-nowrap">
                                             <div className="font-bold mb-1">คุณ</div>
                                             <div className="text-gray-300">฿{formatCurrency(stat.myValue)}</div>
-                                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
-                                              <div className="border-4 border-transparent border-t-gray-900"></div>
-                                            </div>
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px"><div className="border-4 border-transparent border-t-gray-900"></div></div>
                                           </div>
                                         </div>
                                       </div>
-                                      
-                                      {/* จุดค่าเฉลี่ย */}
                                       {avgPosition !== null && (
-                                        <div 
-                                          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group cursor-pointer"
-                                          style={{ left: `${Math.max(5, Math.min(95, avgPosition))}%` }}
-                                        >
+                                        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group cursor-pointer" style={{ left: `${Math.max(5, Math.min(95, avgPosition))}%` }}>
                                           <div className="w-3 h-3 bg-gray-600 rounded-full border-2 border-white shadow group-hover:scale-125 transition-transform duration-200" />
-                                          
-                                          <div 
-                                            className={`absolute left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none ${
-                                              isTooClose ? 'top-full mt-2' : '-top-16'
-                                            }`}
-                                          >
+                                          <div className={`absolute left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none ${isTooClose ? 'top-full mt-2' : '-top-16'}`}>
                                             <div className="bg-gray-700 text-white px-3 py-2 rounded-lg shadow-xl text-xs whitespace-nowrap">
                                               <div className="font-bold mb-1">ค่าเฉลี่ย</div>
                                               <div className="text-gray-300">฿{formatCurrency(stat.avg)}</div>
-                                              <div className={`absolute left-1/2 -translate-x-1/2 ${
-                                                isTooClose ? 'bottom-full mb-px' : 'top-full -mt-px'
-                                              }`}>
-                                                <div className={`border-4 border-transparent ${
-                                                  isTooClose ? 'border-b-gray-700' : 'border-t-gray-700'
-                                                }`}></div>
+                                              <div className={`absolute left-1/2 -translate-x-1/2 ${isTooClose ? 'bottom-full mb-px' : 'top-full -mt-px'}`}>
+                                                <div className={`border-4 border-transparent ${isTooClose ? 'border-b-gray-700' : 'border-t-gray-700'}`}></div>
                                               </div>
                                             </div>
                                           </div>
@@ -519,8 +419,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                                   );
                                 })()}
                               </div>
-                              
-                              {/* Labels */}
                               <div className="flex justify-between text-xs text-gray-600 mt-3 px-1">
                                 <div className="text-left">
                                   <div className="font-semibold text-green-700">ต่ำสุด</div>
@@ -534,11 +432,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                             </div>
                           </div>
 
-                          {/* ข้อมูลเพิ่มเติม */}
                           <details className="text-xs">
-                            <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-semibold">
-                              ดูข้อมูลเพิ่มเติม
-                            </summary>
+                            <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-semibold">ดูข้อมูลเพิ่มเติม</summary>
                             <div className="mt-2 space-y-1 bg-gray-50 rounded-lg p-3">
                               <div className="flex justify-between">
                                 <span className="text-gray-600">ค่าเฉลี่ย (หลังตัด outliers):</span>
@@ -554,12 +449,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                                 <div className="flex items-start gap-2 mt-2 pt-2 border-t border-gray-200">
                                   <span className="text-orange-600">⚠️</span>
                                   <div className="flex-1">
-                                    <span className="text-orange-600 font-semibold">
-                                      ตัดค่าผิดปกติ {stat.outliersCount} รายการ
-                                    </span>
-                                    <p className="text-xs text-orange-500 mt-1">
-                                      ค่าเหล่านี้ห่างจากค่าเฉลี่ยมากเกินไป จึงไม่นำมาคำนวณ
-                                    </p>
+                                    <span className="text-orange-600 font-semibold">ตัดค่าผิดปกติ {stat.outliersCount} รายการ</span>
+                                    <p className="text-xs text-orange-500 mt-1">ค่าเหล่านี้ห่างจากค่าเฉลี่ยมากเกินไป จึงไม่นำมาคำนวณ</p>
                                   </div>
                                 </div>
                               )}
@@ -567,9 +458,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                           </details>
                         </div>
                       ) : (
-                        <p className="text-xs text-gray-500 italic text-center py-8">
-                          รอสมาชิกคนอื่นกรอกเพื่อเปรียบเทียบ
-                        </p>
+                        <p className="text-xs text-gray-500 italic text-center py-8">รอสมาชิกคนอื่นกรอกเพื่อเปรียบเทียบ</p>
                       )}
                     </div>
                   );
@@ -582,7 +471,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
               <p className="text-sm text-purple-800">
                 💡 <strong>คำแนะนำ:</strong> {
                   hasRealStats
-                    ? totalStats.myTotal > totalStats.avgTotal 
+                    ? totalStats.myTotal > totalStats.avgTotal
                       ? 'งบของคุณสูงกว่าค่าเฉลี่ย อาจพิจารณาปรับลดได้'
                       : totalStats.myTotal < totalStats.avgTotal
                       ? 'งบของคุณต่ำกว่าค่าเฉลี่ย อาจพิจารณาเพิ่มงบสำรองได้'
@@ -591,26 +480,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                 }
               </p>
             </div>
-          </div>
-
-          {/* Footer */}
-          <div className="sticky bottom-0 bg-gray-50 p-4 rounded-b-xl border-t flex gap-3">
-            <button
-              onClick={() => setShowAnalysisModal(false)}
-              className="flex-1 px-4 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
-            >
-              ปิด
-            </button>
-            <button
-              onClick={() => {
-                setShowAnalysisModal(false);
-                setJustSaved(false);
-                onManualNext?.();
-              }}
-              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition shadow-lg"
-            >
-              ไปหน้าถัดไป (สถานที่) →
-            </button>
           </div>
         </div>
       </div>
@@ -651,22 +520,16 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
         {/* แก้ไขงบประมาณ */}
         <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg border border-gray-200">
           <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">
-            💰 กรุณากรอกงบประมาณ (ทั้งทริป)
+            💰 กรุณากรอกงบประมาณ (จำนวนเงินแต่ละหมวดต่อ {tripDuration} วัน)
           </h3>
-          
+
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full border-collapse min-w-[500px]">
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                 <tr>
-                  <th className="py-3 px-4 text-left font-semibold text-gray-700">
-                    หมวดหมู่
-                  </th>
-                  <th className="py-3 px-4 text-right font-semibold text-gray-700">
-                    จำนวนเงิน (฿)
-                  </th>
-                  <th className="py-3 px-4 text-center font-semibold text-gray-700 w-24">
-                    บันทึก
-                  </th>
+                  <th className="py-3 px-4 text-left font-semibold text-gray-700">หมวดหมู่</th>
+                  <th className="py-3 px-4 text-right font-semibold text-gray-700">จำนวนเงิน (฿)</th>
+                  <th className="py-3 px-4 text-center font-semibold text-gray-700 w-24">บันทึก</th>
                 </tr>
               </thead>
               <tbody>
@@ -674,16 +537,13 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                   <tr key={key} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div 
-                          className="w-3 h-3 rounded-full shadow-sm" 
-                          style={{ backgroundColor: color }} 
-                        />
+                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: color }} />
                         <span className="font-medium text-gray-800">{label}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         disabled={isSaving || isLocked}
                         min={MIN_BUDGET}
                         max={MAX_BUDGET}
@@ -705,7 +565,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                     </td>
                   </tr>
                 ))}
-                
+
                 {/* รวม */}
                 <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 font-bold">
                   <td className="px-4 py-3 text-gray-800">รวมทั้งหมด</td>
@@ -742,59 +602,135 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
           )}
         </button>
 
-        {/* Smart Toast */}
-        {justSaved && (
-          <>
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 z-50 animate-backdrop-fade-in"
-              onClick={() => setJustSaved(false)}
-            />
-            
-            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-toast-pop-up">
-              <div className="bg-white rounded-xl shadow-2xl border-2 border-green-500 p-4 max-w-md">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 text-3xl">✅</div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-bold text-gray-800">บันทึกงบประมาณสำเร็จ!</p>
-                      <button
-                        onClick={() => setJustSaved(false)}
-                        className="text-gray-400 hover:text-gray-600 transition"
-                        aria-label="ปิด"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3">
-                      💰 งบรวม: ฿{formatCurrency(totalBudget)}
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setJustSaved(false);
-                          setShowAnalysisModal(true);
-                        }}
-                        className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-200 transition"
-                      >
-                        🔍 ดูผลการวิเคราะห์
-                      </button>
-                      <button
-                        onClick={() => {
-                          setJustSaved(false);
-                          onManualNext?.();
-                        }}
-                        className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
-                      >
-                        ไปหน้าถัดไป →
-                      </button>
-                    </div>
-                  </div>
-                </div>
+        {/* ✅ ผลการวิเคราะห์ inline (เหมือน StepVote) — แสดงหลังบันทึก */}
+        {hasSaved && budgetStats && (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+
+            {/* Header — กดเพื่อพับ/ขยาย */}
+            <button
+              onClick={() => setIsAnalysisOpen(prev => !prev)}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition border-b border-gray-100"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">💰</span>
+                <span className="font-bold text-gray-800 text-sm">ผลการวิเคราะห์งบประมาณ</span>
               </div>
-            </div>
-          </>
+              <span className="text-gray-400 text-sm">{isAnalysisOpen ? '▲ ซ่อน' : '▼ ดูผล'}</span>
+            </button>
+
+            {/* Content — แสดงเมื่อ isAnalysisOpen */}
+            {isAnalysisOpen && (() => {
+              const voterCount = totalBudgetInfo?.filledMembers || 0;
+              const hasRealStats = voterCount >= 2 && Object.values(budgetStats).some(s => {
+                if (s.avg === 0 && s.min === 0 && s.max === 0) return false;
+                if (voterCount === 2) return s.min !== s.max;
+                return s.median !== undefined && s.median > 0;
+              });
+
+              const totalAvg = Object.values(budgetStats).reduce((sum, s) => sum + s.avg, 0);
+
+              return (
+                <div className="p-4 space-y-4">
+
+                  {/* ความคืบหน้า */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-3 mb-1">
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full transition-all"
+                          style={{ width: `${Math.min(100, (filledBudgetMembers / (trip.members?.length || 1)) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold text-blue-900 whitespace-nowrap">
+                        {filledBudgetMembers}/{trip.members?.length || 1} คน
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-700">
+                      {hasRealStats ? '✅ มีข้อมูลเปรียบเทียบจากสมาชิกหลายคนแล้ว' : '⏳ รอสมาชิกคนอื่นกรอกเพื่อเปรียบเทียบ'}
+                    </p>
+                  </div>
+
+                  {/* รายหมวด */}
+                  {BUDGET_CATEGORIES.map(({ key, label, color }) => {
+                    const stat = budgetStats[key];
+                    if (!stat || stat.myValue === 0) return null;
+
+                    const diffFromAvg = stat.myValue - stat.avg;
+                    const diffPercent = stat.avg > 0 ? Math.round((diffFromAvg / stat.avg) * 100) : 0;
+
+                    return (
+                      <div key={key} className="border border-gray-200 rounded-lg p-4 bg-white">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                            <span className="text-sm font-semibold text-gray-800">{label}</span>
+                          </div>
+                          <span className="text-lg font-bold" style={{ color }}>
+                            ฿{formatCurrency(stat.myValue)}
+                          </span>
+                        </div>
+
+                        {hasRealStats ? (
+                          <div className="space-y-2">
+                            {/* เปรียบเทียบ */}
+                            <div className="flex items-center gap-2 text-sm">
+                              {diffFromAvg === 0 ? (
+                                <><span className="text-green-600">✓</span><span className="text-green-700 font-semibold">ตรงกับค่าเฉลี่ย</span></>
+                              ) : diffFromAvg > 0 ? (
+                                <><span className="text-orange-600">↑</span><span className="text-orange-700 font-semibold">สูงกว่าค่าเฉลี่ย +{Math.abs(diffPercent)}%</span><span className="text-xs text-orange-500">(฿{formatCurrency(Math.abs(diffFromAvg))})</span></>
+                              ) : (
+                                <><span className="text-green-600">↓</span><span className="text-green-700 font-semibold">ต่ำกว่าค่าเฉลี่ย -{Math.abs(diffPercent)}%</span><span className="text-xs text-green-500">(฿{formatCurrency(Math.abs(diffFromAvg))})</span></>
+                              )}
+                            </div>
+
+                            {/* Range Bar */}
+                            {(() => {
+                              const range = stat.max - stat.min;
+                              const position = range > 0
+                                ? Math.max(5, Math.min(95, ((stat.myValue - stat.min) / range) * 100))
+                                : 50;
+                              return (
+                                <div className="relative">
+                                  <div className="h-2 bg-gradient-to-r from-green-100 via-yellow-100 to-red-100 rounded-full">
+                                    <div
+                                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full border-2 border-white shadow"
+                                      style={{ left: `${position}%`, backgroundColor: color }}
+                                    />
+                                  </div>
+                                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                    <span>฿{formatCurrency(stat.min)}</span>
+                                    <span className="text-gray-400">ค่าเฉลี่ย ฿{formatCurrency(stat.avg)}</span>
+                                    <span>฿{formatCurrency(stat.max)}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">รอสมาชิกคนอื่นกรอกเพื่อเปรียบเทียบ</p>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* คำแนะนำ */}
+                  <div className="bg-purple-50 border-l-4 border-purple-500 p-3 rounded">
+                    <p className="text-sm text-purple-800">
+                      💡 <strong>คำแนะนำ:</strong> {
+                        hasRealStats
+                          ? totalBudget > totalAvg
+                            ? 'งบของคุณสูงกว่าค่าเฉลี่ย อาจพิจารณาปรับลดได้'
+                            : totalBudget < totalAvg
+                            ? 'งบของคุณต่ำกว่าค่าเฉลี่ย อาจพิจารณาเพิ่มงบสำรองได้'
+                            : 'งบของคุณใกล้เคียงกับค่าเฉลี่ย เหมาะสม!'
+                          : 'เชิญชวนสมาชิกคนอื่นกรอกงบประมาณเพื่อดูการเปรียบเทียบ'
+                      }
+                    </p>
+                  </div>          
+                </div>
+              );
+            })()}
+          </div>
         )}
 
         {/* คำแนะนำ */}

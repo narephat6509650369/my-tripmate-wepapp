@@ -26,7 +26,8 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
   // State สำหรับ Smart Toast & Modal
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
-
+  const [hasSaved, setHasSaved] = useState(false);
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false); 
   const tripDuration = trip.numdays;
 
   const prevDatesRef = React.useRef<string>("");
@@ -67,10 +68,11 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
         alert("ไม่พบข้อมูลทริปหรือผู้ใช้");
         return;
       }
-      setJustSaved(true);
       if (onSave) {
         await onSave(selectedDates);
       }
+      setJustSaved(true);
+      setHasSaved(true);
     } catch (err: any) {
       console.error(err);
       alert(err?.response?.data?.message || "บันทึกไม่สำเร็จ");
@@ -108,26 +110,6 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
 
           {/* Content */}
           <div className="p-6 space-y-6">
-            {/* ความคืบหน้า */}
-            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800 mb-2 font-semibold">📊 ความคืบหน้าการกรอก</p>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-gray-200 rounded-full h-3">
-                  <div 
-                    className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all"
-                    style={{ 
-                      width: `${summary.totalMembers > 0 
-                        ? Math.min(100, (availability.length / summary.totalMembers * 100))
-                        : 0}%` 
-                    }}
-                  />
-                </div>
-                <span className="text-sm font-semibold text-blue-900">
-                  {availability.length}/{summary.totalMembers} คน
-                </span>
-              </div>
-            </div>
-
             {/* ผลการวิเคราะห์ */}
             {recommendation ? (
               <div className={`border rounded-lg p-4 ${
@@ -310,11 +292,11 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
             className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-100 transition"
           >
             <h3 className="font-bold text-blue-900">📅 เลือกวันที่ว่าง (ต้องการ {tripDuration} วันติดกัน)</h3>
-            <span className="text-blue-700 text-xl">
-              {showInstructions ? '−' : '+'}
+            <span className="text-blue-700 text-sm">
+              {showInstructions ? '▲ ซ่อนคำแนะนำ' : '▼ ดูคำแนะนำ'}
             </span>
           </button>
-          
+         
           {showInstructions && (
             <div className="px-4 pb-4 border-t border-blue-200">
               <ul className="text-sm text-blue-800 space-y-1 mt-3">
@@ -424,60 +406,97 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
           }
         </button>
 
-        {/* Smart Toast */}
-        {justSaved && (
-          <>
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 z-50 animate-backdrop-fade-in"
-              onClick={() => setJustSaved(false)}
-            />
-            
-            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-toast-pop-up">
-              <div className="bg-white rounded-xl shadow-2xl border-2 border-green-500 p-4 max-w-md">
-                <div className="flex items-start gap-3">
-                  <button
-                    onClick={() => setJustSaved(false)}
-                    className="ml-auto -mt-1 -mr-1 text-gray-400 hover:text-gray-600 transition"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                
-                <div className="flex items-start gap-3 mt-2">
-                  <div className="flex-shrink-0 text-3xl">✅</div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-800 mb-1">บันทึกวันที่สำเร็จ!</p>
-                    <p className="text-sm text-gray-600 mb-3">
-                      📊 บันทึกแล้ว {selectedDates.length} วัน
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setJustSaved(false);
-                          setShowAnalysisModal(true);
-                        }}
-                        className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-200 transition"
-                      >
-                        🔍 ดูผลการวิเคราะห์
-                      </button>
-                      <button
-                        onClick={() => {
-                          setJustSaved(false);
-                          onManualNext?.();
-                        }}
-                        className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
-                      >
-                        ไปหน้าถัดไป →
-                      </button>
+        {/* ── ผลการวิเคราะห์ (แสดงหลังบันทึก) ── */}
+        {hasSaved && matchingInfo && (
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          
+          {/* Header — กดเพื่อพับ/ขยาย */}
+          <button
+            onClick={() => setIsAnalysisOpen(prev => !prev)}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition border-b border-gray-100"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔍</span>
+              <span className="font-bold text-gray-800 text-sm">ผลการวิเคราะห์วันที่</span>
+            </div>
+            <span className="text-gray-400 text-sm">{isAnalysisOpen ? '▲ ซ่อน' : '▼ ดูผล'}</span>
+          </button>
+
+          {/* Content — แสดงเมื่อ isAnalysisOpen */}
+          {isAnalysisOpen && (
+            <div className="p-4 space-y-4">
+              {matchingInfo.recommendation ? (
+                <div className={`border rounded-lg p-4 ${
+                  matchingInfo.recommendation.isConsecutive
+                    ? 'bg-blue-50 border-blue-300'
+                    : 'bg-orange-50 border-orange-300'
+                }`}>
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className={`font-semibold mb-1 ${
+                        matchingInfo.recommendation.isConsecutive ? 'text-blue-800' : 'text-orange-800'
+                      }`}>
+                        {matchingInfo.recommendation.isConsecutive ? '💡' : '⚠️'} ช่วงที่แนะนำ
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        คะแนน: {matchingInfo.recommendation.score} •{' '}
+                        {matchingInfo.recommendation.dates.length === tripDuration
+                          ? '✓ ครบจำนวนวัน'
+                          : `${matchingInfo.recommendation.dates.length}/${tripDuration} วัน`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-blue-600">
+                        {matchingInfo.recommendation.avgPeople}
+                      </p>
+                      <p className="text-xs text-gray-600">คนว่างเฉลี่ย</p>
                     </div>
                   </div>
+
+                  <div className="bg-white rounded-lg p-3 border border-gray-200">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {matchingInfo.recommendation.dates.map((date, idx) => {
+                        const d = new Date(date);
+                        const availInfo = matchingInfo.availability.find(a => a.date === date);
+                        const peopleCount = availInfo?.count || 0;
+
+                        return (
+                          <React.Fragment key={date}>
+                            <div className="flex flex-col items-center">
+                              <div className={`px-3 py-2 rounded-lg font-semibold text-sm ${
+                                peopleCount >= (matchingInfo.recommendation?.avgPeople || 0)
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                              </div>
+                              <span className="text-xs text-gray-600 mt-1">👥 {peopleCount}</span>
+                            </div>
+                            {idx < matchingInfo.recommendation!.dates.length - 1 && (
+                              <span className="text-gray-400">→</span>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-sm">
+                    <span className={matchingInfo.recommendation.isConsecutive ? 'text-green-600' : 'text-orange-600'}>
+                      {matchingInfo.recommendation.isConsecutive ? '✓ วันติดกันทั้งหมด' : '⚠️ มีช่องว่างระหว่างวัน'}
+                    </span>
+                    <p className="text-gray-600">📊 {matchingInfo.recommendation.percentage}% ของสมาชิกว่าง</p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <p className="text-gray-500 text-sm">💭 ยังไม่มีข้อมูลเพียงพอสำหรับการแนะนำ</p>
+                </div>
+              )}
             </div>
-          </>
-        )}
+          )}
+        </div>
+      )}
       </div>
 
       {/* Analysis Modal */}

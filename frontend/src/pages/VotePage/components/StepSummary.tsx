@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, DollarSign, MapPin, Sparkles, Brain, Settings,
          Check, ChevronDown, ChevronUp, Loader2, Copy, Code } from 'lucide-react';
 import type { TripDetail, DateMatchingResponse, BudgetVotingResponse } from '../../../types';
-import { voteAPI } from '../../../services/tripService';
+import { voteAPI, tripAPI } from '../../../services/tripService';
 
 // ── Local Types ──
 type AIModel = 'gpt-4' | 'gpt-3.5-turbo' | 'claude-3-opus' | 'claude-3-sonnet' | 'gemini-pro';
@@ -35,18 +35,6 @@ const MODEL_CONFIGS: Record<AIModel, { name: string; provider: string; costPer1k
   'claude-3-opus':  { name: 'Claude 3 Opus',   provider: 'Anthropic', costPer1kTokens: { input: 0.015 } },
   'claude-3-sonnet':{ name: 'Claude 3 Sonnet', provider: 'Anthropic', costPer1kTokens: { input: 0.003 } },
   'gemini-pro':     { name: 'Gemini Pro',       provider: 'Google',    costPer1kTokens: { input: 0.0005 } },
-};
-
-const PromptEngineering = {
-  generatePromptWithMetadata: (data: any, config: PromptConfig) => {
-    const prompt = `วางแผนทริป: ${JSON.stringify(data, null, 2)}`;
-    const estimatedTokens = Math.ceil(prompt.length / 4);
-    const estimatedCost = (estimatedTokens / 1000) * MODEL_CONFIGS[config.model].costPer1kTokens.input;
-    return {
-      prompt,
-      metadata: { estimatedTokens, estimatedCost, model: config.model, version: '1.0.0', timestamp: new Date().toISOString() }
-    };
-  }
 };
 
 // ============== TYPES ==============
@@ -121,6 +109,8 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   const [activeTab, setActiveTab] = useState<'templates' | 'models'>('templates');
   const [copied, setCopied] = useState<Record<string, boolean>>({});
   const [isClosing, setIsClosing] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string>('');
+  const [aiMeta, setAiMeta] = useState<any>(null);
 
   // ── Sync config ──
   useEffect(() => {
@@ -128,11 +118,11 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   }, [selectedModel, selectedTemplate]);
 
   // ── Fetch summary data ──
+  // useEffect 1: fetch vote data ครั้งเดียวตอน mount
   useEffect(() => {
     if (!trip?.tripid) return;
 
-    // fallback fetch ถ้าไม่มี initialSummaryData
-    const fetchAll = async () => {
+    const fetchVoteData = async () => {
       try {
         setIsLoading(true);
         const [dateRes, budgetRes, locRes] = await Promise.all([
@@ -140,35 +130,37 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
           voteAPI.getBudgetVoting(trip.tripid),
           voteAPI.getLocationVote(trip.tripid),
         ]);
-        // console.log('dateRes.data.summary:', dateRes?.data?.summary);
-        const bestDates = dateRes?.data?.recommendation?.dates || [];
-        const stats = budgetRes?.data?.stats || {};
-        const avgBudget = {
-          accommodation: Math.round(stats.accommodation?.q2 || 0),
-          transport:     Math.round(stats.transport?.q2 || 0),
-          food:          Math.round(stats.food?.q2 || 0),
-          other:         Math.round(stats.other?.q2 || 0),
-        };
-        const rawLoc = locRes?.data?.locationVotesTotal || [];
-        const topLocations = rawLoc.slice(0, 3).map((r: any) => ({ place: r.place, total_score: r.total_score }));
-        setSummaryData({
-          bestDates,
-          avgBudget,
-          topLocations,
-          progress: {
-            dates: dateRes?.data?.summary?.totalMembers || 0,
-            budget:   budgetRes?.data?.filledMembers || 0,
-            location: rawLoc.length > 0 ? Math.max(...rawLoc.map((r: any) => r.voteCount || 0)) : 0,
-          },
-        });
+        // ... map data เหมือนเดิม
       } catch (err) {
-        console.error('Failed to load summary', err);
+        console.error('Failed to load vote data', err);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchAll();
+
+    fetchVoteData();
   }, [trip?.tripid]);
+
+
+  // useEffect 2: fetch AI summary เฉพาะตอน canViewSummary = true
+  useEffect(() => {
+    if (!trip?.tripid) return;
+    if (!canViewSummary) return; // ← guard 
+
+    const fetchAiSummary = async () => {
+      try {
+        const summaryRes = await tripAPI.getTripSummary(trip.tripid, selectedTemplate);
+        if (summaryRes?.data?.aiSummary) {
+          setAiSummary(summaryRes.data.aiSummary);
+          setAiMeta(summaryRes.data.aiMeta);
+        }
+      } catch (err) {
+        console.error('Failed to load AI summary', err);
+      }
+    };
+
+    fetchAiSummary();
+  }, [trip?.tripid, selectedTemplate, canViewSummary]);
 
   // ── Helpers ──
   const memberCount = trip.membercount || trip.members?.length || 0;
@@ -196,31 +188,14 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
     }
   };
 
-  // Build a minimal TripSummaryResult-like object for PromptEngineering
-  // (uses what we have; fields not available will be undefined/null)
-  const buildPromptData = () => ({
-    trip: {
-      trip_name: trip.tripname,
-      description: trip.description || '',
-      num_days: trip.numdays,
-      trip_code: trip.invitecode,
-      owner_id: trip.ownerid,
-      created_at: trip.createdat || '',
-    },
-    members: trip.members || [],
-    locationResult: summaryData?.topLocations[0]
-      ? { province_name: summaryData.topLocations[0].place, vote_count: summaryData.topLocations[0].total_score }
-      : null,
-    dateResult: summaryData?.bestDates.length
-      ? { final_dates: summaryData.bestDates, voter_count: summaryData.progress.dates }
-      : null,
-    budgetResult: summaryData?.avgBudget || null,
-  } as any);
-
-  const promptData = buildPromptData();
-  const { prompt, metadata } = canViewSummary && summaryData
-    ? PromptEngineering.generatePromptWithMetadata(promptData, promptConfig)
-    : { prompt: '', metadata: { estimatedTokens: 0, estimatedCost: 0, model: selectedModel, version: '1.0.0', timestamp: '' } };
+  const prompt = aiSummary;
+  const metadata = aiMeta ?? {
+    estimatedTokens: 0,
+    estimatedCost: 0,
+    model: selectedModel,
+    version: '1.0.0',
+    timestamp: ''
+  };
 
   // ============== LOADING ==============
   if (isLoading) {
@@ -571,7 +546,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
       </div>
 
       {/* ── Quick Edit ── */}
-      {onNavigateToStep && (
+      {onNavigateToStep && !canViewSummary && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <p className="text-sm text-blue-800 font-semibold mb-3">🔧 ต้องการแก้ไขข้อมูล?</p>
           <div className="flex flex-wrap gap-2">

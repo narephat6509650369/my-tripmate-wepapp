@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from 'react';
 import { MapPin, Bell, Menu, X, ChevronDown, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Users, Vote, CheckCircle } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { formatRelativeTime } from "../utils";
+import { notiApi } from "../services/tripService";
 
 // ============================================================================
 // TYPES
@@ -13,15 +14,17 @@ interface HeaderProps {
   onLogout?: () => void;
 }
 
-// ✅ เพิ่ม Type Definition
+// เปลี่ยน type ให้ตรง DB
 type NotificationType = 
-  | 'trip_invite' 
-  | 'new_vote' 
-  | 'vote_complete' 
-  | 'trip_confirmed';
+  | 'trip_invitation' 
+  | 'new_voting_session'
+  | 'voting_closed'
+  | 'trip_confirmed'
+  | 'member_joined'
+  | 'member_removed';
 
 interface Notification {
-  id: number;
+  id: string;
   type: NotificationType;
   text: string;
   read: boolean;
@@ -47,58 +50,45 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   const getDisplayName = () =>
     user?.full_name || user?.email?.split("@")[0] || "User";
   
-  // Mock Notifications with different types
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      type: "trip_invite",
-      text: "คุณถูกเชิญเข้าทริป 'สงขลา 3 วัน 2 คืน'",
-      read: false,
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-      tripId: "trip123",
-      tripName: "สงขลา 3 วัน 2 คืน"
-    },
-    {
-      id: 2,
-      type: "new_vote",
-      text: "เปิดรอบโหวตใหม่ในทริป 'เชียงใหม่ 4 วัน 3 คืน'",
-      read: false,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      tripId: "trip124",
-      tripName: "เชียงใหม่ 4 วัน 3 คืน"
-    },
-    {
-      id: 3,
-      type: "vote_complete",
-      text: "ผลโหวตเสร็จสิ้นแล้ว พร้อมยืนยันทริป 'ภูเก็ต 5 วัน 4 คืน'!",
-      read: false,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
-      tripId: "trip125",
-      tripName: "ภูเก็ต 5 วัน 4 คืน"
-    },
-    {
-      id: 4,
-      type: "trip_confirmed",
-      text: "ทริป 'กรุงเทพ 2 วัน 1 คืน' ได้รับการยืนยันแล้ว!",
-      read: true,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      tripId: "trip126",
-      tripName: "กรุงเทพ 2 วัน 1 คืน"
-    }
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  useEffect(() => {
+    const fetchNoti = async () => {
+      try {
+        const res = await notiApi.getNoti();
+        if (res?.success && Array.isArray(res.data?.notifications)) {
+          setNotifications(res.data.notifications.map((n: any) => ({
+            id: n.notification_id,
+            type: n.notification_type,
+            text: n.message || n.title,
+            read: Boolean(n.is_read),
+            timestamp: new Date(n.created_at),
+            tripId: n.trip_id,
+          })));
+        }
+      } catch (err) {
+        console.error("Failed to fetch notifications:", err);
+      }
+    };
+    fetchNoti();
+  }, []);
+
   const getNotificationIcon = (type: NotificationType) => {
     switch (type) {
-      case "trip_invite":
+      case "trip_invitation":
         return <Users className="w-4 h-4 text-blue-500" />;
-      case "new_vote":
+      case "new_voting_session":
         return <Vote className="w-4 h-4 text-purple-500" />;
-      case "vote_complete":
+      case "voting_closed":
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case "trip_confirmed":
         return <CheckCircle className="w-4 h-4 text-emerald-500" />;
+      case "member_joined":
+        return <Users className="w-4 h-4 text-blue-400" />;
+      case "member_removed":
+        return <X className="w-4 h-4 text-red-400" />;
       default:
         return <Bell className="w-4 h-4 text-gray-500" />;
     }
@@ -136,14 +126,16 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
     console.log("User logged out");
   };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); // optimistic
+    await notiApi.markAllAsRead();
   };
 
-  const markAsRead = (id: number) => {
+  const markAsRead = async (id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
+    await notiApi.markAsRead(id);
   };
 
   const handleNotificationClick = (notification: Notification) => {
@@ -153,25 +145,26 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
     }
   };
 
-  const deleteNotification = (id: number, e: React.MouseEvent) => {
+  const deleteNotification = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setNotifications((prev) => prev.filter((n) => n.id !== id)); // optimistic
+    await notiApi.deleteNoti(id);
   };
 
   const addMockNotification = () => {
     const mockNotifications = [
       {
-        type: "trip_invite" as NotificationType,
+        type: "trip_invitation" as NotificationType,
         text: "คุณถูกเชิญเข้าทริป 'พัทยา 2 วัน 1 คืน'",
         tripName: "พัทยา 2 วัน 1 คืน"
       },
       {
-        type: "new_vote" as NotificationType,
+        type: "new_voting_session" as NotificationType,
         text: "เปิดรอบโหวตใหม่ในทริป 'อยุธยา 1 วัน'",
         tripName: "อยุธยา 1 วัน"
       },
       {
-        type: "vote_complete" as NotificationType,
+        type: "voting_closed" as NotificationType,
         text: "ผลโหวตเสร็จสิ้นแล้ว พร้อมยืนยันทริป 'ตราด 3 วัน 2 คืน'!",
         tripName: "ตราด 3 วัน 2 คืน"
       }
@@ -180,7 +173,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
     const randomNotif = mockNotifications[Math.floor(Math.random() * mockNotifications.length)];
     
     const newNotif: Notification = {
-      id: Date.now(),
+      id: `mock-${Date.now()}`,
       type: randomNotif.type,
       text: randomNotif.text,
       read: false,
