@@ -12,9 +12,12 @@ import type {
   DateMatchingResponse
 } from '../types';
 
-// ============================================================================
 // MOCK DATA
-// ============================================================================
+export const MOCK_TRIP_STATUS: Record<string, string> = {
+  'trip-001': 'voting',
+  'trip-002': 'completed', 
+  'trip-003': 'planning',
+};
 
 export const MOCK_CURRENT_USER_ID = 'user-001';
 export const MOCK_CURRENT_USER_EMAIL = 'user@example.com';
@@ -58,14 +61,12 @@ export const MOCK_TRIPS: Trip[] = [
     invite_link: 'http://localhost:3000/join/trip-003',
     status: 'planning',
     membercount: 3,
-    created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
+    created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
     is_active: true
   }
 ];
 
-// ============================================================================
 // MOCK API FUNCTIONS
-// ============================================================================
 
 /**
  * Simulate API delay
@@ -158,7 +159,7 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       numdays: trip.num_days,
       invitecode: trip.invite_code,
       invitelink: trip.invite_link,
-      status: trip.status,
+      status: MOCK_TRIP_STATUS[tripId] || trip.status,
       createdat: trip.created_at,
       members: [
       {
@@ -423,7 +424,42 @@ export const getMockCloseTrip = (tripCode: string): ApiResponse => {
   return {
     success: true,
     code: 'OK',
-    message: 'Trip voting closed successfully'
+    message: 'Trip voting closed successfully',
+    data: { trip_id: tripCode, status: 'completed' }
+  };
+};
+
+/**
+ * GET /api/votes/:tripId/location-vote
+ */
+export const getMockLocationVote = (tripId: string): ApiResponse => {
+  const rowlog = tripId === 'trip-003' ? [
+    { proposed_by: 'user-002', province_name: 'อุบลราชธานี', score: 3 },
+    { proposed_by: 'user-002', province_name: 'ขอนแก่น', score: 2 },
+    { proposed_by: 'user-002', province_name: 'นครราชสีมา', score: 1 },
+  ] : [
+    { proposed_by: 'user-001', province_name: 'ภูเก็ต', score: 3 },
+    { proposed_by: 'user-001', province_name: 'เชียงใหม่', score: 2 },
+    { proposed_by: 'user-001', province_name: 'กระบี่', score: 1 },
+  ];
+
+  return {
+    success: true,
+    code: 'OK',
+    message: 'Location votes loaded',
+    data: {
+      locationVotesTotal: tripId === 'trip-003' ? [
+        { place: 'อุบลราชธานี', total_score: 3, voteCount: 1 },
+        { place: 'ขอนแก่น', total_score: 2, voteCount: 1 },
+        { place: 'นครราชสีมา', total_score: 1, voteCount: 1 },
+      ] : [
+        { place: 'ภูเก็ต', total_score: 9, voteCount: 3 },
+        { place: 'เชียงใหม่', total_score: 6, voteCount: 3 },
+        { place: 'กระบี่', total_score: 3, voteCount: 3 },
+      ],
+      rowlog,
+      analysis: null
+    }
   };
 };
 
@@ -456,27 +492,24 @@ export const getMockDateMatchingResult = (tripId: string): ApiResponse<DateMatch
         score: 895,
         isConsecutive: true
       },
-      rowlog: [
-        {
-          available_date: '2025-01-20',
-          proposed_at: new Date().toISOString(),
-          proposed_by: 'user-001',
-          proposed_by_name: 'สมชาย ใจดี'
-        },
-        {
-          available_date: '2025-01-21',
-          proposed_at: new Date().toISOString(),
-          proposed_by: 'user-002',
-          proposed_by_name: 'สมหญิง รักดี'
-        }
-      ],
+      rowlog: tripId === 'trip-003' ? [] : [
+      {
+        available_date: '2025-01-20',
+        proposed_at: new Date().toISOString(),
+        proposed_by: 'user-001',
+        proposed_by_name: 'สมชาย ใจดี'
+      },
+      {
+        available_date: '2025-01-21',
+        proposed_at: new Date().toISOString(),
+        proposed_by: 'user-002',
+        proposed_by_name: 'สมหญิง รักดี'
+      }
+    ],
     }
   };
 };
 
-/*
-* GET /api/votes/:tripcode/get-budget
-*/
 /*
 * GET /api/votes/:tripcode/get-budget
 */
@@ -488,31 +521,11 @@ export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
     message: 'Budget voting data loaded',
     data: {
       // ✅ 1. งบของ User ปัจจุบัน (rows)
-      rows: [
-        { 
-          user_id: 'user-001',
-          category_name: 'accommodation',
-          estimated_amount: 5000,
-          voted_at: new Date(Date.now() - 3600000).toISOString()
-        },
-        { 
-          user_id: 'user-001',
-          category_name: 'transport',
-          estimated_amount: 3000,
-          voted_at: new Date(Date.now() - 3600000).toISOString()
-        },
-        { 
-          user_id: 'user-001',
-          category_name: 'food',
-          estimated_amount: 2000,
-          voted_at: new Date(Date.now() - 3600000).toISOString()
-        },
-        { 
-          user_id: 'user-001',
-          category_name: 'other',
-          estimated_amount: 1000,
-          voted_at: new Date(Date.now() - 3600000).toISOString()
-        }
+      rows: tripCode === 'trip-003' ? [] : [
+        { user_id: 'user-001', category_name: 'accommodation', estimated_amount: 5000, voted_at: new Date(Date.now() - 3600000).toISOString() },
+        { user_id: 'user-001', category_name: 'transport', estimated_amount: 3000, voted_at: new Date(Date.now() - 3600000).toISOString() },
+        { user_id: 'user-001', category_name: 'food', estimated_amount: 2000, voted_at: new Date(Date.now() - 3600000).toISOString() },
+        { user_id: 'user-001', category_name: 'other', estimated_amount: 1000, voted_at: new Date(Date.now() - 3600000).toISOString() }
       ],
 
       // ✅ 2. สถิติจากทุกคน (stats)
@@ -567,7 +580,7 @@ export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
       budgetTotal: 11750,    // รวม Q2 ทุก category
       minTotal: 8800,        // รวม Q1 ทุก category
       maxTotal: 16000,       // รวม Q3 ทุก category
-      filledMembers: 4,      // จำนวนคนที่กรอบ
+      filledMembers: 4,      // จำนวนคนที่กรอบ 
 
       // ✅ 4. ประวัติการเสนอทั้งหมด (rowlog)
       rowlog: [
@@ -711,6 +724,7 @@ export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
 export default {
   // Data
   MOCK_TRIPS,
+  MOCK_TRIP_STATUS,
   MOCK_CURRENT_USER_ID,
   MOCK_CURRENT_USER_EMAIL,
 
@@ -734,6 +748,7 @@ export default {
   getMockUpdateBudget,
   getMockSubmitLocationVote,
   getMockCloseTrip,
+  getMockLocationVote,
   getMockGetBudgetVoting,
   getMockDateMatchingResult
 };  

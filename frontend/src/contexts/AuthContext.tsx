@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ApiResponse } from '../types/index';
+import { CONFIG } from '../config/app.config';
 
 // ============== TYPES ==============
 export interface User {
@@ -45,102 +46,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading: true
   });
 
-  // ✅ Initialize auth state from localStorage
-  // useEffect(() => {
-  //   const initializeAuth = () => {
-  //     try {
-  //       const token = localStorage.getItem('jwtToken');
-  //       const userId = localStorage.getItem('userId');
-  //       const userEmail = localStorage.getItem('userEmail');
+  useEffect(() => {
+    const initializeAuth = () => {
+      try {
+        // 🔥 สำหรับ development: ข้าม auth check
+        setAuthState({
+          user: {
+            user_id: 'user-001',           // ← ตรงกับ MOCK_CURRENT_USER_ID
+            email: 'user@example.com',     // ← ตรงกับ MOCK_CURRENT_USER_EMAIL
+            full_name: 'สมชาย ใจดี',
+            avatar_url: null
+          },
+          isAuthenticated: true,
+          isLoading: false
+        }); 
+        
+        console.log('✅ Mock auth initialized');
 
-  //       if (!token) {
-  //         console.warn('⚠️ No token found, redirecting to login');
-  //         if (pathname !== '/login') {
-  //         if (inviteCode) navigate(`/login?redirect=/join/${inviteCode}`);
-  //           else navigate('/login');
-  //         }
+        /* 
+        // โค้ดเดิม - comment ไว้ก่อน
+        const token = localStorage.getItem('jwtToken');
+        const userId = localStorage.getItem('userId');
+        const userEmail = localStorage.getItem('userEmail');
+
+        if (!token) {
+          console.warn('⚠️ No token found, redirecting to login');
+          if (pathname !== '/login') {
+            if (inviteCode) navigate(`/login?redirect=/join/${inviteCode}`);
+            else navigate('/login');
+          }
+          return;
+        }
+        */
+
+      } catch (error) {
+        console.error('Failed to initialize auth:', error);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // useEffect(() => {
+  //   const initializeAuth = async () => {
+  //     try {
+  //       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+  //       const res = await fetch(`${API_URL}/auth/me`, {
+  //         method: "GET",
+  //         credentials: "include"
+  //       });
+
+  //       if (!res.ok) {
+  //         setAuthState({ user: null, isAuthenticated: false, isLoading: false });
   //         return;
   //       }
 
-  //       if (token && userId && userEmail) {
-  //         setAuthState({
-  //           user: {
-  //             user_id: userId,
-  //             email: userEmail,
-  //             full_name: localStorage.getItem('userName') || undefined,
-  //             avatar_url: localStorage.getItem('userAvatar') || null
-  //           },
-  //           token,
-  //           isAuthenticated: true,
-  //           isLoading: false
-  //         });
-  //       } else {
-  //         setAuthState({
-  //           user: null,
-  //           token: null,
-  //           isAuthenticated: false,
-  //           isLoading: false
-  //         });
-  //       }
-  //     } catch (error) {
-  //       console.error('Failed to initialize auth:', error);
-  //       setAuthState({
-  //         user: null,
-  //         token: null,
-  //         isAuthenticated: false,
-  //         isLoading: false
-  //       });
+  //       const result = await res.json();
+  //       setAuthState({ user: result.data, isAuthenticated: true, isLoading: false });
+
+  //     } catch {
+  //       setAuthState({ user: null, isAuthenticated: false, isLoading: false });
   //     }
   //   };
 
   //   initializeAuth();
   // }, []);
-
-  useEffect(() => {
-  const initializeAuth = async () => {
-
-    if (authState.isAuthenticated) {
-      return;
-    }
-
-    try {
-      const API_URL =
-        import.meta.env.VITE_API_BASE_URL ||
-        'http://localhost:5000/api';
-
-      const res = await fetch(`${API_URL}/auth/me`, {
-        method: "GET",
-        credentials: "include"
-      });
-
-      if (!res.ok) {
-        setAuthState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false
-        });
-        return;
-      }
-
-      const result = await res.json();
-
-      setAuthState({
-        user: result.data,
-        isAuthenticated: true,
-        isLoading: false
-      });
-
-    } catch {
-      setAuthState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false
-      });
-    }
-  };
-
-  initializeAuth();
-}, []);
 
 
   // ✅ Login with Google
