@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { getUserTrips, joinTripByCode, removeMemberService, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService} from "../services/tripService.js";
+import { getUserTrips, joinTripByCode, removeMemberService, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate} from "../services/tripService.js";
 import voteService from "../services/voteService.js";
 
 //เพิ่มสมาชิก
@@ -318,6 +318,22 @@ export const getTripDetailController = async (req: Request, res: Response) => {
 };
 
 // ดึวงสรุปผลทริป (สำหรับหน้า summary)
+
+const allowedTemplates: PromptTemplate[] = [
+  "comprehensive",
+  "itinerary",
+  "budget",
+  "activities",
+  "accommodation",
+];
+
+function parseTemplate(value: unknown): PromptTemplate {
+  if (typeof value !== "string") return "comprehensive";
+
+  return allowedTemplates.includes(value as PromptTemplate)
+    ? (value as PromptTemplate)
+    : "comprehensive";
+}
 export const getTripSummaryController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
@@ -341,8 +357,13 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
       });
     }
 
-    const summary = await getTripSummaryService(tripId, user_id,template as string );
-    console.log("Trip summary:", summary);
+    const selectedTemplate = parseTemplate(template);
+
+    const summary = await getTripSummaryService(
+      tripId,
+      user_id,
+      selectedTemplate
+    );
 
     return res.status(200).json({
       success: true,
@@ -352,7 +373,6 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error("getTripSummary error:", error);
     if (error.message === "Trip not found") {
       return res.status(404).json({
         success: false,
@@ -373,7 +393,6 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
       success: false,
       code: "INTERNAL_ERROR",
       message: "Failed to get trip summary",
-      error: { detail: error }
     });
   }
 };

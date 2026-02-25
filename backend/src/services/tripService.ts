@@ -195,14 +195,14 @@ export const joinTripByCode = async (invite_code: string, user_id: string) => {
  */
 export const removeMemberService = async ( trip_id: string, member_id: string, owner_id: string ) => {
 
-  // 1️⃣ ตรวจสอบว่าทริปมีอยู่จริง
+  // ตรวจสอบว่าทริปมีอยู่จริง
   const trip = await tripModel.getTripDetail(trip_id);
 
   if (!trip) {
     return { success: false, error: "ไม่พบทริป" };
   }
 
-  // 2️⃣ ตรวจสอบสิทธิ์ owner
+  // ตรวจสอบสิทธิ์ owner
   if (trip.owner_id !== owner_id) {
     return {
       success: false,
@@ -210,7 +210,7 @@ export const removeMemberService = async ( trip_id: string, member_id: string, o
     };
   }
 
-  // 3️⃣ ห้าม owner ลบตัวเอง
+  // ห้าม owner ลบตัวเอง
   if (owner_id === member_id) {
     return {
       success: false,
@@ -218,7 +218,7 @@ export const removeMemberService = async ( trip_id: string, member_id: string, o
     };
   }
 
-  // 4️⃣ ตรวจสอบว่าสมาชิกอยู่ในทริป และยัง active อยู่
+  // ตรวจสอบว่าสมาชิกอยู่ในทริป และยัง active อยู่
   const member = await tripModel.findMemberInTrip(trip_id, member_id);
 
   if (!member) {
@@ -228,7 +228,7 @@ export const removeMemberService = async ( trip_id: string, member_id: string, o
     };
   }
 
-  // 5️⃣ ทำ Soft Delete + ลบ availability ภายใน transaction
+  // ทำ Soft Delete + ลบ availability ภายใน transaction
   await tripModel.removeMemberById(trip_id, member_id);
 
   return {
@@ -248,7 +248,9 @@ export const findById = async (tripId: string) => {
   return trip;
 }
 
-export async function getTripSummaryService(tripId: string, user_id: string, template?: string) {
+export type PromptTemplate =| "comprehensive"| "itinerary"| "budget"| "activities"| "accommodation";
+
+export async function getTripSummaryService(tripId: string, user_id: string, template: PromptTemplate = "comprehensive") {
   try {
     const summary = await getTripSummaryById(tripId);
 
@@ -271,52 +273,52 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
     }
 
     // ดึงผลโหวตทั้งหมด
-const [budgetVotes, locationResult, dateOptions] = await Promise.all([
-  voteService.getvoteBudget(tripId, user_id),
-  voteService.getvoteLocation(tripId, user_id),
-  voteService.getvoteDate(tripId, user_id),
-]);
+    const [budgetVotes, locationResult, dateOptions] = await Promise.all([
+      voteService.getvoteBudget(tripId, user_id),
+      voteService.getvoteLocation(tripId, user_id),
+      voteService.getvoteDate(tripId, user_id),
+    ]);
 
-// Map โครงสร้างให้ตรงกับที่ PromptService คาดหวัง
-const mappedLocation = locationResult?.analysis?.winner
-  ? {
-      province_name: locationResult.analysis.winner.place,
-      vote_count: locationResult.analysis.winner.total_score,
-    }
-  : null;
+    // Map โครงสร้างให้ตรงกับที่ PromptService คาดหวัง
+    const mappedLocation = locationResult?.analysis?.winner
+      ? {
+        province_name: locationResult.analysis.winner.place,
+        vote_count: locationResult.analysis.winner.total_score,
+      }
+    : null;
 
-const mappedBudget = budgetVotes?.stats
-  ? {
-      accommodation: budgetVotes.stats.accommodation?.q2 ?? 0,
-      transport:     budgetVotes.stats.transport?.q2     ?? 0,
-      food:          budgetVotes.stats.food?.q2          ?? 0,
-      other:         0,
-    }
-  : null;
+    const mappedBudget = budgetVotes?.stats
+      ? {
+        accommodation: budgetVotes.stats.accommodation?.q2 ?? 0,
+        transport: budgetVotes.stats.transport?.q2?? 0,
+        food: budgetVotes.stats.food?.q2?? 0,
+        other: 0,
+      }
+    : null;
 
-const mappedDate = dateOptions?.recommendation
-  ? {
-      final_dates:  dateOptions.recommendation.dates ?? [],
-      voter_count:  dateOptions.summary?.totalMembers ?? 0,
-    }
-  : null;
+    const mappedDate = dateOptions?.recommendation
+      ? {
+        final_dates:  dateOptions.recommendation.dates ?? [],
+        voter_count:  dateOptions.summary?.totalMembers ?? 0,
+      }
+      : null;
 
-// เรียก PromptService ด้วย mapped data
-const { prompt, metadata } = PromptService.buildPromptWithMetadata(
-  {
-    trip:           summary.trip,
-    members:        summary.members,
-    locationResult: mappedLocation,
-    budgetResult:   mappedBudget,
-    dateResult:     mappedDate,
-  },
-  {
-    template:   "comprehensive",
-    model:      "gpt-4o-mini",
-    structured: true,
-    includeCOT: true,
-  }
-);
+    // เรียก PromptService ด้วย mapped data
+    const { prompt, metadata } = PromptService.buildPromptWithMetadata(
+      {
+        trip: summary.trip,
+        members: summary.members,
+        locationResult: mappedLocation,
+        budgetResult: mappedBudget,
+        dateResult: mappedDate,
+      },
+      {
+        template: (template as PromptTemplate) || "comprehensive",
+        model: "gpt-4o-mini",
+        structured: true,
+        includeCOT: true,
+      }
+    );
 
 return {
   summary,
@@ -325,7 +327,7 @@ return {
   locationResult,
   dateOptions,
   aiSummary: prompt,  
-  aiMeta:    metadata,
+  aiMeta: metadata,
 };
 
   } catch (error) {
