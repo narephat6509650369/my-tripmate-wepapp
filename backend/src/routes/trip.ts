@@ -32,7 +32,6 @@ router.delete('/DeleteTrip', auth,deleteTripController);
 router.get("/:tripId", auth, getTripDetailController);
 
 // Owner ลบสมาชิกออกจากทริป  
-/* returns: { success: true, message: "ลบสมาชิกสำเร็จ" } */
 router.delete("/:tripId/members/:memberId", auth, removeMemberController);
 
 

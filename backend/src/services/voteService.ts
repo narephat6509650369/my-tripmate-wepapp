@@ -580,7 +580,7 @@ export const getvoteLocation = async (tripId: string, user_id: string) => {
     }))
     .sort((a, b) =>
       b.total_score - a.total_score ||   // คะแนนรวม (3-2-1) 
-      b.rank1Count - a.rank1Count ||     // //จำนวน คน ที่ให้จังหวัดนั้นเป็นอันดับ 1
+      b.rank1Count - a.rank1Count ||     // จำนวน คน ที่ให้จังหวัดนั้นเป็นอันดับ 1
       b.voteCount - a.voteCount          // จำนวนคนโหวตให้จังหวัดนั้น (ไม่สนอันดับ)
     );
 

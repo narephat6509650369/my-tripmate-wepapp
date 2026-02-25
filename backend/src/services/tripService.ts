@@ -109,9 +109,7 @@ export const getTripDetail = async (tripId: string) => {
 }
 
 
-/**
- * ลบทริป (เฉพาะ Owner + สถานะต้องเป็น 'planning')
- */
+
 export const deleteTripService = async (trip_id: string) => {
   // 1. เช็คสถานะก่อน
   const status = await tripModel.getTripStatus(trip_id);
@@ -195,36 +193,48 @@ export const joinTripByCode = async (invite_code: string, user_id: string) => {
 /**
  * ลบสมาชิกออกจากทริป (เฉพาะ Owner)
  */
-export const removeMemberService = async (params: {trip_id: string;member_id: string;owner_id: string;}) => {
-  const { trip_id, member_id, owner_id } = params;
-  
-  // 1. เช็คว่าผู้เรียกเป็น owner หรือไม่
+export const removeMemberService = async ( trip_id: string, member_id: string, owner_id: string ) => {
+
+  // 1️⃣ ตรวจสอบว่าทริปมีอยู่จริง
   const trip = await tripModel.getTripDetail(trip_id);
-  
+
   if (!trip) {
     return { success: false, error: "ไม่พบทริป" };
   }
-  
+
+  // 2️⃣ ตรวจสอบสิทธิ์ owner
   if (trip.owner_id !== owner_id) {
-    return { success: false, error: "เฉพาะเจ้าของทริปเท่านั้นที่ลบสมาชิกได้" };
+    return {
+      success: false,
+      error: "เฉพาะเจ้าของทริปเท่านั้นที่ลบสมาชิกได้"
+    };
   }
-  
-  // 2. เช็คว่าสมาชิกอยู่ในทริปหรือไม่
+
+  // 3️⃣ ห้าม owner ลบตัวเอง
+  if (owner_id === member_id) {
+    return {
+      success: false,
+      error: "เจ้าของทริปไม่สามารถลบตัวเองได้"
+    };
+  }
+
+  // 4️⃣ ตรวจสอบว่าสมาชิกอยู่ในทริป และยัง active อยู่
   const member = await tripModel.findMemberInTrip(trip_id, member_id);
-  
+
   if (!member) {
-    return { success: false, error: "ไม่พบสมาชิกในทริป" };
+    return {
+      success: false,
+      error: "ไม่พบสมาชิกในทริป"
+    };
   }
-  
-  // 3. ห้ามลบตัวเอง (Owner)
-  if (member.user_id === owner_id) {
-    return { success: false, error: "เจ้าของทริปไม่สามารถลบตัวเองได้" };
-  }
-  
-  // 4. ลบสมาชิก (Soft Delete + ลบ Availability)
+
+  // 5️⃣ ทำ Soft Delete + ลบ availability ภายใน transaction
   await tripModel.removeMemberById(trip_id, member_id);
-  
-  return { success: true, message: "ลบสมาชิกสำเร็จ" };
+
+  return {
+    success: true,
+    message: "ลบสมาชิกสำเร็จ"
+  };
 };
 
 //
