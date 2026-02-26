@@ -72,6 +72,10 @@ const HomePage: React.FC = () => {
     setDialogMessage("เข้าร่วมห้องสำเร็จ 🎉");
     navigate(location.pathname, { replace: true });
   }
+  
+  if (state?.joinPending) {
+    setDialogMessage("ส่งคำขอเข้าร่วมแล้ว รอเจ้าของทริปอนุมัติ ⏳");
+  }
 }, [location]);
 
 
@@ -128,35 +132,20 @@ const HomePage: React.FC = () => {
   // ✅ เข้าร่วมทริป
   const handleJoinTrip = async (code: string) => {
     const cleanCode = code.trim().toUpperCase();
-    
-    if (!cleanCode) {
-      alert("กรุณากรอกรหัสห้อง");
-      return;
-    }
-    
-    if (!validateInviteCode(cleanCode)) {
-      alert("รูปแบบรหัสไม่ถูกต้อง\nรูปแบบที่ถูกต้อง: XXXX-XXXX-XXXX-XXXX");
-      return;
-    }
-    
+    if (!cleanCode) { alert("กรุณากรอกรหัสห้อง"); return; }
+    if (!validateInviteCode(cleanCode)) { alert("รูปแบบรหัสไม่ถูกต้อง"); return; }
+
     try {
-      const response = await tripAPI.joinTrip(cleanCode);
-      
-      if (response.success && response.data) {
-        const message = response.data.rejoined 
-          ? 'เข้าร่วมทริปสำเร็จ! (คุณเคยเป็นสมาชิกอยู่แล้ว)'
-          : 'เข้าร่วมทริปสำเร็จ!';
-        
-        alert(message);
-        navigate(`/votepage/${response.data.trip_id}`);
+      const response = await tripAPI.requestToJoin(cleanCode);
+      if (response.success) {
         setRoomCode("");
+        setDialogMessage("ส่งคำขอเข้าร่วมแล้ว รอเจ้าของทริปอนุมัติ ⏳");
         loadTrips();
       } else {
-        alert(response.message || 'ไม่สามารถเข้าร่วมทริปได้');
+        setDialogMessage(response.message || 'ไม่สามารถส่งคำขอได้');
       }
     } catch (error) {
-      console.error('Error joining trip:', error);
-      alert('เกิดข้อผิดพลาดในการเข้าร่วมทริป');
+      setDialogMessage('เกิดข้อผิดพลาด กรุณาลองใหม่');
     }
   };
 

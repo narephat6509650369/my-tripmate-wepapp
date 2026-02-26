@@ -299,8 +299,96 @@ return data;
     } catch (error) {
       return handleApiError(error);
     }
+  },
+  
+  // สำหรับเจ้าของทริป: อนุมัติ/ปฏิเสธคำขอเข้าร่วมทริปจากสมาชิกที่ไม่ใช่เจ้าของทริป (Pending Requests) - API ใหม่ที่เพิ่มมาในภายหลัง
+  /**
+   * POST /api/trips/:tripId/request-join
+   */
+  requestToJoin: async (inviteCode: string): Promise<ApiResponse> => {
+    try {
+      const response = await fetchWithTimeout(`${API_URL}/trips/request-join`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invite_code: inviteCode })
+      });
+
+      // ✅ เช็คก่อนว่าเป็น JSON จริงไหม
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        return {
+          success: false,
+          code: 'API_ERROR',
+          message: response.status === 404 
+            ? 'ไม่พบ endpoint กรุณาติดต่อผู้พัฒนา' 
+            : `Server error (${response.status})`
+        };
+      }
+
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  /**
+   * GET /api/trips/:tripId/pending-requests
+   */
+  getPendingRequests: async (tripId: string): Promise<ApiResponse> => {
+    try {
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/${tripId}/pending-requests`,
+        { credentials: 'include' }
+      );
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  /**
+   * PATCH /api/trips/:tripId/approve/:userId
+   */
+  approveRequest: async (tripId: string, userId: string): Promise<ApiResponse> => {
+    try {
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/${tripId}/approve/${userId}`,
+        { method: 'PATCH', credentials: 'include' }
+      );
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  /**
+   * PATCH /api/trips/:tripId/reject/:userId
+   */
+  rejectRequest: async (tripId: string, userId: string): Promise<ApiResponse> => {
+    try {
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/${tripId}/reject/${userId}`,
+        { method: 'PATCH', credentials: 'include' }
+      );
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  getMembers: async (tripId: string): Promise<ApiResponse> => {
+    try {
+      const response = await fetchWithTimeout(
+        `${API_URL}/trips/${tripId}/members`,
+        { credentials: 'include' }
+      );
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
   }
-    
+  
 };
 
 
@@ -576,6 +664,7 @@ export const voteAPI = {
     },
 
   };
+  
 // ============================================================================
 // EXPORTS
 // ============================================================================

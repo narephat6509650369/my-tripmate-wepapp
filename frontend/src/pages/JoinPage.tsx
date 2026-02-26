@@ -36,11 +36,10 @@ const JoinPage = () => {
     //login แล้ว → เริ่ม join
   const doJoin = async () => {
   try {
-  const res = await tripService.joinTrip(inviteCode);
-
+  const res = await tripService.requestToJoin(inviteCode);
   if (res.success) {
     navigate("/homepage", {
-      state: { joinSuccess: true }
+      state: { joinSuccess: false, joinPending: true }  // ← แสดงว่า "รออนุมัติ"
     });
   } else {
     navigate("/homepage", {
