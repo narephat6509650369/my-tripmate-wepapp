@@ -442,6 +442,26 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
           {/* Content — แสดงเมื่อ isAnalysisOpen */}
           {isAnalysisOpen && (
             <div className="p-4 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="flex-1 bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, ((matchingInfo.summary?.totalMembers || 0) / (trip.members?.length || 1)) * 100)}%`
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-blue-900 whitespace-nowrap">
+                    {matchingInfo.summary?.totalMembers || 0}/{trip.members?.length || 1} คน
+                  </span>
+                </div>
+                <p className="text-xs text-blue-700">
+                  {(matchingInfo.summary?.totalMembers || 0) >= (trip.members?.length || 1)
+                    ? '✅ ทุกคนเลือกวันแล้ว'
+                    : '⏳ รอสมาชิกคนอื่นเลือกวัน'}
+                </p>
+              </div>
               {matchingInfo.recommendation ? (
                 <div className={`border rounded-lg p-4 ${
                   matchingInfo.recommendation.isConsecutive

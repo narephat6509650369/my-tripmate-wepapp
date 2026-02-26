@@ -130,6 +130,30 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
           voteAPI.getBudgetVoting(trip.tripid),
           voteAPI.getLocationVote(trip.tripid),
         ]);
+        const dateData = dateRes?.data;
+        const budgetData = budgetRes?.data;
+        const locData = locRes?.data;
+
+        setSummaryData({
+          bestDates: dateData?.recommendation?.dates || [],
+          avgBudget: {
+            accommodation: Math.round(budgetData?.stats?.accommodation?.q2 || 0),
+            transport:     Math.round(budgetData?.stats?.transport?.q2 || 0),
+            food:          Math.round(budgetData?.stats?.food?.q2 || 0),
+            other:         Math.round(budgetData?.stats?.other?.q2 || 0),
+          },
+          topLocations: (locData?.locationVotesTotal || [])
+            .sort((a: any, b: any) => b.total_score - a.total_score)
+            .slice(0, 3)
+            .map((l: any) => ({ place: l.place, total_score: l.total_score })),
+          progress: {
+            dates:    dateData?.summary?.totalMembers || 0,
+            budget:   budgetData?.filledMembers || 0,
+            location: locData?.locationVotesTotal?.length
+              ? Math.max(...(locData.locationVotesTotal.map((r: any) => r.voteCount || 0)))
+              : 0,
+          }
+        });
       } catch (err) {
         console.error('Failed to load vote data', err);
       } finally {
@@ -166,6 +190,8 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   const totalAvgBudget = summaryData
     ? Object.values(summaryData.avgBudget).reduce((a, b) => a + b, 0)
     : 0;
+
+  const tripDuration = trip.numdays;
 
   const handleCopy = (key: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -292,7 +318,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
             {/* งบประมาณ */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-                <DollarSign className="w-3.5 h-3.5" /> งบประมาณเฉลี่ยกลุ่ม
+                <DollarSign className="w-3.5 h-3.5" /> งบประมาณเฉลี่ยแต่ละหมวดต่อ {tripDuration} วัน
               </p>
               {summaryData ? (
                 <div className="space-y-1.5">

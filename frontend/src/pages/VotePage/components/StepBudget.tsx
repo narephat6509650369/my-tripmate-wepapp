@@ -695,11 +695,46 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                                 : 50;
                               return (
                                 <div className="relative">
-                                  <div className="h-2 bg-gradient-to-r from-green-100 via-yellow-100 to-red-100 rounded-full">
+                                  <div className="relative h-2 bg-gradient-to-r from-green-100 via-yellow-100 to-red-100 rounded-full">
+                                    {(() => {
+                                      const range = stat.max - stat.min;
+                                      const avgPosition = range > 0
+                                        ? Math.max(5, Math.min(95, ((stat.avg - stat.min) / range) * 100))
+                                        : 50;
+                                      return (
+                                        <div
+                                          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 group cursor-pointer"
+                                          style={{ left: `${avgPosition}%` }}
+                                        >
+                                          {/* เส้นตั้ง */}
+                                          <div className="w-0.5 h-4 bg-gray-500 rounded-full" />
+                                          {/* Tooltip */}
+                                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                            <div className="bg-gray-700 text-white px-2 py-1 rounded text-xs whitespace-nowrap">
+                                              ค่าเฉลี่ย: ฿{formatCurrency(stat.avg)}
+                                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-700" />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
                                     <div
-                                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full border-2 border-white shadow"
-                                      style={{ left: `${position}%`, backgroundColor: color }}
-                                    />
+                                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group cursor-pointer"
+                                      style={{ left: `${position}%` }}
+                                    >
+                                      <div
+                                        className="w-3 h-3 rounded-full border-2 border-white shadow group-hover:scale-125 transition-transform"
+                                        style={{ backgroundColor: color }}
+                                      />
+                                      {/* Tooltip */}
+                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                        <div className="bg-gray-900 text-white px-2 py-1 rounded text-xs whitespace-nowrap">
+                                          คุณ: ฿{formatCurrency(stat.myValue)}
+                                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                                        </div>
+                                      </div>
+                                    </div>
+
                                   </div>
                                   <div className="flex justify-between text-xs text-gray-500 mt-1">
                                     <span>฿{formatCurrency(stat.min)}</span>
