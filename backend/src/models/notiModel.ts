@@ -50,8 +50,22 @@ export const getNotificationsByUserId = async (user_id: string) => {
     try {
         
         const [rows] = await connection.query(
-            `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC`,
-            [user_id]
+            `
+            SELECT 
+                n.notification_id,
+                n.trip_id,
+                n.notification_type,
+                n.title,
+                n.message,
+                n.is_read,
+                n.created_at,
+                n.read_at,
+                u.full_name
+            FROM notifications n
+            JOIN users u ON n.user_id = u.user_id
+            WHERE n.user_id = ?
+            ORDER BY n.created_at DESC
+            `,[user_id]
         );
         console.log("Notification rows:", rows);
 
