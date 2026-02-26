@@ -59,21 +59,10 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
       });
       setMyVote(newVote);
     }
-  }, [initialVotes]);
-
-  // Dev auto-fill
-  useEffect(() => {
-    if (import.meta.env.DEV && initialVotes.length === 0) {
-    const timer = setTimeout(() => {
-      if (trip.tripid === 'trip-003') {
-        setMyVote(['อุบลราชธานี', 'ขอนแก่น', 'นครราชสีมา']);
-      } else {
-        setMyVote(['เชียงใหม่', 'ภูเก็ต', 'กระบี่']);
-      }
-    }, 100);
-      return () => clearTimeout(timer);
+    if (initialVotes && initialVotes.length > 0) {
+      setHasSaved(true);
     }
-  }, []);
+  }, [initialVotes]);
 
   // Load voting results
   useEffect(() => {
@@ -177,6 +166,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       setHasSaved(true);
+      setIsAnalysisOpen(true);
 
       // Retry to get updated results
       let retries = 0;
