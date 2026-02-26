@@ -148,6 +148,10 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       });
     }
 
+    if (budgetInfo?.rows && budgetInfo.rows.length > 0) {
+      setHasSaved(true);
+    }
+
     setIsLoading(false);
   }, [budgetInfo]);
 
@@ -156,7 +160,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
   const handleSaveCategory = useCallback(async (category: keyof BudgetState) => {
     const amount = budget[category];
     const validation = validateBudget(amount);
-    if (!validation.valid) {
+    if (!validation.valid) {  
       alert(validation.error);
       return;
     }
@@ -222,8 +226,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
         setError(`บันทึกไม่สำเร็จสำหรับ: ${failedCategories}`);
         alert(`⚠️ บันทึกสำเร็จบางส่วน (${results.length - failures.length}/${results.length} หมวด)`);
       } else {
-        // ✅ เปลี่ยนจาก setJustSaved(true) เป็น setHasSaved(true) เหมือน StepVote
         setHasSaved(true);
+        setIsAnalysisOpen(true);
       }
     } catch (error) {
       console.error('Error saving budget:', error);
