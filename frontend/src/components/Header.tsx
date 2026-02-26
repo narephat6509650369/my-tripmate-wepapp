@@ -21,7 +21,8 @@ type NotificationType =
   | 'voting_closed'
   | 'trip_confirmed'
   | 'member_joined'
-  | 'member_removed';
+  | 'member_removed'
+  | 'trip_deleted';  
 
 interface Notification {
   id: string;
@@ -98,6 +99,8 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
         return <Users className="w-4 h-4 text-blue-400" />;
       case "member_removed":
         return <X className="w-4 h-4 text-red-400" />;
+      case "trip_deleted":
+        return <X className="w-4 h-4 text-red-500" />;
       default:
         return <Bell className="w-4 h-4 text-gray-500" />;
     }
@@ -176,6 +179,11 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
         type: "voting_closed" as NotificationType,
         text: "ผลโหวตเสร็จสิ้นแล้ว พร้อมยืนยันทริป 'ตราด 3 วัน 2 คืน'!",
         tripName: "ตราด 3 วัน 2 คืน"
+      },
+      {
+        type: "trip_deleted" as NotificationType,
+        text: "ทริป 'เชียงใหม่ 3 วัน 2 คืน' ถูกลบโดยผู้จัดการทริป",
+        tripName: "เชียงใหม่ 3 วัน 2 คืน"
       }
     ];
 
