@@ -10,6 +10,12 @@ export const notifyMemberJoined = async (trip_id: string,joinedUserId: string) =
   try {
     const members = await tripModel.getTripMembersWithEmail(trip_id);
 
+    const joinedUser = members.find(m => m.user_id === joinedUserId);
+    const joinedEmail = joinedUser?.email ?? joinedUserId;
+
+    const trip = await tripModel.findTripById(trip_id);
+    const tripName = trip?.trip_name ?? trip_id;
+
     const results = await Promise.all(
       members
         .filter(m => m.user_id !== joinedUserId)
@@ -19,7 +25,7 @@ export const notifyMemberJoined = async (trip_id: string,joinedUserId: string) =
             m.user_id,
             'member_joined',
             'A new member has joined your trip',
-            `User ${joinedUserId} joined trip ${trip_id}`
+            `${joinedEmail} joined trip ${tripName}`
           )
         )
 
