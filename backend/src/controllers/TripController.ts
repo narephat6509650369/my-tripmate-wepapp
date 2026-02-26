@@ -545,4 +545,5 @@ export const deleteMemberController = async (req: Request, res: Response) => {
   }
 };
 
+
 export default {addTripController, deleteTripController, getMyTripsController, joinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,deleteMemberController};
