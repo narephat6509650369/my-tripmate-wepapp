@@ -18,6 +18,7 @@ router.get("/:tripId/summary",auth,getTripSummaryController);
 // ดึงทริปทั้งหมดของผู้ใช้(เจ้าของ + เข้าร่วม)*  
 /* returns: { all, owned, joined } */
 router.get("/all-my-trips", auth, getMyTripsController);
+// router.get("/all-my-trips", auth, getMyTripsController);
 
 //เพิ่มทริปใหม่*
 
@@ -38,8 +39,5 @@ router.delete("/:tripId/members/:memberId", auth, removeMemberController);
 // ปิดทริป
 //router.patch("/:tripId/auto-close",auth,autoCloseController);
 router.patch("/:tripId/manual-close",auth,requireTripOwner,manualCloseController);
-
-
-
 
 export default router;
