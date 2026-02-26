@@ -44,6 +44,9 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
       prevDatesRef.current = newDatesStr;
       setSelectedDates(initialDates);
     }
+    if (initialDates && initialDates.length > 0) {
+      setHasSaved(true);
+    }
   }, [initialDates]);
 
   // ================= HANDLERS =================
@@ -73,8 +76,9 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
       }
       setJustSaved(true);
       setHasSaved(true);
+      setIsAnalysisOpen(true);
     } catch (err: any) {
-      console.error(err);
+      console.error(err); 
       alert(err?.response?.data?.message || "บันทึกไม่สำเร็จ");
     } finally {
       setLoading(false);
