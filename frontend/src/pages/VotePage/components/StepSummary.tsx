@@ -130,7 +130,6 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
           voteAPI.getBudgetVoting(trip.tripid),
           voteAPI.getLocationVote(trip.tripid),
         ]);
-        // ... map data เหมือนเดิม
       } catch (err) {
         console.error('Failed to load vote data', err);
       } finally {
