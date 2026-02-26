@@ -93,7 +93,7 @@ export const getTripDetail = async (tripId: string) => {
 
     const trip = await tripModel.getTripDetail(tripId);
 
-    console.log("getTripDetail",trip)
+    //console.log("getTripDetail",trip)
 
     if (!trip) {
       throw new Error("Trip not found");
@@ -109,9 +109,7 @@ export const getTripDetail = async (tripId: string) => {
 }
 
 
-/**
- * ลบทริป (เฉพาะ Owner + สถานะต้องเป็น 'planning')
- */
+
 export const deleteTripService = async (trip_id: string) => {
   // 1. เช็คสถานะก่อน
   const status = await tripModel.getTripStatus(trip_id);
@@ -195,36 +193,48 @@ export const joinTripByCode = async (invite_code: string, user_id: string) => {
 /**
  * ลบสมาชิกออกจากทริป (เฉพาะ Owner)
  */
-export const removeMemberService = async (params: {trip_id: string;member_id: string;owner_id: string;}) => {
-  const { trip_id, member_id, owner_id } = params;
-  
-  // 1. เช็คว่าผู้เรียกเป็น owner หรือไม่
+export const removeMemberService = async ( trip_id: string, member_id: string, owner_id: string ) => {
+
+  // ตรวจสอบว่าทริปมีอยู่จริง
   const trip = await tripModel.getTripDetail(trip_id);
-  
+
   if (!trip) {
     return { success: false, error: "ไม่พบทริป" };
   }
-  
+
+  // ตรวจสอบสิทธิ์ owner
   if (trip.owner_id !== owner_id) {
-    return { success: false, error: "เฉพาะเจ้าของทริปเท่านั้นที่ลบสมาชิกได้" };
+    return {
+      success: false,
+      error: "เฉพาะเจ้าของทริปเท่านั้นที่ลบสมาชิกได้"
+    };
   }
-  
-  // 2. เช็คว่าสมาชิกอยู่ในทริปหรือไม่
+
+  // ห้าม owner ลบตัวเอง
+  if (owner_id === member_id) {
+    return {
+      success: false,
+      error: "เจ้าของทริปไม่สามารถลบตัวเองได้"
+    };
+  }
+
+  // ตรวจสอบว่าสมาชิกอยู่ในทริป และยัง active อยู่
   const member = await tripModel.findMemberInTrip(trip_id, member_id);
-  
+
   if (!member) {
-    return { success: false, error: "ไม่พบสมาชิกในทริป" };
+    return {
+      success: false,
+      error: "ไม่พบสมาชิกในทริป"
+    };
   }
-  
-  // 3. ห้ามลบตัวเอง (Owner)
-  if (member.user_id === owner_id) {
-    return { success: false, error: "เจ้าของทริปไม่สามารถลบตัวเองได้" };
-  }
-  
-  // 4. ลบสมาชิก (Soft Delete + ลบ Availability)
+
+  // ทำ Soft Delete + ลบ availability ภายใน transaction
   await tripModel.removeMemberById(trip_id, member_id);
-  
-  return { success: true, message: "ลบสมาชิกสำเร็จ" };
+
+  return {
+    success: true,
+    message: "ลบสมาชิกสำเร็จ"
+  };
 };
 
 //
@@ -238,66 +248,98 @@ export const findById = async (tripId: string) => {
   return trip;
 }
 
-export async function getTripSummaryService(tripId: string,user_id: string) {
-  try{
+export type PromptTemplate =| "comprehensive"| "itinerary"| "budget"| "activities"| "accommodation";
 
-  const summary = await getTripSummaryById(tripId);
+export async function getTripSummaryService(tripId: string, user_id: string, template: PromptTemplate = "comprehensive") {
+  try {
+    const summary = await getTripSummaryById(tripId);
 
-  if (!summary) {
-    throw new Error("Trip not found");
-  }
-
-  // ตรวจสอบสิทธิ์: ต้องเป็นสมาชิก
-  const isMember = summary.members.some( (m: any) => m.user_id === user_id );
-
-  if (!isMember) {
-    throw new Error("FORBIDDEN");
-  }
-  //console.log("members:",summary.members);
-   
-  const getVoteNumber = await tripModel.getStatusVoteResult(tripId);
-  
-
-  const tripStatus = summary.trip.status;
-  //console.log("Trip Status:", tripStatus);
-  //เช็คสถานะทริป ถ้าเป็น planning จะยังไม่แสดงผลโหวต จนกว่าคนจะโหวเสร็จ
-  if (tripStatus === 'planning' ) {
-    return {
-      summary,
-      getVoteNumber
+    if (!summary) {
+      throw new Error("Trip not found");
     }
-  }
-  const budgetVotes = await voteService.getvoteBudget(tripId,user_id);
-  const locationResult = await voteService.getvoteLocation(tripId,user_id);
-  const dateOptions = await voteService.getvoteDate(tripId,user_id);
 
-  const { result, metadata } =
-  await PromptService.generate(
-    {
-      trip: summary.trip,
-      members: summary.members,
-      locationResult,
-      budgetResult: budgetVotes, 
-    },
-    {
-      template: "comprehensive",
-      model: "gpt-4",
-      structured: true,
+    // ตรวจสอบสิทธิ์: ต้องเป็นสมาชิก
+    const isMember = summary.members.some((m: any) => m.user_id === user_id);
+    if (!isMember) {
+      throw new Error("FORBIDDEN");
     }
-  );
 
-  return { 
-    summary, 
-    budgetVotes, 
-    locationResult, 
-    dateOptions,
-    aiSummary: result,
-    aiMeta: metadata, 
-  };
+    const getVoteNumber = await tripModel.getStatusVoteResult(tripId);
+    const tripStatus = summary.trip.status;
+
+    // ถ้ายังอยู่ระหว่างโหวต ยังไม่ต้องเรียก AI
+    if (tripStatus === "planning") {
+      return { summary, getVoteNumber };
+    }
+
+    // ดึงผลโหวตทั้งหมด
+    const [budgetVotes, locationResult, dateOptions] = await Promise.all([
+      voteService.getvoteBudget(tripId, user_id),
+      voteService.getvoteLocation(tripId, user_id),
+      voteService.getvoteDate(tripId, user_id),
+    ]);
+
+    // Map โครงสร้างให้ตรงกับที่ PromptService คาดหวัง
+    const mappedLocation = locationResult?.analysis?.winner
+      ? {
+        province_name: locationResult.analysis.winner.place,
+        vote_count: locationResult.analysis.winner.total_score,
+      }
+    : null;
+
+    const mappedBudget = budgetVotes?.stats
+      ? {
+        accommodation: budgetVotes.stats.accommodation?.q2 ?? 0,
+        transport: budgetVotes.stats.transport?.q2?? 0,
+        food: budgetVotes.stats.food?.q2?? 0,
+        other: 0,
+      }
+    : null;
+
+    const mappedDate = dateOptions?.recommendation
+      ? {
+        final_dates:  dateOptions.recommendation.dates ?? [],
+        voter_count:  dateOptions.summary?.totalMembers ?? 0,
+      }
+      : null;
+
+    // เรียก PromptService ด้วย mapped data
+    const { prompt, metadata } = PromptService.buildPromptWithMetadata(
+      {
+        trip: summary.trip,
+        members: summary.members,
+        locationResult: mappedLocation,
+        budgetResult: mappedBudget,
+        dateResult: mappedDate,
+      },
+      {
+        template: (template as PromptTemplate) || "comprehensive",
+        model: "gpt-4o-mini",
+        structured: true,
+        includeCOT: true,
+      }
+    );
+
+return {
+  summary,
+  getVoteNumber,
+  budgetVotes,
+  locationResult,
+  dateOptions,
+  aiSummary: prompt,  
+  aiMeta: metadata,
+};
 
   } catch (error) {
-    console.error("Get trip summary error:", error instanceof Error ? error.message : error);
-    throw new Error(error instanceof Error ? error.message : "An error occurred while fetching trip summary");
+    console.error(
+      "Get trip summary error:",
+      error instanceof Error ? error.message : error
+    );
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "An error occurred while fetching trip summary"
+    );
   }
 }
 

@@ -555,43 +555,73 @@ export const getTripMembersWithEmail = async (trip_id: string) => {
 
 
 // สมาชิกที่ออกจากทริปต้องไม่สามารถเข้าถึงข้อมูลโหวต/งบ/สถานที่ได้อีก
-export const removeMemberById = async (trip_id: string, member_id: string) => {
-  const connection = await pool.getConnection(); // ขอ Connection แยกเพื่อทำ Transaction
-  
-  try {
-    await connection.beginTransaction(); // เริ่มต้น Transaction
+export const removeMemberById = async (trip_id: string,member_id: string) => {
+  const connection = await pool.getConnection();
 
-    // 1. หา user_id จาก member_id ก่อน (เพราะตาราง availability ใช้ user_id)
+  try {
+    await connection.beginTransaction();
+
+    // 1️หา user_id จาก member_id
     const [rows] = await connection.query<RowDataPacket[]>(
-      `SELECT user_id FROM trip_members WHERE member_id = ? AND trip_id = ?`,
+      `SELECT user_id 
+        FROM trip_members 
+        WHERE member_id = ? AND trip_id = ?`,
       [member_id, trip_id]
     );
 
-    if (rows.length === 0) {
-       throw new Error("Member not found");
-    }
-    const user_id = rows[0]?.user_id;
+    const memberRow = rows[0];
 
-    // 2. Soft Delete สมาชิก (Active = 0)
+    if (!memberRow) {
+     throw new Error("Member not found");
+    }
+
+    const user_id = memberRow.user_id;
+
+    // Soft delete สมาชิก
     await connection.query(
-      `UPDATE trip_members SET is_active = 0 WHERE trip_id = ? AND member_id = ?`,
+      `UPDATE trip_members 
+       SET is_active = 0 
+       WHERE trip_id = ? AND member_id = ?`,
       [trip_id, member_id]
     );
 
-    
+    // 3ลบ date availability
+    await connection.query(
+      `DELETE FROM date_votes 
+       WHERE trip_id = ? AND user_id = ?`,
+      [trip_id, user_id]
+    );
 
-    await connection.commit(); // บันทึกทุกอย่าง
-    return { success: true, message: "Member removed and availability cleared" };
+    // ลบ budget vote
+    await connection.query(
+      `DELETE FROM budget_votes 
+       WHERE trip_id = ? AND user_id = ?`,
+      [trip_id, user_id]
+    );
+
+    // ลบ location vote
+    await connection.query(
+      `DELETE FROM location_votes 
+       WHERE trip_id = ? AND user_id = ?`,
+      [trip_id, user_id]
+    );
+
+    await connection.commit();
+
+    return {
+      success: true,
+      message: "Member removed and related data cleared"
+    };
 
   } catch (error) {
-    await connection.rollback(); // ถ้าพัง ให้ยกเลิกทั้งหมด (Data จะไม่แหว่ง)
+    await connection.rollback();
     throw error;
   } finally {
-    connection.release(); // คืน Connection
+    connection.release();
   }
 };
 
-// หาข้อมูลทริปจาก Invite Code (สำหรับ FR2.10)
+// หาข้อมูลทริปจาก Invite Code 
 export const getTripByInviteCode = async (invite_code: string) => {
     const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT trip_id, trip_name, status FROM trips WHERE invite_code = ?`,
