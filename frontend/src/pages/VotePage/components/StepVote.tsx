@@ -39,15 +39,28 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
   }, [matchingData]);
 
   useEffect(() => {
-    const newDatesStr = JSON.stringify([...(initialDates || [])].sort());
-    if (initialDates?.length && newDatesStr !== prevDatesRef.current) {
-      prevDatesRef.current = newDatesStr;
-      setSelectedDates(initialDates);
-    }
-    if (initialDates && initialDates.length > 0) {
+    if (initialDates?.length) {
+      const normalized = initialDates.map(d => d.slice(0, 10));
+      
+      const newDatesStr = JSON.stringify([...normalized].sort());
+      if (newDatesStr !== prevDatesRef.current) {
+        prevDatesRef.current = newDatesStr;
+        setSelectedDates(normalized);
+
+        const firstDate = [...normalized].sort()[0];
+        if (firstDate) {
+          const d = new Date(firstDate);
+          setCalendarMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+        }
+      }
       setHasSaved(true);
     }
   }, [initialDates]);
+
+  useEffect(() => {
+    console.log("initialDates:", initialDates);
+    console.log("selectedDates:", selectedDates);
+  }, [initialDates, selectedDates]);
 
   // ================= HANDLERS =================
 
