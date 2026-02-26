@@ -32,6 +32,7 @@ interface Notification {
   timestamp: Date;
   tripId?: string;
   tripName?: string;
+  subText?: string;
 }
 
 // ============================================================================
@@ -66,8 +67,9 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
             id: n.notification_id,
             type: n.notification_type,
             text: n.message || n.title,
+            subText: n.email,
             read: Boolean(n.is_read),
-            timestamp: new Date(n.created_at),
+            timestamp: new Date(new Date(n.created_at).getTime() + 7 * 60 * 60 * 1000),
             tripId: n.trip_id,
           })));
         }
@@ -322,6 +324,9 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
                             <p className={`${item.read ? "text-gray-700" : "font-medium text-gray-900"} text-sm`}>
                               {item.text}
                             </p>
+                            {item.subText && (
+                              <p className="text-xs text-blue-500 mt-0.5">{item.subText}</p>
+                            )}
                             <p className="text-xs text-gray-500 mt-1">
                               {formatRelativeTime(item.timestamp.getTime())}
                             </p>
