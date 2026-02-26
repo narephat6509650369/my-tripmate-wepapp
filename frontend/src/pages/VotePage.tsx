@@ -47,6 +47,12 @@ const VotePage: React.FC = () => {
     return diffDays >= 7;
   };
 
+  const [stepCompleted, setStepCompleted] = useState({
+    2: false, // วันที่
+    3: false, // งบประมาณ
+    4: false, // สถานที่
+  });
+
   // ============== LOAD TRIP DATA ==============
   useEffect(() => {
     const loadTripData = async () => {
@@ -85,6 +91,7 @@ const VotePage: React.FC = () => {
           const hasDates = dateRes?.data?.rowlog?.some(
             (r: any) => r.proposed_by === user?.user_id
           );
+          if (hasDates) setStepCompleted(prev => ({ ...prev, 2: true }));
 
           // ========== งบประมาณ ==========
           const budgetRes = await voteAPI.getBudgetVoting(tripData.tripid);
@@ -92,12 +99,14 @@ const VotePage: React.FC = () => {
           const hasBudget = budgetRes?.data?.rows?.some(
             (r: any) => r.user_id === user?.user_id
           );
+          if (hasBudget) setStepCompleted(prev => ({ ...prev, 3: true }));
 
           // ========== จังหวัด ==========
           const locRes = await voteAPI.getLocationVote(tripData.tripid);
           const hasPlace = locRes?.data?.rowlog?.some(
             (r: any) => r.proposed_by === user?.user_id
           );
+          if (hasPlace) setStepCompleted(prev => ({ ...prev, 4: true }));
           if (locRes?.data?.rowlog && user?.user_id) {
             const myVotes = locRes.data.rowlog
               .filter((log: any) => log.proposed_by === user.user_id)
@@ -178,6 +187,7 @@ const VotePage: React.FC = () => {
       if (response.success) {
         console.log('✅ บันทึกวันที่สำเร็จ');
         setUserDates(dates);
+        setStepCompleted(prev => ({ ...prev, 2: true }));
       } else {
         throw new Error(response.message);
       }
@@ -200,6 +210,7 @@ const VotePage: React.FC = () => {
       
       if (response.success) {
         console.log('บันทึกงบประมาณสำเร็จ');
+        setStepCompleted(prev => ({ ...prev, 3: true }));
       } else {
         throw new Error(response.message);
       }
@@ -223,6 +234,7 @@ const VotePage: React.FC = () => {
         score: v.score
       }));
       setUserLocations(updatedLocations);
+      setStepCompleted(prev => ({ ...prev, 4: true }));
       } else {
         throw new Error(response.message);
       }
@@ -246,6 +258,11 @@ const VotePage: React.FC = () => {
   const back = () => { 
     if (step > 2) setStep(step - 1); 
   };
+
+  const isNextDisabled =  
+    step === 5 || 
+    isClosed || 
+    (step >= 2 && step <= 4 && !stepCompleted[step as keyof typeof stepCompleted]);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -438,7 +455,7 @@ const VotePage: React.FC = () => {
             <StepPlace
               trip={trip}
               onVote={handleVoteLocation}
-              initialVotes={userLocations}
+              initialVotes={userLocations}  
               initialVotingResults={userLocations}
               isLocked={isClosed}
             />
@@ -471,13 +488,18 @@ const VotePage: React.FC = () => {
           </button>
           <button 
             onClick={next}
-            disabled={step === stepLabels.length || isClosed}
+            disabled={isNextDisabled}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 px-4 sm:px-6 rounded-xl text-white font-semibold text-sm sm:text-base transition-all shadow-lg hover:shadow-xl min-h-[48px]"
           >
             <span className="hidden sm:inline">หน้าถัดไป →</span>
             <span className="sm:hidden">ถัดไป →</span>
           </button>
         </div>
+        {step >= 2 && step <= 4 && !stepCompleted[step as keyof typeof stepCompleted] && (
+          <p className="text-center text-xs text-orange-500 mt-2">
+            ⚠️ กรุณากรอกข้อมูลและบันทึกก่อนไปขั้นตอนถัดไป
+          </p>
+        )}
       </main>
       {/* Delete Confirm Modal */}
       {showDeleteConfirm && (
