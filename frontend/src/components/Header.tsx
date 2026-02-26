@@ -54,6 +54,8 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const [, forceUpdate] = useState(0);
+
   useEffect(() => {
     const fetchNoti = async () => {
       try {
@@ -73,6 +75,13 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
       }
     };
     fetchNoti();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceUpdate(n => n + 1);
+    }, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const getNotificationIcon = (type: NotificationType) => {
