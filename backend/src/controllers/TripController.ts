@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { getUserTrips, joinTripByCode, removeMemberService, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate} from "../services/tripService.js";
+import { getUserTrips, joinTripByCode, removeMemberService, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate, getMemberService} from "../services/tripService.js";
 import voteService from "../services/voteService.js";
 
 //เพิ่มสมาชิก
@@ -132,7 +132,6 @@ export const joinTripController = async (req: Request, res: Response) => {
   try {
     const { invite_code } = req.body;
     const user_id = req.user?.user_id;
-    //console.log("Join trip request - user_id:", user_id, "invite_code:", invite_code);
 
     if (!user_id) {
       return res.status(401).json({
@@ -152,9 +151,6 @@ export const joinTripController = async (req: Request, res: Response) => {
     }
 
     const result = await joinTripByCode(invite_code, user_id);
-    //console.log("Join trip result:", result);
-    //console.log("result.success:",result.success)
-
 
     if (!result.success) {
       return res.status(400).json({
@@ -164,35 +160,35 @@ export const joinTripController = async (req: Request, res: Response) => {
       });
     }
 
+    // extract จาก result.message
+    const tripData = result.message as {
+      trip_id: string;
+      trip_name: string;
+      rejoined: boolean;
+      text: string;
+    };
+
     return res.status(200).json({
       success: true,
       code: "TRIP_JOINED",
-      message: "Joined trip successfully",
+      message: tripData.text,
       data: {
-        tripId: result.trip_id,
-        tripName: result.trip_name
+        tripId: tripData.trip_id,
+        tripName: tripData.trip_name,
+        rejoined: tripData.rejoined
       }
     });
 
   } catch (error: any) {
-    let code = "INTERNAL_ERROR";
-    let message = "Cannot join trip";
+    console.error("joinTripController error:", error);
 
-    if (error.message === "Invalid invite code") {
-      code = "TRIP_NOT_FOUND";
-      message = "ไม่พบห้อง (รหัสผิด)";
-    }
-
-    if (error.message.includes("already a member")) {
-      code = "TRIP_ALREADY_MEMBER";
-      message = "คุณเป็นสมาชิกอยู่แล้ว";
-    }
-
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
-      code,
-      message,
-      error: { detail: error.message }
+      code: "INTERNAL_ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Cannot join trip"
     });
   }
 };
@@ -545,5 +541,60 @@ export const deleteMemberController = async (req: Request, res: Response) => {
   }
 };
 
+export const getMemberController = async (req: Request, res: Response) => {
+  try {
+    const { tripId } = req.params;
+    const ownerId = req.user?.user_id;
+
+    if (!ownerId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        message: "Trip ID is required"
+      });
+    }
+
+    const result = await getMemberService(tripId, ownerId);
+
+    // check success ก่อน
+    if (!result.success) {
+      return res.status(403).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+    // ตอนนี้ TypeScript รู้ว่า result เป็น { success: true; data: TripMember[] }
+    if (result.data.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No members in this trip."
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Get Member from Owner success",
+      data: result.data
+    });
+
+  } catch (error) {
+    console.error("getMemberController error:", error);
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to find member"
+    });
+  }
+};
 
 export default {addTripController, deleteTripController, getMyTripsController, joinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,deleteMemberController};

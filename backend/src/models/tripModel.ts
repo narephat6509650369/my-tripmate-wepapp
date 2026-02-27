@@ -528,8 +528,20 @@ export const findMemberInTrip = async (trip_id: string, member_id: string) => {
 
 export const getTripMembers = async (trip_id: string) => {
   const [rows] = await pool.query<TripMember[]>(
-    `SELECT * FROM trip_members WHERE trip_id = ? AND is_active = 1`,
-    [trip_id]
+    `
+    SELECT 
+      tm.member_id,
+      tm.trip_id,
+      tm.user_id,
+      tm.role,
+      tm.joined_at,
+      tm.is_active,
+      u.full_name
+    FROM trip_members tm
+    JOIN users u ON tm.user_id = u.user_id
+    WHERE tm.trip_id = ?
+    AND tm.is_active = 1;
+    `,[trip_id]
   );
   return rows;
 }
@@ -740,7 +752,6 @@ export const getStatusVoteResult = async (trip_id: string) => {
       WHERE lvt.trip_id = ?
     `;
 
-    // 🔥 รันพร้อมกันทั้งหมด
     const [
       totalMembersResult,
       dateResult,
@@ -817,6 +828,8 @@ export const getTripMemberCount = async (trip_id: string): Promise<number> => {
 
   return rows.length > 0 ? rows[0]?.member_count : 0;
 };
+
+
 
 
 export default {
