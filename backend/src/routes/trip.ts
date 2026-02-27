@@ -1,5 +1,5 @@
 import express from 'express';
-import { addTripController, getMyTripsController, deleteTripController,joinTripController, removeMemberController, getTripDetailController, getTripSummaryController, manualCloseController} from "../controllers/TripController.js";
+import { addTripController, getMyTripsController, deleteTripController,joinTripController, removeMemberController, getTripDetailController, getTripSummaryController, manualCloseController,getMemberController} from "../controllers/TripController.js";
 import { auth } from "../middleware/auth.js"
 import { requireTripOwner ,requireTripMember} from "../middleware/role.js"
 
@@ -33,6 +33,9 @@ router.get("/:tripId", auth, getTripDetailController);
 
 // Owner ลบสมาชิกออกจากทริป  
 router.delete("/:tripId/members/:memberId", auth, removeMemberController);
+
+// Owner ดึงสมาชิกจากทริป
+router.get("/:tripId/get-members",auth,getMemberController);
 
 
 // ปิดทริป
