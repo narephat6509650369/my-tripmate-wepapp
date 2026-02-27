@@ -49,7 +49,7 @@ const VotePage: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [panelTab, setPanelTab] = useState<'pending' | 'members'>('pending');
-  const [members, setMembers] = useState<{user_id: string, full_name: string, email: string}[]>([]);
+  const [members, setMembers] = useState<{user_id: string, member_id: string, full_name: string, email: string}[]>([]);
 
   const displayCode = inviteCode || tripCode;
   const isClosed = trip?.status === 'completed' || trip?.status === 'archived';
@@ -242,12 +242,12 @@ const VotePage: React.FC = () => {
     }
   };
 
-  const handleRemoveMember = async (userId: string) => {
+  const handleRemoveMember = async (memberId: string) => {
     if (!trip) return;
     try {
-      const res = await tripAPI.removeMember(trip.tripid, userId);
+      const res = await tripAPI.removeMember(trip.tripid, memberId);
       if (res.success) {
-        setMembers(prev => prev.filter(m => m.user_id !== userId));
+        setMembers(prev => prev.filter(m => m.member_id !== memberId));
       } else {
         alert(res.message || 'ลบสมาชิกไม่สำเร็จ');
       }
@@ -684,7 +684,7 @@ const VotePage: React.FC = () => {
                       </div>
                       {member.user_id !== user?.user_id && (
                         <button
-                          onClick={() => handleRemoveMember(member.user_id)}
+                          onClick={() => handleRemoveMember(member.member_id)}
                           className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition flex-shrink-0"
                           title="ลบสมาชิก"
                         >

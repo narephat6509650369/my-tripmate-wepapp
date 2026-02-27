@@ -380,7 +380,7 @@ return data;
   getMembers: async (tripId: string): Promise<ApiResponse> => {
     try {
       const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripId}/members`,
+        `${API_URL}/trips/${tripId}/get-members`,
         { credentials: 'include' }
       );
       return await response.json();
