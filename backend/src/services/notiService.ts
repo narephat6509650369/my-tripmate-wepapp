@@ -166,7 +166,7 @@ export const notifyTripCompleted = async (trip_id: string) => {
 export const getUserNotifications = async (user_id: string) => {
     try {
         const result = await notiModel.getNotificationsByUserId(user_id);
-        console.log("results:",result);
+        //console.log("results:",result);
         if (result.success) {
             return {
                 success: true,
@@ -274,6 +274,184 @@ export const deleteNotification = async (noti_Id: string,user_id: string) => {
   }
 };
 
+export const notifyOwnerJoinRequest = async (trip_id: string,requestUserId: string) => {
+
+  try {
+    if(!trip_id){
+
+    }
+    // หา owner
+    const owner = await tripModel.getTripOwner(trip_id);
+
+    if (!owner.user_id) {
+      return {
+        success: false,
+        message: "Owner not found"
+      };
+    }
+
+    // create notification
+    const result = await notiModel.createNotification(
+      trip_id,
+      owner.user_id,
+      "member_joined", // หรือจะเพิ่ม enum ใหม่ "join_request" ก็ได้
+      "New join request",
+      `User ${requestUserId} requested to join your trip`
+    );
+
+    if (!result.success) {
+      return result;
+    }
+
+    // optional: send email
+    if (owner.email) {
+
+      await sendEmail(
+        owner.email,
+        "TripMate - New Join Request",
+        "Someone requested to join your trip",
+        `
+          <p>Hello ${owner.full_name}</p>
+          <p>User requested to join your trip.</p>
+        `
+      );
+
+    }
+
+    return {
+      success: true,
+      message: "Owner notified successfully"
+    };
+
+  } catch (error) {
+
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Error notifying owner"
+    };
+
+  }
+
+};
+
+export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
+
+  try {
+
+    const member =
+      await tripModel.getMemberWithEmail(trip_id, user_id);
+
+    if (!member) {
+      return {
+        success: false,
+        message: "Member not found"
+      };
+    }
+
+    const result = await notiModel.createNotification(
+      trip_id,
+      user_id,
+      "member_joined",
+      "Join request approved",
+      "Your request to join the trip has been approved"
+    );
+
+    if (!result.success) {
+      return result;
+    }
+
+    if (member.email) {
+
+      await sendEmail(
+        member.email,
+        "TripMate - Request Approved",
+        "Your join request has been approved",
+        `
+          <p>Hello ${member.full_name}</p>
+          <p>Your join request has been approved.</p>
+        `
+      );
+
+    }
+
+    return {
+      success: true
+    };
+
+  } catch (error) {
+
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Error notifying approved member"
+    };
+
+  }
+
+};
+
+export const notifyMemberRejected = async (trip_id: string,user_id: string) => {
+
+  try {
+
+    const member =
+      await tripModel.getMemberWithEmail(trip_id, user_id);
+
+    if (!member) {
+      return {
+        success: false,
+        message: "Member not found"
+      };
+    }
+
+    const result = await notiModel.createNotification(
+      trip_id,
+      user_id,
+      "member_removed",
+      "Join request rejected",
+      "Your join request has been rejected"
+    );
+
+    if (!result.success) {
+      return result;
+    }
+
+    if (member.email) {
+
+      await sendEmail(
+        member.email,
+        "TripMate - Request Rejected",
+        "Your join request has been rejected",
+        `
+          <p>Hello ${member.full_name}</p>
+          <p>Your join request has been rejected.</p>
+        `
+      );
+
+    }
+
+    return {
+      success: true
+    };
+
+  } catch (error) {
+
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Error notifying rejected member"
+    };
+
+  }
+
+};
 
 export default {
     notifyMemberJoined,
@@ -283,5 +461,8 @@ export default {
     markNotificationAsRead,
     getUserNotifications,
     getUnreadCount,
-    deleteNotification
+    deleteNotification,
+    notifyMemberApproved,
+    notifyOwnerJoinRequest,
+    notifyMemberRejected
 };
