@@ -211,6 +211,7 @@ export async function findAllTripsByUserId(user_id: string): Promise<TripSummary
     `;
     
     const [rows] = await pool.query<TripSummary[]>(sql, [user_id]);
+
     return rows;
 }
 
@@ -916,7 +917,7 @@ export const addPendingMember = async (trip_id: string, user_id: string) => {
   }
 };
 
-export const approveMember = async (trip_id: string,user_id: string) => {
+export const approveMemberModel = async (trip_id: string,user_id: string) => {
 
   let connection;
 
@@ -983,7 +984,7 @@ export const getPendingMembers = async (trip_id: string) => {
         tm.member_id,
         tm.user_id,
         u.full_name,
-        u.profile_image,
+        u.avatar_url,
         tm.joined_at
       FROM trip_members tm
       JOIN users u ON u.user_id = tm.user_id
@@ -1178,7 +1179,7 @@ export default {
     updateTripStatus,
     getTripMembersWithEmail,
     addPendingMember,
-    approveMember,
+    approveMemberModel,
     getPendingMembers,
     rejectMember,
     getTripOwner,

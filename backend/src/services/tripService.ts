@@ -224,7 +224,7 @@ export const requestJoinTripByCode = async (invite_code: string,user_id: string)
     if (existing?.status === "pending") {
       return {
         success: false,
-        message: "คุณส่งคำขอไปแล้ว กรุณารอ Owner อนุมัติ"
+        message: "คุณส่งคำขอไปแล้ว กรุณารอ เจ้าของทริป อนุมัติ"
       };
     }
 
@@ -268,6 +268,7 @@ export const getPendingRequests = async (trip_id: string, user_id: string) => {
   try {
 
     const pending = await tripModel.getPendingMembers(trip_id);
+    console.log("pending",pending);
 
     return {
       success: true,
@@ -295,7 +296,8 @@ export const approveMember = async (trip_id: string,user_id: string,owner_id: st
 
     // check owner permission
     const owner = await tripModel.getTripOwner(trip_id);
-
+    console.log("owner.user_id",owner.user_id);
+    console.log("owner_id",owner_id);
     if (owner.user_id !== owner_id) {
 
       return {
@@ -305,7 +307,9 @@ export const approveMember = async (trip_id: string,user_id: string,owner_id: st
 
     }
 
-    await tripModel.approveMember(trip_id,user_id);
+    console.log("Member:",user_id);
+
+    await tripModel.approveMemberModel(trip_id,user_id);
 
     await notiService.notifyMemberApproved(trip_id,user_id);
 

@@ -273,7 +273,7 @@ export const approveMemberController = async (req: Request,res: Response) => {
     if (!userId) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized"
+        message: "Member ID Require"
       });
     }
 
@@ -283,6 +283,8 @@ export const approveMemberController = async (req: Request,res: Response) => {
         message: "Unauthorized"
       });
     }
+
+    console.log("userId",userId);
 
     const result = await approveMember(tripId,userId,owner_id);
 
@@ -521,6 +523,8 @@ export const getTripDetailController = async (req: Request, res: Response) => {
     }
 
     const response = await getTripDetail(tripId);
+    console.log("response:",response)
+    console.log("response:",response.data)
 
     if (!response.success) {
       return res.status(404).json({

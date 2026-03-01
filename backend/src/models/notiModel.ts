@@ -60,9 +60,12 @@ export const getNotificationsByUserId = async (user_id: string) => {
                 n.is_read,
                 n.created_at,
                 n.read_at,
-                u.full_name
+                u.full_name,
+                u.email,
+                t.trip_name
             FROM notifications n
             JOIN users u ON n.user_id = u.user_id
+            JOIN trips t ON n.trip_id = t.trip_id
             WHERE n.user_id = ?
             ORDER BY n.created_at DESC
             `,[user_id]
