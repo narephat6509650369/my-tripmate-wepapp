@@ -67,7 +67,7 @@ export const getNotificationsByUserId = async (user_id: string) => {
             ORDER BY n.created_at DESC
             `,[user_id]
         );
-        console.log("Notification rows:", rows);
+        //console.log("Notification rows:", rows);
 
         return {
             success: true,

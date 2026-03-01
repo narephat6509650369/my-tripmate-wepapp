@@ -38,7 +38,8 @@ export const addTrip = async (owner_id: string,trip_name: string,description: st
     // 5. return success
     return {
       success: true,
-      message: {
+      message: "สร้างทริปสำเร็จ",
+      data: {
         trip_id,
         owner_id,
         trip_name,
@@ -48,7 +49,7 @@ export const addTrip = async (owner_id: string,trip_name: string,description: st
         invite_link,
         status: "planning"
       }
-    };
+};
 
   } catch (error) {
     console.error("addTrip service error:", error);
@@ -68,7 +69,7 @@ export const addTrip = async (owner_id: string,trip_name: string,description: st
  */
 export const getUserTrips = async (user_id: string) => {
   try{
-
+    //เอาไว้เช็คว่าครบ 7ิ วันรึยังถ้าครบก็ปิด trip เลย
     await autoCloseEligibleTripsForUser(user_id);
 
     // ดึงทริปทั้งหมด
@@ -79,9 +80,13 @@ export const getUserTrips = async (user_id: string) => {
     const joined = allTrips.filter(t => t.role === 'member');
   
     return {
-      all: allTrips,
-      owned,
-      joined
+      success: true,
+      message: "โหลดข้อมูลทริปสำเร็จแล้ว",
+      data: {
+        all: allTrips,
+        owned,
+        joined
+      }
     };
 
   } catch (error) {
@@ -111,12 +116,18 @@ export const getTripDetail = async (tripId: string) => {
     const trip = await tripModel.getTripDetail(tripId);
 
     //console.log("getTripDetail",trip)
-
-    if (!trip) {
-      throw new Error("Trip not found");
+ if (!trip) {
+      return {
+        success: false,
+        message: "ไม่พบทริป"
+      };
     }
-    
-    return trip;
+
+    return {
+      success: true,
+      message: "ดึงข้อมูลรายละเอียดทริปสำเร็จแล้ว",
+      data: trip
+    };
   }
   
   catch (error) {
@@ -170,6 +181,189 @@ export const deleteTripService = async (trip_id: string) => {
 /**
  * เข้าร่วมทริปด้วยรหัสเชิญ
  */
+export const requestJoinTripByCode = async (invite_code: string,user_id: string) => {
+
+  try {
+
+    const trip = await tripModel.getTripByInviteCode(invite_code);
+
+    if (!trip) {
+      return {
+        success: false,
+        message: "Invalid invite code"
+      };
+    }
+
+    // check trip closed
+    if (
+      trip.status === "archived" ||
+      trip.status === "completed" ||
+      trip.status === "confirmed"
+    ) {
+      return {
+        success: false,
+        message: "ทริปนี้ปิดรับสมาชิกแล้ว"
+      };
+    }
+
+    const members = await tripModel.getTripMembers(trip.trip_id);
+
+    const existing = members.find(
+      m => m.user_id === user_id
+    );
+
+    // already active
+    if (existing?.status === "active") {
+      return {
+        success: false,
+        message: "คุณเป็นสมาชิกอยู่แล้ว"
+      };
+    }
+
+    // already pending
+    if (existing?.status === "pending") {
+      return {
+        success: false,
+        message: "คุณส่งคำขอไปแล้ว กรุณารอ Owner อนุมัติ"
+      };
+    }
+
+    // rejected before → allow request again
+    if (existing?.status === "rejected") {
+
+      await tripModel.updateMemberStatus(trip.trip_id,user_id,"pending");
+
+    } else {
+
+      // create pending member
+      await tripModel.addPendingMember(trip.trip_id,user_id);
+
+    }
+
+    // notify owner
+    await notiService.notifyOwnerJoinRequest(trip.trip_id,user_id);
+
+    return {
+      success: true,
+      message: "ส่งคำขอเข้าร่วมสำเร็จ กรุณารอ Owner อนุมัติ",
+      trip_id: trip.trip_id,
+      trip_name: trip.trip_name
+    };
+
+  } catch (error) {
+
+    console.error("requestJoinTripByCode error:", error);
+
+    return {
+      success: false,
+      message: "Cannot request join trip"
+    };
+
+  }
+
+};
+
+export const getPendingRequests = async (trip_id: string, user_id: string) => {
+
+  try {
+
+    const pending = await tripModel.getPendingMembers(trip_id);
+
+    return {
+      success: true,
+      message: "ดึงรายการคำขอเข้าร่วมทริปสำเร็จแล้ว",
+      data: pending
+    };
+
+  } catch (error) {
+
+    console.error("getPendingRequests error:", error);
+
+   return {
+    success: false,
+    message: "ไม่สามารถดึงคำขอเข้าร่วมทริปได้",
+    data: []
+  };
+
+  }
+
+};
+
+export const approveMember = async (trip_id: string,user_id: string,owner_id: string) => {
+
+  try {
+
+    // check owner permission
+    const owner = await tripModel.getTripOwner(trip_id);
+
+    if (owner.user_id !== owner_id) {
+
+      return {
+        success: false,
+        message: "เฉพาะเจ้าของทริปเท่านั้นที่สามารถอนุมัติสมาชิกได้"
+      };
+
+    }
+
+    await tripModel.approveMember(trip_id,user_id);
+
+    await notiService.notifyMemberApproved(trip_id,user_id);
+
+    return {
+      success: true,
+      message: "อนุมัติสำเร็จ"
+    };
+
+  } catch (error) {
+
+    console.error("approveMember error:", error);
+
+    return {
+      success: false,
+      message: "Approve failed"
+    };
+
+  }
+
+};
+
+export const rejectMember = async (trip_id: string,user_id: string,owner_id: string) => {
+
+  try {
+
+   const owner = await tripModel.getTripOwner(trip_id);
+
+  if (owner.user_id !== owner_id) {
+
+      return {
+        success: false,
+        message: "เฉพาะเจ้าของทริปเท่านั้นที่สามารถปฏิเสธสมาชิกได้"
+      };
+
+    }
+
+    await tripModel.rejectMember(trip_id,user_id);
+
+    await notiService.notifyMemberRejected(trip_id,user_id);
+
+    return {
+      success: true,
+      message: "ปฏิเสธสำเร็จ"
+    };
+
+  } catch (error) {
+
+    console.error("rejectMember error:", error);
+
+    return {
+      success: false,
+      message: "Reject failed"
+    };
+
+  }
+
+};
+/*
 export const joinTripByCode = async (invite_code: string, user_id: string) => {
   try {
     const trip = await tripModel.getTripByInviteCode(invite_code);
@@ -248,7 +442,7 @@ export const joinTripByCode = async (invite_code: string, user_id: string) => {
     };
   }
 };
-
+*/
 
 /**
  * ลบสมาชิกออกจากทริป (เฉพาะ Owner)
@@ -297,7 +491,7 @@ export const removeMemberService = async ( trip_id: string, member_id: string, o
   };
 };
 
-//
+/*
 export const TripDetail = async (tripCode: string) => {
   const trip = await tripModel.getTripDetail(tripCode);
   return trip;
@@ -307,7 +501,7 @@ export const findById = async (tripId: string) => {
   const trip = await tripModel.findTripById(tripId);
   return trip;
 }
-
+*/
 export type PromptTemplate =| "comprehensive"| "itinerary"| "budget"| "activities"| "accommodation";
 
 export async function getTripSummaryService(tripId: string, user_id: string, template: PromptTemplate = "comprehensive") {
@@ -319,7 +513,8 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
     }
 
     // ตรวจสอบสิทธิ์: ต้องเป็นสมาชิก
-    const isMember = summary.members.some((m: any) => m.user_id === user_id);
+    const isMember = summary.members.some((m: any) =>m.user_id === user_id &&m.is_active === 1 &&m.status === "active");
+    
     if (!isMember) {
       throw new Error("FORBIDDEN");
     }
@@ -380,15 +575,19 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
       }
     );
 
-return {
-  summary,
-  getVoteNumber,
-  budgetVotes,
-  locationResult,
-  dateOptions,
-  aiSummary: prompt,  
-  aiMeta: metadata,
-};
+  return {
+  success: true,
+  message: "ดึงข้อมูลสรุปทริปสำเร็จแล้ว",
+  data: {
+    summary,
+    getVoteNumber,
+    budgetVotes,
+    locationResult,
+    dateOptions,
+    aiSummary: prompt,
+    aiMeta: metadata,
+  }
+  };
 
   } catch (error) {
     console.error(
@@ -471,9 +670,9 @@ export const closeTripService = async (tripId: string,type: string,user_id?: str
   // MANUAL CLOSE 
   else if (type === "manual") {
 
-    const ownerId = await tripModel.getTripOwnerId(tripId);
+    const owner = await tripModel.getTripOwner(tripId);
 
-    if (user_id === ownerId) {
+    if (user_id === owner.user_id) {
 
       await closeTrip(tripId, "confirmed");
 
@@ -500,14 +699,15 @@ export const closeTripService = async (tripId: string,type: string,user_id?: str
 
 export const getMemberService = async (tripId: string,ownerId: string): Promise<GetMemberServiceResponse> => {
   try {
-    const owner = await tripModel.getTripOwnerId(tripId);
 
-    if (!owner) {
+    if (!tripId) {
       return {
         success: false,
         message: "Trip not found"
       };
     }
+
+    const owner = await tripModel.getTripOwner(tripId);
 
     if (owner !== ownerId) {
       return {
@@ -547,13 +747,22 @@ export default {
   addTrip,
   getUserTrips,
   deleteTripService,
-  joinTripByCode,
   removeMemberService,
-  TripDetail,
-  findById,
+
   getTripDetail,
   getTripSummaryService,
   closeTripService,
-  getMemberService
+  getMemberService,
+  requestJoinTripByCode,
+  rejectMember,
+  approveMember,
+  getPendingRequests,
+  
 };
 
+<<<<<<< HEAD
+=======
+
+ // TripDetail,
+ // findById,
+>>>>>>> origin/feature/summary

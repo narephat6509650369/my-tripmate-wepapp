@@ -14,7 +14,7 @@ export const getUserNotiController = async (req: Request, res: Response) => {
         }
 
         const result = await notiservice.getUserNotifications(user_id);
-        console.log("getUserNotiController", result)
+        //console.log("getUserNotiController", result)
 
         if (!result.success) {
             return res.status(500).json({

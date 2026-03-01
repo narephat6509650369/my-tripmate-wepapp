@@ -66,95 +66,6 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
     });
   }
 };
-/*
-// ดึงข้อมูล heatmap ของทริป
-export const getTripHeatmapController = async (req: Request, res: Response) => {
-  try {
-    const { tripId } = req.params;
-
-    if (!tripId) {
-      return res.status(400).json({
-        success: false,
-        code: "MISSING_FIELD",
-        message: "Trip ID is required",
-        error: { field: "tripId" }
-      });
-    }
-
-    const data = await voteService.getTripHeatmap(tripId, (req.user as JwtPayload)?.user_id);
-
-    return res.status(200).json({
-      success: true,
-      code: "HEATMAP_LOADED",
-      message: "Heatmap data loaded",
-      data
-    });
-
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      code: "INTERNAL_ERROR",
-      message: "Failed to load heatmap",
-      error: {
-        detail: err instanceof Error ? err.message : err
-      }
-    });
-  }
-};
-*/
-/*
-// เริ่มการโหวตเลือกวัน
-export const startVotingController = async (req: Request, res: Response) => {
-  try {
-    const { trip_id } = req.body;
-    const user_id = (req.user as JwtPayload)?.user_id;
-
-    if (!trip_id) {
-      return res.status(400).json({
-        success: false,
-        code: "MISSING_FIELD",
-        message: "trip_id is required",
-        error: { field: "trip_id" }
-      });
-    }
-
-    const result = await voteService.startVotingSession(trip_id, user_id);
-
-    return res.status(201).json({
-      success: true,
-      code: "VOTING_STARTED",
-      message: "Voting session started",
-      data: result
-    });
-
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "";
-
-    if (message.includes("already active")) {
-      return res.status(409).json({
-        success: false,
-        code: "VOTING_ALREADY_ACTIVE",
-        message,
-      });
-    }
-
-    if (message.includes("เฉพาะเจ้าของทริป")) {
-      return res.status(403).json({
-        success: false,
-        code: "AUTH_FORBIDDEN",
-        message,
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      code: "INTERNAL_ERROR",
-      message: "Failed to start voting",
-      error: { detail: message }
-    });
-  }
-};
-*/
 
 // ดึงผลการ intersection ของวันว่างทั้งหมด
 export const getDateMatchingResultController = async (req: Request, res: Response) => {
@@ -204,49 +115,6 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
 
 
 // ================= BUDGET  =================
-/*
-export const getTripDetailController = async (req: Request, res: Response) => {
-  try {
-    const { tripCode } = req.params;
-
-    if (!tripCode) {
-      return res.status(400).json({
-        success: false,
-        code: "MISSING_FIELD",
-        message: "Trip Code is required",
-        error: { field: "tripCode" }
-      });
-    }
-
-    const data = await voteService.getFullTripData(tripCode);
-
-    return res.status(200).json({
-      success: true,
-      code: "TRIP_LOADED",
-      message: "Trip data loaded",
-      data
-    });
-
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "";
-
-    if (message === "ไม่พบทริป") {
-      return res.status(404).json({
-        success: false,
-        code: "TRIP_NOT_FOUND",
-        message
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      code: "INTERNAL_ERROR",
-      message: "Failed to load trip",
-      error: { detail: message }
-    });
-  }
-};
-*/
 export const submitBudgetVoteController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
@@ -434,8 +302,7 @@ export const getLocationVoteController = async (req: Request, res: Response) => 
         message: "User not authenticated"
     });
   }
-
-
+  
     if (!tripId) {
       return res.status(400).json({
         success: false,

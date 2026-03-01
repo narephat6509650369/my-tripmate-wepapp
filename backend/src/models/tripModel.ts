@@ -178,8 +178,11 @@ export async function createTripWithMember( tripData: Trip, member_id: string ):
         // 2. สร้าง Member (Owner)
         // Hardcode role='owner' และ is_active=1 ได้เลย เพราะฟังก์ชันนี้ใช้ตอนสร้างทริปใหม่เท่านั้น
         await connection.query(
-            'INSERT INTO trip_members (member_id, trip_id, user_id, role, is_active) VALUES (?, ?, ?, ?, ?)',
-            [member_id, tripData.trip_id, tripData.owner_id, 'owner', 1]
+        `
+        INSERT INTO trip_members 
+          (member_id, trip_id, user_id, role, status, is_active) 
+        VALUES (?, ?, ?, ?, ?, ?)`,
+        [member_id,tripData.trip_id,tripData.owner_id,'owner','active',  1]
         );
 
         await connection.commit(); // บันทึกจริงเมื่อผ่านทั้งคู่
@@ -200,10 +203,10 @@ export async function findAllTripsByUserId(user_id: string): Promise<TripSummary
             t.trip_name, 
             t.status, 
             tm.role,
-            (SELECT COUNT(*) FROM trip_members WHERE trip_id = t.trip_id AND is_active = 1) as num_members
+            (SELECT COUNT(*) FROM trip_members WHERE trip_id = t.trip_id AND is_active = 1 AND status = 'active') as num_members
         FROM trips t
         JOIN trip_members tm ON t.trip_id = tm.trip_id
-        WHERE tm.user_id = ? AND tm.is_active = 1
+        WHERE tm.user_id = ? AND tm.is_active = 1 AND tm.status = 'active'
         ORDER BY t.created_at DESC
     `;
     
@@ -275,31 +278,10 @@ export const findTripByInviteCode = async (inviteCode: string) => {
   return (rows as any[])[0];
 };
 
-export const addMemberIfNotExists = async (tripId: string, user_id: string) => {
-  try{
-
-  const [rows] = await pool.execute(
-    "SELECT * FROM trip_members WHERE trip_id = ? AND user_id = ?",
-    [tripId, user_id]
-  );
-
-  if ((rows as any[]).length > 0) return (rows as any[])[0];
-
-  const role = "member";
-  await pool.execute(
-    `INSERT INTO trip_members (member_id, trip_id, user_id, role) VALUES (UUID(), ?, ?, ?)`,
-    [tripId, user_id, role]
-  );
-
-  return { trip_id: tripId, user_id: user_id, role };
-  } catch (error) {
-    console.error("Add member error:", error instanceof Error ? error.message : error);
-    throw new Error(error instanceof Error ? error.message : "An error occurred while adding member to the trip");
-  }
-};
 
 //รายการทริปทั้งหมดที่ user เข้าร่วม + ถูกเชิญ + เป็นเจ้าของ
 export async function getMyTrips(user_id: string): Promise<MyTrip[]> {
+
     const sql = `
         SELECT 
             t.trip_id,
@@ -308,19 +290,28 @@ export async function getMyTrips(user_id: string): Promise<MyTrip[]> {
             t.status,
             t.created_at,
             COUNT(tm2.user_id) AS num_members,
-            DATEDIFF(t.created_at + INTERVAL 7 DAY, NOW()) AS days_left_7
+            DATEDIFF(
+                DATE_ADD(t.created_at, INTERVAL 7 DAY),
+                NOW()
+            ) AS days_left_7
         FROM trips t
-        JOIN trip_members tm ON tm.trip_id = t.trip_id
-        LEFT JOIN trip_members tm2 ON tm2.trip_id = t.trip_id AND tm2.is_active = TRUE
-        WHERE tm.user_id = ? 
-          AND t.is_active = TRUE
+        JOIN trip_members tm 
+            ON tm.trip_id = t.trip_id
+            AND tm.user_id = ?
+            AND tm.status = 'active'
+            AND tm.is_active = TRUE
+        LEFT JOIN trip_members tm2 
+            ON tm2.trip_id = t.trip_id
+            AND tm2.status = 'active'
+            AND tm2.is_active = TRUE
+        WHERE t.is_active = TRUE
         GROUP BY t.trip_id
         ORDER BY t.created_at DESC
     `;
 
     const [rows] = await pool.query<RowDataPacket[]>(sql, [user_id]);
 
-    return rows as MyTrip[];   
+    return rows as MyTrip[];
 }
 
 // ข้อมูลทริปแบบละเอียดของทริปหนึ่ง
@@ -341,22 +332,24 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
         COUNT(tm.user_id) AS member_count
       FROM trips t
       LEFT JOIN trip_members tm 
-        ON t.trip_id = tm.trip_id AND tm.is_active = 1
+        ON t.trip_id = tm.trip_id AND tm.is_active = 1 AND tm.status = 'active'
       WHERE t.trip_id = ?
       GROUP BY t.trip_id
     `;
 
     const memberSql = `
       SELECT
-        tm.user_id AS id,
+        tm.user_id,
         u.full_name AS name,
         u.email,
         tm.role,
+        tm.status,
         tm.joined_at
       FROM trip_members tm
       JOIN users u ON tm.user_id = u.user_id
       WHERE tm.trip_id = ?
         AND tm.is_active = 1
+        AND tm.status = 'active'
     `;
 
     const dateRangeSql = `
@@ -483,6 +476,7 @@ export async function findOpenTripsByUserId(user_id: string): Promise<Trip[]> {
     JOIN trip_members tm ON t.trip_id = tm.trip_id
     WHERE tm.user_id = ? 
       AND tm.is_active = 1
+      AND tm.status = 'active'
       AND t.status IN ('planning', 'voting')
   `;
   const [rows] = await pool.query<RowDataPacket[]>(sql, [user_id]);
@@ -520,13 +514,14 @@ export async function groupDatesToRanges(dates: string[]): Promise<{ start: stri
 // หาสมาชิกในทริป
 export const findMemberInTrip = async (trip_id: string, member_id: string) => {
   const [rows] = await pool.query<TripMember[]>(
-    `SELECT * FROM trip_members WHERE trip_id = ? AND member_id = ? AND is_active = 1`,
+    `SELECT * FROM trip_members WHERE trip_id = ? AND member_id = ? AND is_active = 1 AND tm.status = 'active'`,
     [trip_id, member_id]
   );
   return rows.length > 0 ? rows[0] : null;
 };
 
 export const getTripMembers = async (trip_id: string) => {
+
   const [rows] = await pool.query<TripMember[]>(
     `
     SELECT 
@@ -535,16 +530,18 @@ export const getTripMembers = async (trip_id: string) => {
       tm.user_id,
       tm.role,
       tm.joined_at,
-      tm.is_active,
+      tm.status,
       u.full_name
     FROM trip_members tm
     JOIN users u ON tm.user_id = u.user_id
     WHERE tm.trip_id = ?
-    AND tm.is_active = 1;
-    `,[trip_id]
+    AND tm.status = 'active'
+    `,
+    [trip_id]
   );
+
   return rows;
-}
+};
 
 export const getTripMembersWithEmail = async (trip_id: string) => {
   const [rows] = await pool.query<TripMemberWithEmail[]>(
@@ -556,7 +553,7 @@ export const getTripMembersWithEmail = async (trip_id: string) => {
     FROM trip_members tm
     JOIN users u ON tm.user_id = u.user_id
     WHERE tm.trip_id = ?
-    AND tm.is_active = 1
+    AND tm.status = 'active'
     AND u.is_active = 1
     `,
     [trip_id]
@@ -567,69 +564,91 @@ export const getTripMembersWithEmail = async (trip_id: string) => {
 
 
 // สมาชิกที่ออกจากทริปต้องไม่สามารถเข้าถึงข้อมูลโหวต/งบ/สถานที่ได้อีก
-export const removeMemberById = async (trip_id: string,member_id: string) => {
+export const removeMemberById = async (
+  trip_id: string,
+  member_id: string
+) => {
+
   const connection = await pool.getConnection();
 
   try {
+
     await connection.beginTransaction();
 
-    // 1️หา user_id จาก member_id
-    const [rows] = await connection.query<RowDataPacket[]>(
-      `SELECT user_id 
-        FROM trip_members 
-        WHERE member_id = ? AND trip_id = ?`,
-      [member_id, trip_id]
-    );
+    // 1. หา user_id
+    const [rows] = await connection.query<RowDataPacket[]>(`
+      SELECT user_id
+      FROM trip_members
+      WHERE member_id = ?
+      AND trip_id = ?
+      AND status = 'active'
+      AND is_active = 1
+    `, [member_id, trip_id]);
 
-    const memberRow = rows[0];
-
-    if (!memberRow) {
-     throw new Error("Member not found");
+    if (rows.length === 0) {
+      throw new Error("Member not found or already removed");
+    }
+    
+    const member = rows[0];
+    if (!member) {
+      throw new Error("Member not found or already removed");
     }
 
-    const user_id = memberRow.user_id;
+    const user_id = member.user_id;
 
-    // Soft delete สมาชิก
-    await connection.query(
-      `UPDATE trip_members 
-       SET is_active = 0 
-       WHERE trip_id = ? AND member_id = ?`,
-      [trip_id, member_id]
-    );
+    // 2. soft delete member
+    await connection.query(`
+      UPDATE trip_members
+      SET
+        is_active = 0,
+        status = 'rejected'
+      WHERE member_id = ?
+      AND trip_id = ?
+    `, [member_id, trip_id]);
 
-    // 3ลบ date availability
-    await connection.query(
-      `DELETE FROM date_votes 
-       WHERE trip_id = ? AND user_id = ?`,
-      [trip_id, user_id]
-    );
+    // 3. delete date votes (correct join)
+    await connection.query(`
+      DELETE dv FROM date_votes dv
+      JOIN date_options do ON dv.date_option_id = do.date_option_id
+      JOIN date_votings dvt ON do.date_voting_id = dvt.date_voting_id
+      WHERE dvt.trip_id = ?
+      AND dv.user_id = ?
+    `, [trip_id, user_id]);
 
-    // ลบ budget vote
-    await connection.query(
-      `DELETE FROM budget_votes 
-       WHERE trip_id = ? AND user_id = ?`,
-      [trip_id, user_id]
-    );
+    // 4. delete budget votes
+    await connection.query(`
+      DELETE bv FROM budget_votes bv
+      JOIN budget_options bo ON bv.budget_option_id = bo.budget_option_id
+      JOIN budget_votings bvt ON bo.budget_voting_id = bvt.budget_voting_id
+      WHERE bvt.trip_id = ?
+      AND bv.user_id = ?
+    `, [trip_id, user_id]);
 
-    // ลบ location vote
-    await connection.query(
-      `DELETE FROM location_votes 
-       WHERE trip_id = ? AND user_id = ?`,
-      [trip_id, user_id]
-    );
+    // 5. delete location votes
+    await connection.query(`
+      DELETE lv FROM location_votes lv
+      JOIN location_options lo ON lv.location_option_id = lo.location_option_id
+      JOIN location_votings lvt ON lo.location_voting_id = lvt.location_voting_id
+      WHERE lvt.trip_id = ?
+      AND lv.user_id = ?
+    `, [trip_id, user_id]);
 
     await connection.commit();
 
     return {
       success: true,
-      message: "Member removed and related data cleared"
+      message: "Member removed successfully"
     };
 
   } catch (error) {
+
     await connection.rollback();
     throw error;
+
   } finally {
+
     connection.release();
+
   }
 };
 
@@ -645,6 +664,7 @@ export const getTripByInviteCode = async (invite_code: string) => {
 
 
 // ดึงสมาชิกเก่ากลับเข้าทริป (กรณีเคยออกไปแล้ว is_active = 0)
+/*
 export const reactivateTripMember = async (trip_id: string, user_id: string) => {
     await pool.query(
         `UPDATE trip_members SET is_active = 1, role = 'member' 
@@ -652,7 +672,7 @@ export const reactivateTripMember = async (trip_id: string, user_id: string) => 
         [trip_id, user_id]
     );
 };
-
+*/
 // ดึงข้อมูลสรุปทริป
 export async function getTripSummaryById(tripId: string): Promise<TripSummaryResult | null> {
   try {
@@ -688,6 +708,7 @@ export async function getTripSummaryById(tripId: string): Promise<TripSummaryRes
         ON tm.user_id = u.user_id
       WHERE tm.trip_id = ?
         AND tm.is_active = 1
+        AND tm.status = 'active'
       `,
       [tripId]
     );
@@ -810,27 +831,332 @@ export const closeTrip = async (trip_id: string, type: string) => {
   }
 };
 
-export const getTripOwnerId = async (trip_id: string): Promise<string | null> => {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT owner_id FROM trips WHERE trip_id = ?`,
+export const getTripOwner = async (trip_id: string) => {
+
+  const [rows]: any = await pool.query(
+    `
+    SELECT
+      tm.user_id,
+      u.email,
+      u.full_name
+    FROM trip_members tm
+    JOIN users u ON u.user_id = tm.user_id
+    WHERE tm.trip_id = ?
+    AND tm.role = 'owner'
+    AND tm.status = 'active'
+    LIMIT 1
+    `,
     [trip_id]
   );
 
-  return rows.length > 0 ? rows[0]?.owner_id : null;
+  return rows[0];
 
-}
+};
 
 export const getTripMemberCount = async (trip_id: string): Promise<number> => {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT COUNT(*) AS member_count FROM trip_members WHERE trip_id = ? AND is_active = 1`,
+    `SELECT COUNT(*) AS member_count FROM trip_members WHERE trip_id = ? AND is_active = 1 AND status = 'active'`,
     [trip_id]
   );
 
   return rows.length > 0 ? rows[0]?.member_count : 0;
 };
 
+export const addPendingMember = async (trip_id: string, user_id: string) => {
+  let connection;
 
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
 
+    const member_id = uuidv4();
+
+    const sql = `
+      INSERT INTO trip_members (
+        member_id,
+        trip_id,
+        user_id,
+        role,
+        status,
+        is_active,
+        joined_at
+      )
+      VALUES (?, ?, ?, 'member', 'pending', 0, NOW())
+    `;
+
+    await connection.query(sql, [
+      member_id,
+      trip_id,
+      user_id
+    ]);
+
+    await connection.commit();
+
+    return {
+      success: true,
+      member_id,
+      trip_id,
+      user_id,
+      status: "pending",
+      message: "Join request created successfully"
+    };
+
+  } catch (error) {
+
+    if (connection) await connection.rollback();
+
+    console.error("addPendingMember error:", error);
+
+    throw error;
+
+  } finally {
+
+    if (connection) connection.release();
+
+  }
+};
+
+export const approveMember = async (trip_id: string,user_id: string) => {
+
+  let connection;
+
+  try {
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const sql = `
+      UPDATE trip_members
+      SET
+        status = 'active',
+        is_active = 1
+      WHERE trip_id = ?
+      AND user_id = ?
+      AND status = 'pending'
+    `;
+
+    const [result]: any = await connection.query(sql, [
+      trip_id,
+      user_id
+    ]);
+
+    if (result.affectedRows === 0) {
+      throw new Error("No pending member found or already approved");
+    }
+
+    await connection.commit();
+
+    return {
+      success: true,
+      trip_id,
+      user_id,
+      status: "active",
+      message: "Member approved successfully"
+    };
+
+  } catch (error) {
+
+    if (connection) await connection.rollback();
+
+    console.error("approveMember error:", error);
+
+    throw error;
+
+  } finally {
+
+    if (connection) connection.release();
+
+  }
+
+};
+
+export const getPendingMembers = async (trip_id: string) => {
+
+  let connection;
+
+  try {
+
+    connection = await pool.getConnection();
+
+    const sql = `
+      SELECT
+        tm.member_id,
+        tm.user_id,
+        u.full_name,
+        u.profile_image,
+        tm.joined_at
+      FROM trip_members tm
+      JOIN users u ON u.user_id = tm.user_id
+      WHERE tm.trip_id = ?
+      AND tm.status = 'pending'
+      ORDER BY tm.joined_at ASC
+    `;
+
+    const [rows]: any = await connection.query(sql, [trip_id]);
+
+    return {
+      success: true,
+      count: rows.length,
+      data: rows
+    };
+
+  } catch (error) {
+
+    console.error("getPendingMembers error:", error);
+
+    throw error;
+
+  } finally {
+
+    if (connection) connection.release();
+
+  }
+
+};
+
+export const rejectMember = async (trip_id: string,user_id: string) => {
+
+  let connection;
+
+  try {
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const sql = `
+      DELETE FROM trip_members
+      WHERE trip_id = ?
+      AND user_id = ?
+      AND status = 'pending'
+    `;
+
+    const [result]: any = await connection.query(sql, [
+      trip_id,
+      user_id
+    ]);
+
+    if (result.affectedRows === 0) {
+      throw new Error("No pending member found");
+    }
+
+    await connection.commit();
+
+    return {
+      success: true,
+      trip_id,
+      user_id,
+      message: "Member rejected successfully"
+    };
+
+  } catch (error) {
+
+    if (connection) await connection.rollback();
+
+    console.error("rejectMember error:", error);
+
+    throw error;
+
+  } finally {
+
+    if (connection) connection.release();
+
+  }
+
+};
+
+export const updateMemberStatus = async (trip_id: string,user_id: string,status: "pending" | "active" | "rejected") => {
+
+  let connection;
+
+  try {
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const is_active = status === "active" ? 1 : 0;
+
+    const sql = `
+      UPDATE trip_members
+      SET
+        status = ?,
+        is_active = ?
+      WHERE trip_id = ?
+      AND user_id = ?
+    `;
+
+    const [result]: any = await connection.query(sql, [
+      status,
+      is_active,
+      trip_id,
+      user_id
+    ]);
+
+    if (result.affectedRows === 0) {
+      throw new Error("Member not found");
+    }
+
+    await connection.commit();
+
+    return {
+      success: true,
+      trip_id,
+      user_id,
+      status,
+      message: "Member status updated successfully"
+    };
+
+  } catch (error) {
+
+    if (connection) await connection.rollback();
+
+    console.error("updateMemberStatus error:", error);
+
+    throw error;
+
+  } finally {
+
+    if (connection) connection.release();
+
+  }
+
+};
+
+export const getMemberWithEmail = async (trip_id: string,user_id: string) => {
+  try {
+
+    const [rows]: any = await pool.query(
+      `
+      SELECT
+        tm.member_id,
+        tm.trip_id,
+        tm.user_id,
+        tm.role,
+        tm.status,
+        tm.is_active,
+        tm.joined_at,
+        u.full_name,
+        u.email
+      FROM trip_members tm
+      JOIN users u
+        ON tm.user_id = u.user_id
+      WHERE tm.trip_id = ?
+      AND tm.user_id = ?
+      AND tm.status = 'active'
+      LIMIT 1
+      `,
+      [trip_id, user_id]
+    );
+
+    return rows.length > 0 ? rows[0] : null;
+
+  } catch (error) {
+
+    console.error("getMemberWithEmail error:", error);
+    throw error;
+
+  }
+
+};
 
 export default {
     generateInviteCode,
@@ -838,21 +1164,25 @@ export default {
     getTripDetail,
     getMyTrips,
     findTripByInviteCode,
-    addMemberIfNotExists,
     findMemberInTrip,
     removeMemberById,
     deleteTrip,
     createTripWithMember,
     getTripStatus,
     getTripByInviteCode,
-    reactivateTripMember,
     findAllTripsByUserId,
     getTripMembers,
     findTripById,
     updateInviteInfo,
     getTripSummaryById,
     updateTripStatus,
-    getTripMembersWithEmail
+    getTripMembersWithEmail,
+    addPendingMember,
+    approveMember,
+    getPendingMembers,
+    rejectMember,
+    getTripOwner,
+    getMemberWithEmail
 };
 /*
     getTripById,

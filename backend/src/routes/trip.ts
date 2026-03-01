@@ -1,5 +1,5 @@
 import express from 'express';
-import { addTripController, getMyTripsController, deleteTripController,joinTripController, removeMemberController, getTripDetailController, getTripSummaryController, manualCloseController,getMemberController} from "../controllers/TripController.js";
+import { addTripController, getMyTripsController, getPendingRequestsController, approveMemberController, rejectMemberController, deleteTripController, removeMemberController, getTripDetailController, getTripSummaryController, manualCloseController,getMemberController,requestJoinTripController} from "../controllers/TripController.js";
 import { auth } from "../middleware/auth.js"
 import { requireTripOwner ,requireTripMember} from "../middleware/role.js"
 
@@ -9,7 +9,15 @@ const router = express.Router();
 
 // ผู้ใช้ที่มีบัญชี join โดยใช้โค้ด
 /* returns: { success: true, message: "เข้าร่วมทริปสำเร็จ", trip_id, trip_name } */
-router.post("/join", auth, joinTripController);
+//router.post("/join", auth, joinTripController);
+
+router.post("/request-join",auth,requestJoinTripController);
+
+router.get("/:tripId/pending-requests",auth,getPendingRequestsController);
+
+router.patch("/:tripId/approve/:userId",auth,approveMemberController);
+
+router.patch("/:tripId/reject/:userId",auth,rejectMemberController);
 
 //  ดึงสรุปผลทริป (สำหรับหน้า summary)
 /* returns: { trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status } */

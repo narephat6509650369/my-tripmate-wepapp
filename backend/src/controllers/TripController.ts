@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { getUserTrips, joinTripByCode, removeMemberService, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate, getMemberService} from "../services/tripService.js";
+import { getUserTrips, requestJoinTripByCode, removeMemberService, approveMember, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate, getMemberService, getPendingRequests, rejectMember} from "../services/tripService.js";
 import voteService from "../services/voteService.js";
 
 //เพิ่มสมาชิก
@@ -38,13 +38,21 @@ export const addTripController = async (req: Request, res: Response) => {
       });
     }
 
-    const trip = await addTrip(user_id, trip_name, description, num_days);
+    const response = await addTrip(user_id, trip_name, description, num_days);
 
+    if (!response.success) {
+      return res.status(500).json({
+        success: false,
+        code: "TRIP_CREATE_FAILED",
+        message: response.message
+      });
+    }
+    
     return res.status(201).json({
       success: true,
       code: "TRIP_CREATED",
       message: "Trip created successfully",
-      data: trip
+      data: response.data
     });
 
   } catch (err) {
@@ -73,14 +81,22 @@ export const getMyTripsController = async (req: Request, res: Response) => {
       });
     }
 
-    const trips = await getUserTrips(user_id);
-    //console.log("User trips:", trips);
+    const response = await getUserTrips(user_id);
+    //console.log("User trips:", response);
+
+    if (!response.success) {
+      return res.status(500).json({
+        success: false,
+        code: "GET_TRIPS_FAILED",
+        message: response.message
+      });
+    }
 
     return res.status(200).json({
       success: true,
       code: "OK",
       message: "Trips retrieved successfully",
-      data: trips
+      data: response.data
     });
 
   } catch (error) {
@@ -126,8 +142,239 @@ export const deleteTripController = async (req: Request, res: Response) => {
   }
 };
 
-
 //เข้าร่วมทริปด้วยโค้ด
+export const requestJoinTripController = async (req: Request,res: Response) => {
+
+  try {
+
+    const { invite_code } = req.body;
+    const user_id = req.user?.user_id;
+
+    if (!user_id) {
+      return res.status(401).json({
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "Unauthorized"
+      });
+    }
+
+    if (!invite_code) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_INVITE_CODE",
+        message: "Invite code is required"
+      });
+    }
+
+    const result =await requestJoinTripByCode(invite_code,user_id);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        code: "REQUEST_FAILED",
+        message: result.message
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      code: "REQUEST_SENT",
+      message: result.message,
+      data: {
+        tripId: result.trip_id,
+        tripName: result.trip_name
+      }
+    });
+
+  } catch (error) {
+
+    console.error(
+      "requestJoinTripController error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      code: "INTERNAL_ERROR",
+      message: "Cannot request join trip"
+    });
+
+  }
+
+};
+
+export const getPendingRequestsController = async (req: Request,res: Response) => {
+
+  try {
+
+    const { tripId } = req.params;
+    const user_id = req.user?.user_id;
+
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "tripId is required",
+        error: { field: "tripId" }
+      });
+    }
+
+    if (!user_id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    const result = await getPendingRequests(tripId, user_id);
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        code: "GET_PENDING_FAILED",
+        message: result.message || "ไม่สามารถดึงคำขอเข้าร่วมทริปได้",
+        data: []
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+
+  } catch (error) {
+    console.error("getPendingRequestsController error:",error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Cannot fetch pending requests"
+    });
+
+  }
+
+};
+
+export const approveMemberController = async (req: Request,res: Response) => {
+
+  try {
+
+    const { tripId, userId } = req.params;
+    const owner_id = req.user?.user_id;
+
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "tripId is required",
+        error: { field: "tripId" }
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    if (!owner_id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    const result = await approveMember(tripId,userId,owner_id);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Member approved successfully"
+    });
+
+  } catch (error) {
+
+    console.error(
+      "approveMemberController error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Cannot approve member"
+    });
+
+  }
+
+};
+
+export const rejectMemberController = async (req: Request,res: Response) => {
+
+  try {
+
+    const { tripId, userId } = req.params;
+    const owner_id = req.user?.user_id;
+
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        code: "MISSING_FIELD",
+        message: "tripId is required",
+        error: { field: "tripId" }
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    if (!owner_id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    const result = await rejectMember(tripId,userId,owner_id);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Member rejected successfully"
+    });
+
+  } catch (error) {
+
+    console.error(
+      "rejectMemberController error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Cannot reject member"
+    });
+
+  }
+
+};
+
+/*
 export const joinTripController = async (req: Request, res: Response) => {
   try {
     const { invite_code } = req.body;
@@ -192,7 +439,7 @@ export const joinTripController = async (req: Request, res: Response) => {
     });
   }
 };
-
+*/
 //ลบสมาชิกทริป
 export const removeMemberController = async (req: Request, res: Response) => {
   try {
@@ -273,20 +520,19 @@ export const getTripDetailController = async (req: Request, res: Response) => {
       });
     }
 
-    const trip = await getTripDetail(tripId);
-    //console.log("Trip detail:", trip);
+    const response = await getTripDetail(tripId);
 
-    if (!trip) {
+    if (!response.success) {
       return res.status(404).json({
         success: false,
         code: "TRIP_NOT_FOUND",
-        message: "ไม่พบทริปนี้"
+        message: response.message
       });
     }
 
-    const isMember = trip.members?.some(
-      (m: any) => m.id === user_id
-    );
+  const trip = response.data;
+
+  const isMember = trip?.members?.some((m: any) => m.user_id === user_id) ?? false;
 
     if (!isMember) {
       return res.status(403).json({
@@ -355,17 +601,21 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
 
     const selectedTemplate = parseTemplate(template);
 
-    const summary = await getTripSummaryService(
-      tripId,
-      user_id,
-      selectedTemplate
-    );
+    const response = await getTripSummaryService(tripId,user_id,selectedTemplate);
+
+    if (!response.success) {
+      return res.status(404).json({
+        success: false,
+        code: "TRIP_SUMMARY_NOT_FOUND",
+        message: "ไม่พบข้อมูลสรุปของทริปนี้"
+      });
+    }
 
     return res.status(200).json({
       success: true,
       code: "TRIP_SUMMARY_FETCHED",
       message: "Trip summary fetched successfully",
-      data: summary
+      data: response.data
     });
 
   } catch (error: any) {
@@ -472,7 +722,7 @@ export const manualCloseController = async (req: Request, res: Response) => {
 
     const result = await closeTripService(tripId, "manual", user_id);
 
-    if (!result || !result.success) {
+    if (!result.success) {
       return res.status(403).json({
         success: false,
         code: "AUTH_FORBIDDEN",
@@ -488,6 +738,7 @@ export const manualCloseController = async (req: Request, res: Response) => {
       code: "TRIP_CLOSED",
       message: "Trip closed successfully"
     });
+    
   } catch (error) {
     console.error("Close trip error:", error instanceof Error ? error.message : error);
     return res.status(500).json({
@@ -566,7 +817,7 @@ export const getMemberController = async (req: Request, res: Response) => {
     if (!result.success) {
       return res.status(403).json({
         success: false,
-        message: result.message
+        message: result.message,
       });
     }
 
@@ -597,4 +848,9 @@ export const getMemberController = async (req: Request, res: Response) => {
   }
 };
 
+<<<<<<< HEAD
 export default {addTripController, deleteTripController, getMyTripsController, joinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,deleteMemberController};
+=======
+
+export default {addTripController, deleteTripController, getMyTripsController, requestJoinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,deleteMemberController};
+>>>>>>> origin/feature/summary

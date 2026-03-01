@@ -292,9 +292,7 @@ export const updateBudget = async ( tripid: string,user_id: string,category: str
 
   // 3. เช็คสมาชิก
   const members = await tripModel.getTripMembers(trip.trip_id);
-  const isMember = members.some(
-    m => m.user_id === user_id && m.is_active
-  );
+  const isMember = members.some(m => m.user_id === user_id && m.is_active && m.status==='active');
   
   if (!isMember) {
     throw new Error("You are not a member of this trip");
@@ -334,9 +332,7 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
 
   const members = await tripModel.getTripMembers(trip.trip_id);
 
-  const isMember = members.some(
-    m => m.user_id === user_id && m.is_active
-  );
+  const isMember = members.some(m => m.user_id === user_id && m.is_active && m.status === 'active');
 
   if (!isMember) {
     throw new Error("You are not a member of this trip");
@@ -541,9 +537,7 @@ export const voteLocation = async (tripid: string,user_id: string,votes: Locatio
 
   // 4. เช็คสมาชิก
   const members = await tripModel.getTripMembers(trip.trip_id);
-  const isMember = members.some(
-    m => m.user_id === user_id && m.is_active
-  );
+  const isMember = members.some(m => m.user_id === user_id && m.is_active && m.status === 'active');
 
   if (!isMember) {
     throw new Error("You are not a member of this trip");
