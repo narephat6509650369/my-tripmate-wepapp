@@ -760,9 +760,6 @@ export default {
   
 };
 
-<<<<<<< HEAD
-=======
 
  // TripDetail,
  // findById,
->>>>>>> origin/feature/summary

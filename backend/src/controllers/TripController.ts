@@ -848,9 +848,5 @@ export const getMemberController = async (req: Request, res: Response) => {
   }
 };
 
-<<<<<<< HEAD
-export default {addTripController, deleteTripController, getMyTripsController, joinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,deleteMemberController};
-=======
 
 export default {addTripController, deleteTripController, getMyTripsController, requestJoinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,deleteMemberController};
->>>>>>> origin/feature/summary

@@ -225,8 +225,8 @@ export const getTripStatus = async (trip_id: string): Promise<string | null> => 
 };
 
 export async function deleteTrip(tripId: string): Promise<void> {
-    await pool.query('DELETE FROM trips WHERE trip_id = ?', [tripId]);
-}
+    await pool.query('DELETE FROM trips WHERE trip_id = ? AND owner_id = ?', [tripId]);
+}   
 
 export async function generateInviteCode(): Promise<string> {
     let code = '';

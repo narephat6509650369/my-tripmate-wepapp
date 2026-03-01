@@ -226,4 +226,3 @@ export const deleteNotificationController = async (req: Request,res: Response) =
     });
   }
 };
-
