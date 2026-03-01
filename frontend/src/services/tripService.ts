@@ -224,7 +224,7 @@ export const tripAPI = {
   }
 
   try {
-    const response = await fetchWithTimeout(`${API_URL}/trips/join`, {
+    const response = await fetchWithTimeout(`${API_URL}/trips/request-join`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -314,6 +314,9 @@ return data;
         body: JSON.stringify({ invite_code: inviteCode })
       });
 
+      const data = await response.json();
+      console.log('request-join response:', response.status, data); 
+
       // ✅ เช็คก่อนว่าเป็น JSON จริงไหม
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
@@ -381,8 +384,21 @@ return data;
     try {
       const response = await fetchWithTimeout(
         `${API_URL}/trips/${tripId}/get-members`,
-        { credentials: 'include' }
+        { 
+          credentials: 'include',
+          headers: getAuthHeaders()  // ✅ เพิ่ม auth header
+        }
       );
+      if (!response.ok) {
+        return {
+          success: false,
+          code: `HTTP_${response.status}`,
+          message: response.status === 403 
+            ? 'ไม่มีสิทธิ์ดูสมาชิก' 
+            : 'โหลดสมาชิกไม่สำเร็จ',
+          data: []
+        };
+      }
       return await response.json();
     } catch (error) {
       return handleApiError(error);

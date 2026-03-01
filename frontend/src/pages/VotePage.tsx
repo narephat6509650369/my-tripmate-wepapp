@@ -18,9 +18,11 @@ type MatchingData = Pick<DateMatchingResponse, 'availability' | 'recommendation'
 type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers'>;
 
 interface PendingRequest {
+  member_id: string;
   user_id: string;
-  email: string;
   full_name: string;
+  profile_image: string;
+  joined_at: string;
 }
 
 // ============== MAIN COMPONENT ==============
@@ -96,10 +98,17 @@ const VotePage: React.FC = () => {
           console.log('✅ เป็น Owner โหลด members'); 
           try {
             const pendingRes = await tripAPI.getPendingRequests(tripData.tripid);
-            if (pendingRes.success) setPendingRequests(pendingRes.data || []);
+            console.log('pending requests response:', JSON.stringify(pendingRes));
+            if (pendingRes.success) {
+              const list = pendingRes.data?.data?.data ?? pendingRes.data?.data ?? pendingRes.data ?? [];
+              setPendingRequests(Array.isArray(list) ? list : []);
+            }
             try {
               const membersRes = await tripAPI.getMembers(tripData.tripid);
-              if (membersRes.success) setMembers(membersRes.data || []);
+              if (membersRes.success) {
+                const list = membersRes.data ?? [];
+                setMembers(Array.isArray(list) ? list : []);
+              }
             } catch (e) {
               console.error('Load members failed:', e);
             }
@@ -231,14 +240,14 @@ const VotePage: React.FC = () => {
   // ✅ Approve All
   const handleApproveAll = async () => {
     for (const req of pendingRequests) {
-      await handleApprove(req.user_id);
+      await handleApprove(req.member_id);
     }
   };
 
   // ✅ Reject All
   const handleRejectAll = async () => {
     for (const req of pendingRequests) {
-      await handleReject(req.user_id);
+      await handleReject(req.member_id);
     }
   };
 
@@ -648,17 +657,17 @@ const VotePage: React.FC = () => {
                   </div>
                 ) : (
                   pendingRequests.map(req => (
-                    <div key={req.user_id} className="flex items-center justify-between px-4 py-3 border-b hover:bg-gray-50 transition">
-                      <div className="flex-1 min-w-0 mr-2">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{req.full_name || 'ไม่ระบุชื่อ'}</p>
-                        <p className="text-xs text-gray-500 truncate">{req.email}</p>
-                      </div>
-                      <div className="flex gap-1.5 flex-shrink-0">
-                        <button onClick={() => handleApprove(req.user_id)} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition">✓ รับ</button>
-                        <button onClick={() => handleReject(req.user_id)} className="px-3 py-1.5 bg-red-400 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition">✕</button>
-                      </div>
+                  <div key={req.user_id} className="flex items-center justify-between px-4 py-3 border-b hover:bg-gray-50 transition">
+                    <div className="flex-1 min-w-0 mr-2">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{req.full_name || 'ไม่ระบุชื่อ'}</p>
+                      <p className="text-xs text-gray-500 truncate">{req.email || req.user_id}</p>
                     </div>
-                  ))
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      <button onClick={() => handleApprove(req.member_id)} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition">✓ รับ</button>
+                      <button onClick={() => handleReject(req.member_id)} className="px-3 py-1.5 bg-red-400 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition">✕</button>
+                    </div>
+                  </div>
+                ))
                 )}
               </>
             )}

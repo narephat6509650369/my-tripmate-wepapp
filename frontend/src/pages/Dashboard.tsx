@@ -38,6 +38,7 @@ const Dashboard: React.FC = () => {
   
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState("");
   const [joiningTrip, setJoiningTrip] = useState(false);
 
@@ -95,6 +96,7 @@ const Dashboard: React.FC = () => {
 
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred while loading dashboard stats');
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,7 @@ const Dashboard: React.FC = () => {
     logout();
   };
 
-  if (loading || !stats) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
         <Header onLogout={handleLogout} />
@@ -149,6 +151,27 @@ const Dashboard: React.FC = () => {
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+        <Header onLogout={handleLogout} />
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <div className="text-center">
+            <p className="text-red-500">เกิดข้อผิดพลาด: {error}</p>
+            <button
+              onClick={loadDashboardStats}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              ลองใหม่
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats) return null;
 
   // Data สำหรับ Pie Charts
   const myTripsChartData = [
@@ -264,41 +287,36 @@ const Dashboard: React.FC = () => {
                 {/* Pie Chart */}
                 <div className="bg-blue-100 rounded-lg p-5">
                   <h3 className="text-lg font-semibold text-blue-900 mb-3">📊 สัดส่วนทริป</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={myTripsChartData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        label={({ name, value, percent }) => 
-                          `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
-                        }
-                      >
-                        {myTripsChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-green-500 rounded"></div>
-                      <span className="text-sm text-blue-900">
-                        กำลังดำเนินการ ({stats.myTrips.ongoing} ทริป)
-                      </span>
+                  
+                  {/* ✅ เช็คก่อนว่ามีข้อมูลจริง */}
+                  {stats.myTrips.ongoing === 0 && stats.myTrips.completed === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <p>ยังไม่มีข้อมูลเพียงพอ</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-gray-500 rounded"></div>
-                      <span className="text-sm text-blue-900">
-                        เสร็จสิ้น ({stats.myTrips.completed} ทริป)
-                      </span>
-                    </div>
-                  </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={myTripsChartData.filter(d => d.value > 0)}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          label={({ name, value, percent }) => 
+                            `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
+                          }
+                        >
+                          {myTripsChartData
+                            .filter(d => d.value > 0)
+                            .map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
             )}
@@ -342,26 +360,34 @@ const Dashboard: React.FC = () => {
                 {/* Pie Chart */}
                 <div className="bg-blue-100 rounded-lg p-5">
                   <h3 className="text-lg font-semibold text-blue-900 mb-3">📊 สัดส่วนทริป</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={joinedTripsChartData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        label={({ name, value, percent }) => 
-                          `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
-                        }
-                      >
-                        {joinedTripsChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {stats.joinedTrips.ongoing === 0 && stats.joinedTrips.completed === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <p>ยังไม่มีข้อมูลเพียงพอ</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={joinedTripsChartData.filter(d => d.value > 0)}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          label={({ name, value, percent }) => 
+                            `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
+                          }
+                        >
+                          {joinedTripsChartData
+                            .filter(d => d.value > 0)
+                            .map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
 
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center gap-2">
