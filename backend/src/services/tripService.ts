@@ -206,17 +206,25 @@ export const requestJoinTripByCode = async (invite_code: string,user_id: string)
       };
     }
 
-    const members = await tripModel.getMemberByTripAndUser(trip.trip_id,user_id);
+    const member = await tripModel.getMemberByTripAndUser(trip.trip_id, user_id);
 
-    if (!members) {
+    // ไม่เคยเป็นสมาชิกมาก่อน
+    if (!member) {
+      await tripModel.addPendingMember(trip.trip_id, user_id);
+
+     const noti = await notiService.notifyOwnerJoinRequest(trip.trip_id, user_id);
+     console.log("noti:",noti)
+
       return {
-        success: false,
-        message: "Members not found"
+        success: true,
+        message: "ส่งคำขอเข้าร่วมสำเร็จ กรุณารอ Owner อนุมัติ",
+        trip_id: trip.trip_id,
+        trip_name: trip.trip_name
       };
     }
 
     // already active
-    if (members.status === "active") {
+    if (member.status === "active") {
       return {
         success: false,
         message: "คุณเป็นสมาชิกอยู่แล้ว"
@@ -224,35 +232,32 @@ export const requestJoinTripByCode = async (invite_code: string,user_id: string)
     }
 
     // already pending
-    if (members.status === "pending") {
+    if (member.status === "pending") {
       return {
         success: false,
-        message: "คุณส่งคำขอไปแล้วกรุณารอเจ้าของทริปอนุมัติ"
+        message: "คุณส่งคำขอไปแล้ว กรุณารอเจ้าของทริปอนุมัติ"
       };
     }
 
-    // rejected before → allow request again
-    if (members.status === "rejected") {
+    // rejected → request again
+    if (member.status === "rejected") {
+      await tripModel.updateMemberStatus(trip.trip_id, user_id, "pending");
 
-      await tripModel.updateMemberStatus(trip.trip_id,user_id,"pending");
+      await notiService.notifyOwnerJoinRequest(trip.trip_id, user_id);
 
-    } else {
-
-      // create pending member
-      await tripModel.addPendingMember(trip.trip_id,user_id);
-
+      return {
+        success: true,
+        message: "ส่งคำขอใหม่สำเร็จ กรุณารอ Owner อนุมัติ",
+        trip_id: trip.trip_id,
+        trip_name: trip.trip_name
+      };
     }
 
-    // notify owner
-    await notiService.notifyOwnerJoinRequest(trip.trip_id,user_id);
-
-    return {
-      success: true,
-      message: "ส่งคำขอเข้าร่วมสำเร็จ กรุณารอ Owner อนุมัติ",
-      trip_id: trip.trip_id,
-      trip_name: trip.trip_name
-    };
-
+    // fall back
+      return {
+        success: false,
+        message: "Invalid member status"
+      };
   } catch (error) {
 
     console.error("requestJoinTripByCode error:", error);

@@ -287,7 +287,7 @@ export const findMember = async (trip_id: string,user_id: string)=> {
     `
     SELECT 
       u.full_name
-    FROM trip_member tm
+    FROM trip_members tm
     JOIN users u ON u.user_id = tm.user_id
     WHERE tm.trip_id = ? AND tm.user_id = ?
     LIMIT 1
@@ -591,6 +591,7 @@ export const getMemberByTripAndUser = async (trip_id: string,user_id: string): P
     [trip_id, user_id]
   );
 
+  console.log("getMemberByTripAndUser:",rows)
 
   return rows[0] || null;
 };
@@ -1211,9 +1212,7 @@ interface OwnerRow extends RowDataPacket {
   owner_id: string;
 }
 
-export const findOwnerByTrip = async (
-  trip_id: string
-): Promise<string | null> => {
+export const findOwnerByTrip = async (trip_id: string): Promise<string | null> => {
 
   const [rows] = await pool.query<OwnerRow[]>(
     `

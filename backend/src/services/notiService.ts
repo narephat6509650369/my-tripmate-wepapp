@@ -311,7 +311,8 @@ export const notifyOwnerJoinRequest = async (trip_id: string,requestUserId: stri
         message: "Member not found"
       };
     }
-
+    console.log("Owner:", owner);
+    console.log("Owner email:", owner?.email);
     if (owner.email) {
       await sendEmail(
         owner.email,
@@ -397,8 +398,7 @@ export const notifyMemberRejected = async (trip_id: string,user_id: string) => {
 
   try {
 
-    const member =
-      await tripModel.getMemberWithEmail(trip_id, user_id);
+    const member =await tripModel.getMemberWithEmail(trip_id, user_id);
 
     if (!member) {
       return {

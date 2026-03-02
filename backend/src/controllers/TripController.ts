@@ -193,6 +193,7 @@ export const requestJoinTripController = async (req: Request,res: Response) => {
     }
 
     const result =await requestJoinTripByCode(invite_code,user_id);
+    console.log("requestJoinTripController",result)
 
     if (!result.success) {
       return res.status(400).json({
