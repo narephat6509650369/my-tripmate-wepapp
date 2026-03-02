@@ -487,7 +487,7 @@ export const removeMemberService = async ( trip_id: string, member_id: string, o
   }
 
   // ตรวจสอบสิทธิ์ owner
-  if (trip.owner_id !== owner_id) {
+  if (trip.ownerid !== owner_id) {
     return {
       success: false,
       error: "เฉพาะเจ้าของทริปเท่านั้นที่ลบสมาชิกได้"
@@ -739,7 +739,7 @@ export const getMemberService = async (tripId: string,ownerId: string): Promise<
 
     const owner = await tripModel.getTripOwner(tripId);
 
-    if (owner !== ownerId) {
+    if (owner.user_id !== ownerId && owner.ownerid !== ownerId) {
       return {
         success: false,
         message: "You're not owner of this trip"

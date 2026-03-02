@@ -472,16 +472,16 @@ export const joinTripController = async (req: Request, res: Response) => {
 //ลบสมาชิกทริป
 export const removeMemberController = async (req: Request, res: Response) => {
   try {
-    const { trip_id, member_id } = req.params;
+    const { tripId, memberId } = req.params;
     const owner_id = req.user?.user_id;
 
-    if (!trip_id || !member_id) {
+    if (!tripId || !memberId) {
       return res.status(400).json({
         success: false,
         code: "MISSING_FIELD",
         message: "tripId and memberId are required",
         error: {
-          field: !trip_id ? "trip_id" : "member_id"
+          field: !tripId ? "tripId" : "memberId"
         }
       });
     }
@@ -494,7 +494,7 @@ export const removeMemberController = async (req: Request, res: Response) => {
       });
     }
 
-    const result = await removeMemberService(trip_id, member_id, owner_id);
+    const result = await removeMemberService(tripId, memberId, owner_id);
 
     if (!result.success) {
       return res.status(403).json({

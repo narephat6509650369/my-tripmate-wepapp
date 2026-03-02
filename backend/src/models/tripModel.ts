@@ -549,7 +549,7 @@ export async function groupDatesToRanges(dates: string[]): Promise<{ start: stri
 // หาสมาชิกในทริป
 export const findMemberInTrip = async (trip_id: string, member_id: string) => {
   const [rows] = await pool.query<TripMember[]>(
-    `SELECT * FROM trip_members WHERE trip_id = ? AND member_id = ? AND is_active = 1 AND tm.status = 'active'`,
+    `SELECT * FROM trip_members WHERE trip_id = ? AND member_id = ? AND is_active = 1 AND status = 'active'`,
     [trip_id, member_id]
   );
   return rows.length > 0 ? rows[0] : null;
@@ -566,6 +566,7 @@ export const getTripMembers = async (trip_id: string) => {
       tm.role,
       tm.joined_at,
       tm.status,
+      tm.is_active,
       u.full_name
     FROM trip_members tm
     JOIN users u ON tm.user_id = u.user_id
