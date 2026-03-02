@@ -120,13 +120,16 @@ export interface TripDetail {
 }
 
 export interface Member {
-  id: string;
-  userId: string;
+  id?: string;
+  user_id: string;
+  userId?: string;
   role: string;
-  fullName: string;
-  avatarUrl: string | null;
-  joinedAt: number;
-  isActive: boolean;
+  name?: string;
+  fullName?: string;
+  full_name?: string;
+  avatarUrl?: string | null;
+  joinedAt?: number;
+  isActive?: boolean;
 }
 
 export interface DateRange {

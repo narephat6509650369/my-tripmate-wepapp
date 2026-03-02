@@ -243,11 +243,11 @@ export const tripAPI = {
     };
   }
 
-return data;
+  return data;
 
   } catch (error) {
     return handleApiError(error);
-  }
+    }
   },
 
   /**
@@ -329,7 +329,8 @@ return data;
         };
       }
 
-      return await response.json();
+      return data;
+      
     } catch (error) {
       return handleApiError(error);
     }

@@ -150,6 +150,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
 
     if (budgetInfo?.rows && budgetInfo.rows.length > 0) {
       setHasSaved(true);
+      // setIsAnalysisOpen(true);
     }
 
     setIsLoading(false);
@@ -226,8 +227,20 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
         setError(`บันทึกไม่สำเร็จสำหรับ: ${failedCategories}`);
         alert(`⚠️ บันทึกสำเร็จบางส่วน (${results.length - failures.length}/${results.length} หมวด)`);
       } else {
-        setHasSaved(true);
-        setIsAnalysisOpen(true);
+        setBudgetStats(prev => prev ? {
+          ...prev,
+          accommodation: { ...prev.accommodation, myValue: budget.accommodation },
+          transport:     { ...prev.transport,     myValue: budget.transport },
+          food:          { ...prev.food,          myValue: budget.food },
+          other:         { ...prev.other,         myValue: budget.other },
+        } : {
+          accommodation: { avg: budget.accommodation, min: budget.accommodation, max: budget.accommodation, myValue: budget.accommodation },
+          transport:     { avg: budget.transport,     min: budget.transport,     max: budget.transport,     myValue: budget.transport },
+          food:          { avg: budget.food,          min: budget.food,          max: budget.food,          myValue: budget.food },
+          other:         { avg: budget.other,         min: budget.other,         max: budget.other,         myValue: budget.other },
+        });
+      setHasSaved(true);
+      // setIsAnalysisOpen(true);
       }
     } catch (error) {
       console.error('Error saving budget:', error);
@@ -291,7 +304,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                     style={{
                       width: `${Math.min(
                         100,
-                        (filledBudgetMembers / (trip.members?.length || 1)) * 100
+                        (filledBudgetMembers / Math.max(filledBudgetMembers, trip.members?.length || 1)) * 100
                       )}%`
                     }}
                   />
@@ -607,7 +620,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
         </button>
 
         {/* ✅ ผลการวิเคราะห์ inline (เหมือน StepVote) — แสดงหลังบันทึก */}
-        {hasSaved && budgetStats && (
+        {hasSaved && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
 
             {/* Header — กดเพื่อพับ/ขยาย */}
@@ -623,7 +636,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
             </button>
 
             {/* Content — แสดงเมื่อ isAnalysisOpen */}
-            {isAnalysisOpen && (() => {
+            {isAnalysisOpen && budgetStats && (() => {
               const voterCount = totalBudgetInfo?.filledMembers || 0;
               const hasRealStats = voterCount >= 2 && Object.values(budgetStats).some(s => {
                 if (s.avg === 0 && s.min === 0 && s.max === 0) return false;

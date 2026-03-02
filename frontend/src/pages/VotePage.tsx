@@ -20,8 +20,10 @@ type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 
 interface PendingRequest {
   member_id: string;
   user_id: string;
-  full_name: string;
-  profile_image: string;
+  full_name?: string;
+  name?: string;
+  email?: string;
+  profile_image?: string;
   joined_at: string;
 }
 
@@ -51,7 +53,7 @@ const VotePage: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [panelTab, setPanelTab] = useState<'pending' | 'members'>('pending');
-  const [members, setMembers] = useState<{user_id: string, member_id: string, full_name: string, email: string}[]>([]);
+  const [members, setMembers] = useState<{user_id: string, member_id: string, full_name?: string, name?: string, email?: string}[]>([]);
 
   const displayCode = inviteCode || tripCode;
   const isClosed = trip?.status === 'completed' || trip?.status === 'archived';
@@ -84,6 +86,9 @@ const VotePage: React.FC = () => {
 
         const response = await tripAPI.getTripDetail(tripCode);
         console.log("Trip detail response:", response);
+        // console.log('members:', response.data?.members);
+        // console.log('member[0]:', response.data?.members?.[0]);
+        // console.log('trip owner info:', response.data?.ownerid, response.data);
         if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
@@ -240,14 +245,14 @@ const VotePage: React.FC = () => {
   // ✅ Approve All
   const handleApproveAll = async () => {
     for (const req of pendingRequests) {
-      await handleApprove(req.member_id);
+      await handleApprove(req.user_id);
     }
   };
 
   // ✅ Reject All
   const handleRejectAll = async () => {
     for (const req of pendingRequests) {
-      await handleReject(req.member_id);
+      await handleReject(req.user_id);
     }
   };
 
@@ -415,6 +420,7 @@ const VotePage: React.FC = () => {
           >
             ◄ กลับไปหน้าหลัก
           </button>
+          
 
           <div className="flex items-center gap-3">
             {/* ปุ่มคัดลอกรหัส */}
@@ -438,7 +444,7 @@ const VotePage: React.FC = () => {
                   ? 'bg-green-100 text-green-700'
                   : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
               }`}
-              onClick={() => handleCopy(window.location.href, 'link')}
+              onClick={() => handleCopy(`${window.location.origin}/join/${inviteCode}`, 'link')}
               title="แชร์ลิงก์ทริป"
             >
               <span className="hidden sm:inline">แชร์ลิงก์</span>
@@ -467,6 +473,25 @@ const VotePage: React.FC = () => {
       </div>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {trip && (
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">
+              ✈️ {trip.tripname}
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {trip.numdays ? `${trip.numdays} วัน` : ''} 
+              {trip.members && ` · สมาชิก ${trip.members.length} คน`}
+              {' · '}{trip.status === 'completed' || trip.status === 'archived' ? '✅ ทริปเสร็จสิ้น' : '🗳️ กำลังโหวต'}
+            </p>
+            <p className="text-sm text-gray-400 mt-1">
+              {trip.description || 'ไม่มีคำอธิบายเพิ่มเติม'}
+            </p>
+            <p className="text-sm text-gray-400 mt-1">
+              สร้างโดย {(trip.members?.find(m => m.user_id === trip.ownerid) as any)?.name || 'ไม่ระบุชื่อ'}
+              {trip.createdat && ` · ${new Date(trip.createdat).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}`}
+            </p>
+          </div>
+        )}
         {/* Progress Steps */}
         <div className="mb-8 sm:mb-12">
           <div className="relative">
@@ -659,12 +684,12 @@ const VotePage: React.FC = () => {
                   pendingRequests.map(req => (
                   <div key={req.user_id} className="flex items-center justify-between px-4 py-3 border-b hover:bg-gray-50 transition">
                     <div className="flex-1 min-w-0 mr-2">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{req.full_name || 'ไม่ระบุชื่อ'}</p>
+                      <p className="text-sm font-semibold text-gray-800 truncate">{req.full_name || req.name || 'ไม่ระบุชื่อ'}</p>
                       <p className="text-xs text-gray-500 truncate">{req.email || req.user_id}</p>
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0">
-                      <button onClick={() => handleApprove(req.member_id)} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition">✓ รับ</button>
-                      <button onClick={() => handleReject(req.member_id)} className="px-3 py-1.5 bg-red-400 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition">✕</button>
+                      <button onClick={() => handleApprove(req.user_id)} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition">✓ รับ</button>
+                      <button onClick={() => handleReject(req.user_id)} className="px-3 py-1.5 bg-red-400 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition">✕</button>
                     </div>
                   </div>
                 ))
@@ -684,7 +709,7 @@ const VotePage: React.FC = () => {
                     <div key={member.user_id} className="flex items-center justify-between px-4 py-3 border-b hover:bg-gray-50 transition">
                       <div className="flex-1 min-w-0 mr-2">
                         <p className="text-sm font-semibold text-gray-800 truncate flex items-center gap-1">
-                          {member.full_name || 'ไม่ระบุชื่อ'}
+                          {member.full_name || member.name || 'ไม่ระบุชื่อ'}
                           {member.user_id === user?.user_id && (
                             <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-bold">Owner</span>
                           )}
