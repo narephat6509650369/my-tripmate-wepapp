@@ -154,7 +154,9 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id);
+    setNotiOpen(false);
     if (notification.tripId) {
+      navigate(`/votepage/${notification.tripId}`);
       console.log(`Navigating to trip: ${notification.tripId}`);
     }
   };

@@ -285,6 +285,8 @@ export const notifyOwnerJoinRequest = async (trip_id: string,requestUserId: stri
     }
 
     const owner = await tripModel.getTripOwner(trip_id);
+    const trip = await tripModel.findTripById(trip_id);
+    const tripName = trip?.trip_name ?? trip_id;
 
     if (!owner?.user_id) {
       return {
@@ -292,18 +294,23 @@ export const notifyOwnerJoinRequest = async (trip_id: string,requestUserId: stri
         message: "Owner not found"
       };
     }
+    const member = await tripModel.getMemberWithEmailPending(trip_id, requestUserId);
 
+    if (!member) {
+      return {
+        success: false,
+        message: "Member not found"
+      };
+    }
     const result = await notiModel.createNotification(
       trip_id,
       owner.user_id,
       "member_joined",
       "New join request",
-      `User ${requestUserId} requested to join your trip`
+      `${member.email} requested to join "${tripName}"`
     );
 
     if (!result.success) return result;
-
-    const member = await findMember(trip_id, requestUserId);
 
     if (!member) {
       return {

@@ -34,6 +34,7 @@ const HomePage: React.FC = () => {
   const location = useLocation();
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [tripToDelete, setTripToDelete] = useState<TripCard | null>(null);
+  const [joiningTrip, setJoiningTrip] = useState(false);
   
   // ✅ Helper: แปลง TripSummary → TripCard
   const formatTripSummary = (trip: TripSummary): TripCard => {
@@ -134,8 +135,10 @@ const HomePage: React.FC = () => {
     const cleanCode = code.trim().toUpperCase();
     if (!cleanCode) { alert("กรุณากรอกรหัสห้อง"); return; }
     if (!validateInviteCode(cleanCode)) { alert("รูปแบบรหัสไม่ถูกต้อง"); return; }
+    if (joiningTrip) return;
 
     try {
+      setJoiningTrip(true);
       const response = await tripAPI.requestToJoin(cleanCode);
       if (response.success) {
         setRoomCode("");
@@ -146,7 +149,9 @@ const HomePage: React.FC = () => {
       }
     } catch (error) {
       setDialogMessage('เกิดข้อผิดพลาด กรุณาลองใหม่');
-    }
+    } finally {
+    setJoiningTrip(false);
+  }
   };
 
   // ✅ สร้างทริป
@@ -245,6 +250,7 @@ const HomePage: React.FC = () => {
             />
             <button
               onClick={() => handleJoinTrip(roomCode)}
+              disabled={joiningTrip}  
               className="flex items-center justify-center gap-2 bg-blue-200 hover:bg-blue-300 text-blue-800 font-medium px-4 py-2 rounded-lg transition"
             >
               <Check className="w-5 h-5" />
