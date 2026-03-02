@@ -33,7 +33,7 @@ router.post('/AddTrip', auth, addTripController);
 
 // ลบทริป (เจ้าของทริปเท่านั้น)*
 /* returns: { success: true, message: "ลบทริปสำเร็จ" } */
-router.delete('/DeleteTrip', auth,deleteTripController);
+router.delete('/:tripId', auth, deleteTripController);
 
 // ดึงรายละเอียดทริป
 /* returns: { trip_id, owner_id, trip_name, description, num_days, invite_code, invite_link, status } */

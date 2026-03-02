@@ -138,7 +138,7 @@ export const getTripDetail = async (tripId: string) => {
 
 
 
-export const deleteTripService = async (trip_id: string) => {
+export const deleteTripService = async (trip_id: string,owner_id: string) => {
   try {
     // 1. เช็คสถานะก่อน
     const status = await tripModel.getTripStatus(trip_id);
@@ -158,7 +158,7 @@ export const deleteTripService = async (trip_id: string) => {
     }
 
     // 2. ลบทริป
-    await tripModel.deleteTrip(trip_id);
+    await tripModel.deleteTrip(trip_id,owner_id);
 
     return {
       success: true,
@@ -206,14 +206,17 @@ export const requestJoinTripByCode = async (invite_code: string,user_id: string)
       };
     }
 
-    const members = await tripModel.getTripMembers(trip.trip_id);
+    const members = await tripModel.getMemberByTripAndUser(trip.trip_id,user_id);
 
-    const existing = members.find(
-      m => m.user_id === user_id
-    );
+    if (!members) {
+      return {
+        success: false,
+        message: "Members not found"
+      };
+    }
 
     // already active
-    if (existing?.status === "active") {
+    if (members.status === "active") {
       return {
         success: false,
         message: "คุณเป็นสมาชิกอยู่แล้ว"
@@ -221,15 +224,15 @@ export const requestJoinTripByCode = async (invite_code: string,user_id: string)
     }
 
     // already pending
-    if (existing?.status === "pending") {
+    if (members.status === "pending") {
       return {
         success: false,
-        message: "คุณส่งคำขอไปแล้ว กรุณารอ เจ้าของทริป อนุมัติ"
+        message: "คุณส่งคำขอไปแล้วกรุณารอเจ้าของทริปอนุมัติ"
       };
     }
 
     // rejected before → allow request again
-    if (existing?.status === "rejected") {
+    if (members.status === "rejected") {
 
       await tripModel.updateMemberStatus(trip.trip_id,user_id,"pending");
 
@@ -268,7 +271,7 @@ export const getPendingRequests = async (trip_id: string, user_id: string) => {
   try {
 
     const pending = await tripModel.getPendingMembers(trip_id);
-    console.log("pending",pending);
+    //console.log("pending",pending);
 
     return {
       success: true,
@@ -763,6 +766,7 @@ export default {
   getPendingRequests,
   
 };
+
 
 
  // TripDetail,

@@ -1,7 +1,7 @@
 import notiModel from "../models/notiModel.js";
-import tripModel from "../models/tripModel.js";
+import tripModel, { findMember, findTripById } from "../models/tripModel.js";
 import { sendEmail } from "./email.service.js";
-import { tripConfirmedTemplate } from "../templates/emailTemplates.js";
+import {tripCompletedTemplate,tripArchivedTemplate,joinRequestTemplate,joinApprovedTemplate,joinRejectedTemplate, tripConfirmedTemplate} from "../templates/emailTemplates.js";
 
 /*
 enum('trip_invitation','new_voting_session','voting_closed','trip_confirmed','member_joined','member_removed')
@@ -109,7 +109,7 @@ export const notifyTripArchived = async (trip_id: string) => {
           m.email,
           "Trip archived ",
           "This trip has been archived because it was inactive for 7 days.",
-          tripConfirmedTemplate(m.full_name)
+          tripArchivedTemplate(m.full_name)
         );
       }
     }
@@ -146,7 +146,7 @@ export const notifyTripCompleted = async (trip_id: string) => {
           m.email,
           "TripMate",
           "All members have voted. The trip is now completed.",
-          tripConfirmedTemplate(m.full_name)
+          tripCompletedTemplate(m.full_name)
         );
       }
     }
@@ -275,49 +275,51 @@ export const deleteNotification = async (noti_Id: string,user_id: string) => {
 };
 
 export const notifyOwnerJoinRequest = async (trip_id: string,requestUserId: string) => {
-
   try {
-    if(!trip_id){
 
+    if (!trip_id) {
+      return {
+        success: false,
+        message: "Trip id is required"
+      };
     }
-    // หา owner
+
     const owner = await tripModel.getTripOwner(trip_id);
 
-    if (!owner.user_id) {
+    if (!owner?.user_id) {
       return {
         success: false,
         message: "Owner not found"
       };
     }
 
-    // create notification
     const result = await notiModel.createNotification(
       trip_id,
       owner.user_id,
-      "member_joined", // หรือจะเพิ่ม enum ใหม่ "join_request" ก็ได้
+      "member_joined",
       "New join request",
       `User ${requestUserId} requested to join your trip`
     );
 
-    if (!result.success) {
-      return result;
+    if (!result.success) return result;
+
+    const member = await findMember(trip_id, requestUserId);
+
+    if (!member) {
+      return {
+        success: false,
+        message: "Member not found"
+      };
     }
 
-    // optional: send email
     if (owner.email) {
-
       await sendEmail(
         owner.email,
         "TripMate - New Join Request",
         "Someone requested to join your trip",
-        `
-          <p>Hello ${owner.full_name}</p>
-          <p>User requested to join your trip.</p>
-        `
+        joinRequestTemplate(owner.full_name,member.full_name)
       );
-
     }
-
     return {
       success: true,
       message: "Owner notified successfully"
@@ -341,8 +343,7 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
 
   try {
 
-    const member =
-      await tripModel.getMemberWithEmail(trip_id, user_id);
+    const member = await tripModel.getMemberWithEmail(trip_id, user_id);
 
     if (!member) {
       return {
@@ -369,10 +370,7 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
         member.email,
         "TripMate - Request Approved",
         "Your join request has been approved",
-        `
-          <p>Hello ${member.full_name}</p>
-          <p>Your join request has been approved.</p>
-        `
+        joinApprovedTemplate(member.full_name)
       );
 
     }
@@ -427,10 +425,7 @@ export const notifyMemberRejected = async (trip_id: string,user_id: string) => {
         member.email,
         "TripMate - Request Rejected",
         "Your join request has been rejected",
-        `
-          <p>Hello ${member.full_name}</p>
-          <p>Your join request has been rejected.</p>
-        `
+        joinRejectedTemplate(member.full_name)
       );
 
     }

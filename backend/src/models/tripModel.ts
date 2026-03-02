@@ -53,7 +53,9 @@ interface TripMemberWithEmail extends RowDataPacket {
   full_name: string;
 }
 
-
+interface MemberRow extends RowDataPacket {
+  full_name: string;
+}
 export interface MemberTrip {
     id: string;
     name: string;
@@ -153,6 +155,16 @@ export interface TripSummaryResult {
   totalmembers?: number;
 }
 
+export interface Member {
+  member_id: string;
+  trip_id: string;
+  user_id: string;
+  role: string;
+  status: string;
+  joined_at: string;
+}
+
+
 
 export async function createTripWithMember( tripData: Trip, member_id: string ): Promise<void> {
     const connection = await pool.getConnection(); // ขอ Connection แยกมาเพื่อทำ Transaction
@@ -225,9 +237,14 @@ export const getTripStatus = async (trip_id: string): Promise<string | null> => 
   return rows.length > 0 ? rows[0]?.status : null;
 };
 
-export async function deleteTrip(tripId: string): Promise<void> {
-    await pool.query('DELETE FROM trips WHERE trip_id = ? AND owner_id = ?', [tripId]);
-}   
+export async function deleteTrip(tripId: string,ownerId: string): Promise<void> {
+
+  await pool.query(
+    'DELETE FROM trips WHERE trip_id = ? AND owner_id = ?',
+    [tripId, ownerId]
+  );
+
+}  
 
 export async function generateInviteCode(): Promise<string> {
     let code = '';
@@ -262,6 +279,23 @@ export async function generateInviteLink(inviteCode: string): Promise<string> {
 export const findTripById = async (tripId: string) => {
   const [rows] = await pool.execute("SELECT * FROM trips WHERE trip_id = ?", [tripId]);
   return (rows as any[])[0];
+};
+
+export const findMember = async (trip_id: string,user_id: string)=> {
+
+  const [rows] = await pool.execute<MemberRow[]>(
+    `
+    SELECT 
+      u.full_name
+    FROM trip_member tm
+    JOIN users u ON u.user_id = tm.user_id
+    WHERE tm.trip_id = ? AND tm.user_id = ?
+    LIMIT 1
+    `,
+    [trip_id, user_id]
+  );
+
+  return rows.length > 0 ? rows[0] : null;
 };
 
 export const updateInviteInfo = async (tripId: string, inviteCode: string, inviteLink: string) => {
@@ -544,6 +578,23 @@ export const getTripMembers = async (trip_id: string) => {
   return rows;
 };
 
+export const getMemberByTripAndUser = async (trip_id: string,user_id: string): Promise<TripMember | null> => {
+
+  const [rows] = await pool.query<TripMember[]>(
+    `
+    SELECT *
+    FROM trip_members
+    WHERE trip_id = ?
+    AND user_id = ?
+    LIMIT 1
+    `,
+    [trip_id, user_id]
+  );
+
+
+  return rows[0] || null;
+};
+
 export const getTripMembersWithEmail = async (trip_id: string) => {
   const [rows] = await pool.query<TripMemberWithEmail[]>(
     `
@@ -565,10 +616,7 @@ export const getTripMembersWithEmail = async (trip_id: string) => {
 
 
 // สมาชิกที่ออกจากทริปต้องไม่สามารถเข้าถึงข้อมูลโหวต/งบ/สถานที่ได้อีก
-export const removeMemberById = async (
-  trip_id: string,
-  member_id: string
-) => {
+export const removeMemberById = async (trip_id: string,member_id: string) => {
 
   const connection = await pool.getConnection();
 
@@ -1159,6 +1207,30 @@ export const getMemberWithEmail = async (trip_id: string,user_id: string) => {
 
 };
 
+interface OwnerRow extends RowDataPacket {
+  owner_id: string;
+}
+
+export const findOwnerByTrip = async (
+  trip_id: string
+): Promise<string | null> => {
+
+  const [rows] = await pool.query<OwnerRow[]>(
+    `
+    SELECT owner_id
+    FROM trips
+    WHERE trip_id = ?
+    `,
+    [trip_id]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows[0]?.owner_id ?? null;
+};
+
 export default {
     generateInviteCode,
     generateInviteLink,
@@ -1183,7 +1255,8 @@ export default {
     getPendingMembers,
     rejectMember,
     getTripOwner,
-    getMemberWithEmail
+    getMemberWithEmail,
+    findOwnerByTrip
 };
 /*
     getTripById,

@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { getUserTrips, requestJoinTripByCode, removeMemberService, approveMember, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate, getMemberService, getPendingRequests, rejectMember} from "../services/tripService.js";
 import voteService from "../services/voteService.js";
+import { findOwnerByTrip } from "../models/tripModel.js";
 
 //เพิ่มสมาชิก
 export const addTripController = async (req: Request, res: Response) => {
@@ -114,6 +115,7 @@ export const getMyTripsController = async (req: Request, res: Response) => {
 export const deleteTripController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
+    const user_id = req.user?.user_id;
 
     if (!tripId) {
       return res.status(400).json({
@@ -124,7 +126,31 @@ export const deleteTripController = async (req: Request, res: Response) => {
       });
     }
 
-    await deleteTripService(tripId);
+    if (!user_id) {
+      return res.status(401).json({
+        success: false,
+        code: "AUTH_UNAUTHORIZED",
+        message: "Unauthorized"
+      });
+    }
+
+    const checkOwner = await findOwnerByTrip(tripId);
+
+    if (!checkOwner) {
+      return res.status(404).json({
+        success: false,
+        message: "Trip not found"
+      });
+    }
+
+    if (user_id !== checkOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "คุณไม่มีสิทธิ์ลบทริปนี้"
+      });
+    }
+
+    await deleteTripService(tripId,user_id);
 
     return res.status(200).json({
       success: true,
@@ -523,8 +549,8 @@ export const getTripDetailController = async (req: Request, res: Response) => {
     }
 
     const response = await getTripDetail(tripId);
-    console.log("response:",response)
-    console.log("response:",response.data)
+    //console.log("response:",response)
+    //console.log("response:",response.data)
 
     if (!response.success) {
       return res.status(404).json({
