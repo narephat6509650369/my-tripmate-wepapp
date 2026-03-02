@@ -1208,6 +1208,44 @@ export const getMemberWithEmail = async (trip_id: string,user_id: string) => {
 
 };
 
+export const getMemberWithEmailPending = async (trip_id: string,user_id: string) => {
+  try {
+
+    const [rows]: any = await pool.query(
+      `
+      SELECT
+        tm.member_id,
+        tm.trip_id,
+        tm.user_id,
+        tm.role,
+        tm.status,
+        tm.is_active,
+        tm.joined_at,
+        u.full_name,
+        u.email
+      FROM trip_members tm
+      JOIN users u
+        ON tm.user_id = u.user_id
+      WHERE tm.trip_id = ?
+      AND tm.user_id = ?
+      AND tm.status = 'pending'
+      LIMIT 1
+      `,
+      [trip_id, user_id]
+    );
+    console.log("getMemberWithEmailPending:",rows)
+
+    return rows.length > 0 ? rows[0] : null;
+
+  } catch (error) {
+
+    console.error("getMemberWithEmail error:", error);
+    throw error;
+
+  }
+
+};
+
 interface OwnerRow extends RowDataPacket {
   owner_id: string;
 }
@@ -1255,6 +1293,7 @@ export default {
     rejectMember,
     getTripOwner,
     getMemberWithEmail,
+    getMemberWithEmailPending,
     findOwnerByTrip
 };
 /*

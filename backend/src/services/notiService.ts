@@ -1,5 +1,5 @@
 import notiModel from "../models/notiModel.js";
-import tripModel, { findMember, findTripById } from "../models/tripModel.js";
+import tripModel, { findMember,getMemberWithEmailPending } from "../models/tripModel.js";
 import { sendEmail } from "./email.service.js";
 import {tripCompletedTemplate,tripArchivedTemplate,joinRequestTemplate,joinApprovedTemplate,joinRejectedTemplate, tripConfirmedTemplate} from "../templates/emailTemplates.js";
 
@@ -344,7 +344,7 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
 
   try {
 
-    const member = await tripModel.getMemberWithEmail(trip_id, user_id);
+    const member = await tripModel.getMemberWithEmailPending(trip_id, user_id);
 
     if (!member) {
       return {
@@ -394,18 +394,8 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
 
 };
 
-export const notifyMemberRejected = async (trip_id: string,user_id: string) => {
-
+export const notifyMemberRejected = async (trip_id: string,user_id: string,email: string,fullname: string) => {
   try {
-
-    const member =await tripModel.getMemberWithEmail(trip_id, user_id);
-
-    if (!member) {
-      return {
-        success: false,
-        message: "Member not found"
-      };
-    }
 
     const result = await notiModel.createNotification(
       trip_id,
@@ -419,13 +409,13 @@ export const notifyMemberRejected = async (trip_id: string,user_id: string) => {
       return result;
     }
 
-    if (member.email) {
+    if (email) {
 
       await sendEmail(
-        member.email,
+        email,
         "TripMate - Request Rejected",
         "Your join request has been rejected",
-        joinRejectedTemplate(member.full_name)
+        joinRejectedTemplate(fullname)
       );
 
     }

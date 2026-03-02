@@ -304,8 +304,8 @@ export const approveMember = async (trip_id: string,user_id: string,owner_id: st
 
     // check owner permission
     const owner = await tripModel.getTripOwner(trip_id);
-    console.log("owner.user_id",owner.user_id);
-    console.log("owner_id",owner_id);
+    //console.log("owner.user_id",owner.user_id);
+    //console.log("owner_id",owner_id);
     if (owner.user_id !== owner_id) {
 
       return {
@@ -354,9 +354,27 @@ export const rejectMember = async (trip_id: string,user_id: string,owner_id: str
 
     }
 
+    const trip = await tripModel.getMemberWithEmailPending(trip_id,user_id);
+
+    if(!trip.email){
+      return {
+        success: false,
+        message: "Not have email for reject Member"
+      }
+    }
+
+    if(!trip.full_name){
+      return {
+        success: false,
+        message: "Not name for reject Member"
+      }
+    }
+
     await tripModel.rejectMember(trip_id,user_id);
 
-    await notiService.notifyMemberRejected(trip_id,user_id);
+    const noti = await notiService.notifyMemberRejected(trip_id,user_id,trip.email,trip.full_name);
+
+    console.log("noti reject:",noti)
 
     return {
       success: true,
