@@ -126,6 +126,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
 
   // ============== HANDLERS ==============
   const handleSelect = useCallback((index: number, value: string) => {
+    if (isLocked) return;
     if (myVote.includes(value) && myVote[index] !== value) {
       setError("กรุณาเลือกจังหวัดที่แตกต่างกัน");
       return;
@@ -139,6 +140,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   }, [myVote, onInputChange]);
 
   const handleSubmit = async () => {
+    if (isLocked) return;
     if (myVote.includes("")) {
       setError("กรุณาเลือกครบ 3 อันดับก่อนส่งคะแนน");
       return;

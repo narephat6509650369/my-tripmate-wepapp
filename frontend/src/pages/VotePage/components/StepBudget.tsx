@@ -159,6 +159,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
   // ============== HANDLERS ==============
 
   const handleSaveCategory = useCallback(async (category: keyof BudgetState) => {
+    if (isLocked) return;
     const amount = budget[category];
     const validation = validateBudget(amount);
     if (!validation.valid) {  
@@ -195,6 +196,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
   }, [validateBudget]);
 
   const handleSaveAll = useCallback(async () => {
+    if (isLocked) return;
     const hasRequiredBudget =
       budget.accommodation > 0 &&
       budget.transport > 0 &&

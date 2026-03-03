@@ -39,7 +39,7 @@ const HomePage: React.FC = () => {
   // ✅ Helper: แปลง TripSummary → TripCard
   const formatTripSummary = (trip: TripSummary): TripCard => {
     console.log('Trip status:', trip.trip_id, trip.status);
-    const isCompleted = trip.status === 'completed' || trip.status === 'archived';
+    const isCompleted = trip.status === 'completed' || trip.status === 'archived'|| trip.status === 'confirmed';
 
     return {
       id: trip.trip_id,

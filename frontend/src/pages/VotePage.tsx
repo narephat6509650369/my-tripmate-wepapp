@@ -56,10 +56,10 @@ const VotePage: React.FC = () => {
   const [members, setMembers] = useState<{user_id: string, member_id: string, full_name?: string, name?: string, email?: string}[]>([]);
 
   const displayCode = inviteCode || tripCode;
-  const isClosed = trip?.status === 'completed' || trip?.status === 'archived';
+  const isClosed = trip?.status === 'completed' || trip?.status === 'archived' || trip?.status === 'confirmed';
 
   const isSummaryUnlocked = (tripData: TripDetail): boolean => {
-    if (tripData.status === 'completed' || tripData.status === 'archived') return true;
+    if (tripData.status === 'completed' || tripData.status === 'archived' || tripData.status === 'confirmed') return true;
     if (!tripData.createdat) return false;
     const diffDays = (new Date().getTime() - new Date(tripData.createdat).getTime()) / (1000 * 60 * 60 * 24);
     return diffDays >= 7;
@@ -86,9 +86,6 @@ const VotePage: React.FC = () => {
 
         const response = await tripAPI.getTripDetail(tripCode);
         console.log("Trip detail response:", response);
-        // console.log('members:', response.data?.members);
-        // console.log('member[0]:', response.data?.members?.[0]);
-        // console.log('trip owner info:', response.data?.ownerid, response.data);
         if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
@@ -120,7 +117,7 @@ const VotePage: React.FC = () => {
           } catch (e) {
             console.error('Load pending requests failed:', e);
           }
-        }else {
+        } else {
           console.log('❌ ไม่ใช่ Owner:', tripData.ownerid, 'vs', user?.user_id);
         }
 
@@ -161,7 +158,7 @@ const VotePage: React.FC = () => {
             if (myVotes.length > 0) setUserLocations(myVotes);
           }
 
-          const isCompleted = tripData.status === 'completed' || tripData.status === 'archived';
+          const isCompleted = tripData.status === 'completed' || tripData.status === 'archived' || tripData.status === 'confirmed';
           if (isCompleted || (hasDates && hasBudget && hasPlace)) {
             setStep(5);
           }
@@ -270,8 +267,9 @@ const VotePage: React.FC = () => {
     }
   };
 
-  // ✅ Save Dates
+  // ✅ Save Dates — blocked when trip is closed
   const handleSaveDates = async (dates: string[]) => {
+    if (isClosed) return;
     if (!trip) {
       console.log('No trip data available');
       return;
@@ -298,8 +296,9 @@ const VotePage: React.FC = () => {
     }
   };
 
-  // ✅ Save Budget
+  // ✅ Save Budget — blocked when trip is closed
   const handleSaveBudget = async (category: string, amount: number) => {
+    if (isClosed) return;
     if (!trip) return;
     try {
       const response = await voteAPI.updateBudget(trip.tripid, {
@@ -317,8 +316,9 @@ const VotePage: React.FC = () => {
     }
   };
 
-  // ✅ Vote Location
+  // ✅ Vote Location — blocked when trip is closed
   const handleVoteLocation = async (votes: LocationVote[]) => {
+    if (isClosed) return;
     if (!trip) return;
     try {
       const response = await voteAPI.submitLocationVote(trip.tripid, { votes });
@@ -352,6 +352,7 @@ const VotePage: React.FC = () => {
     if (step > 2) setStep(step - 1);
   };
 
+  // When closed: next is disabled (no more data to submit), but back is allowed for reviewing
   const isNextDisabled =
     step === 5 ||
     isClosed ||
@@ -481,7 +482,7 @@ const VotePage: React.FC = () => {
             <p className="text-sm text-gray-500 mt-1">
               {trip.numdays ? `${trip.numdays} วัน` : ''} 
               {trip.members && ` · สมาชิก ${trip.members.length} คน`}
-              {' · '}{trip.status === 'completed' || trip.status === 'archived' ? '✅ ทริปเสร็จสิ้น' : '🗳️ กำลังโหวต'}
+              {trip.status === 'completed' || trip.status === 'archived' || trip.status === 'confirmed' ? '✅ ทริปเสร็จสิ้น' : '🗳️ กำลังโหวต'}
             </p>
             <p className="text-sm text-gray-400 mt-1">
               {trip.description || 'ไม่มีคำอธิบายเพิ่มเติม'}
@@ -490,6 +491,13 @@ const VotePage: React.FC = () => {
               สร้างโดย {(trip.members?.find(m => m.user_id === trip.ownerid) as any)?.name || 'ไม่ระบุชื่อ'}
               {trip.createdat && ` · ${new Date(trip.createdat).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}`}
             </p>
+
+            {/* ✅ Closed trip banner */}
+            {isClosed && (
+              <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-full text-sm text-gray-600 font-medium">
+                🔒 ทริปนี้ปิดแล้ว — ไม่สามารถแก้ไขข้อมูลได้
+              </div>
+            )}
           </div>
         )}
         {/* Progress Steps */}
@@ -603,7 +611,7 @@ const VotePage: React.FC = () => {
             <span className="sm:hidden">ถัดไป →</span>
           </button>
         </div>
-        {step >= 2 && step <= 4 && !stepCompleted[step as keyof typeof stepCompleted] && (
+        {step >= 2 && step <= 4 && !isClosed && !stepCompleted[step as keyof typeof stepCompleted] && (
           <p className="text-center text-xs text-orange-500 mt-2">
             ⚠️ กรุณากรอกข้อมูลและบันทึกก่อนไปขั้นตอนถัดไป
           </p>

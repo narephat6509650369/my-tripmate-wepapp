@@ -571,7 +571,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
       </div>
 
       {/* ── Quick Edit ── */}
-      {onNavigateToStep && !canViewSummary && (
+      {onNavigateToStep && !canViewSummary && !(trip.status === 'completed' || trip.status === 'archived') && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <p className="text-sm text-blue-800 font-semibold mb-3">🔧 ต้องการแก้ไขข้อมูล?</p>
           <div className="flex flex-wrap gap-2">
