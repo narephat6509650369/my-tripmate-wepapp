@@ -62,7 +62,7 @@ const Dashboard: React.FC = () => {
         t.status === 'planning' || t.status === 'voting'
       ).length;
       const myCompleted = owned.filter(t => 
-        t.status === 'completed' || t.status === 'archived'
+        t.status === 'completed' || t.status === 'archived'|| t.status === 'confirmed'
       ).length;
 
       // คำนวณสถิติทริปที่เข้าร่วม
@@ -70,7 +70,7 @@ const Dashboard: React.FC = () => {
         t.status === 'planning' || t.status === 'voting'
       ).length;
       const joinedCompleted = joined.filter(t => 
-        t.status === 'completed' || t.status === 'archived'
+        t.status === 'completed' || t.status === 'archived' || t.status === 'confirmed'
       ).length;
 
       // TODO: ดึงข้อมูล "สถานะของคุณ" จาก API (ตอนนี้ใช้ mock)
