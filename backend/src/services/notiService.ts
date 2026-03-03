@@ -351,7 +351,8 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
 
   try {
 
-    const member = await tripModel.getMemberWithEmailPending(trip_id, user_id);
+    const member = await tripModel.getMemberWithEmail(trip_id, user_id);
+    
 
     if (!member) {
       return {
@@ -367,7 +368,7 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
       "Join request approved",
       "Your request to join the trip has been approved"
     );
-
+  
     if (!result.success) {
       return result;
     }

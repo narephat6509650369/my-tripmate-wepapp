@@ -311,8 +311,6 @@ export const approveMemberController = async (req: Request,res: Response) => {
       });
     }
 
-    console.log("userId",userId);
-
     const result = await approveMember(tripId,userId,owner_id);
 
     if (!result.success) {
