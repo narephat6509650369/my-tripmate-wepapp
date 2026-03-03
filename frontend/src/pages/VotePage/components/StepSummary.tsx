@@ -147,7 +147,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
             .slice(0, 3)
             .map((l: any) => ({ place: l.place, total_score: l.total_score })),
           progress: {
-            dates:    dateData?.summary?.totalMembers || 0,
+            dates:    dateData?.summary?.actualVote|| 0,
             budget:   budgetData?.filledMembers || 0,
             location: locData?.locationVotesTotal?.length
               ? Math.max(...(locData.locationVotesTotal.map((r: any) => r.voteCount || 0)))

@@ -415,6 +415,7 @@ export interface DateMatchingResponse {
   countrows: number;
   summary: {
     totalMembers: number;
+    actualVote: number;
     totalAvailableDays: number;
   };
   availability: Array<{

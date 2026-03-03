@@ -722,6 +722,21 @@ export const closeAllVotings = async (trip_id: string) => {
   }
 };
 
+export const getActualMembetVote = async (trip_id: string) => {
+  const [rows]: any = await pool.query(
+    `
+    SELECT COUNT(DISTINCT dv.user_id) AS total_voted
+    FROM date_votes dv
+    JOIN date_options do ON dv.date_option_id = do.date_option_id
+    JOIN date_votings dvt ON do.date_voting_id = dvt.date_voting_id
+    WHERE dvt.trip_id = ?
+    `,
+    [trip_id]
+  );
+
+  return rows[0].total_voted;
+};
+
 export default {
   getConnection,
   addAvailability,
@@ -733,7 +748,8 @@ export default {
   getLocationScores,
   getActiveMemberCount,
   getVoteLocation,
-  getAvailabilitiesByTrip
+  getAvailabilitiesByTrip,
+  getActualMembetVote,
 };
 
 /*

@@ -146,6 +146,7 @@ export const getvoteDate = async (tripId: string,userId: string) => {
   const {rows, rowlog,countrows} = await voteModel.getTripAvailabilities(tripId, userId);
   const availabilities = await voteModel.getAvailabilitiesByTrip(tripId);
   const totalMembers = await voteModel.getActiveMemberCount(tripId);
+  const actualVote =  await voteModel.getActualMembetVote(tripId);
 
   if (!availabilities.length || totalMembers === 0) {
     return {
@@ -261,6 +262,7 @@ export const getvoteDate = async (tripId: string,userId: string) => {
   countrows,  
   summary: {
       totalMembers,
+      actualVote,
       totalAvailableDays: Object.keys(table).length
   },
   availability: rankedDays,
