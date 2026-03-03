@@ -543,7 +543,7 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
     }
 
     // ตรวจสอบสิทธิ์: ต้องเป็นสมาชิก
-    const isMember = summary.members.some((m: any) =>m.user_id === user_id &&m.is_active === 1 &&m.status === "active");
+    const isMember = summary.members.some((m: any) => m.user_id === user_id);
     
     if (!isMember) {
       throw new Error("FORBIDDEN");
@@ -554,7 +554,7 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
 
     // ถ้ายังอยู่ระหว่างโหวต ยังไม่ต้องเรียก AI
     if (tripStatus === "planning") {
-      return { summary, getVoteNumber };
+      return { success: true, message: "ดึงข้อมูลสรุปทริปสำเร็จแล้ว", data: { summary, getVoteNumber } };
     }
 
     // ดึงผลโหวตทั้งหมด
