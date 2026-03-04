@@ -565,10 +565,13 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
     ]);
 
     // Map โครงสร้างให้ตรงกับที่ PromptService คาดหวัง
-    const mappedLocation = locationResult?.analysis?.winner
-      ? {
-        province_name: locationResult.analysis.winner.place,
-        vote_count: locationResult.analysis.winner.total_score,
+    const winner = locationResult?.locationVotesTotal
+    ?.sort((a: any, b: any) => b.total_score - a.total_score)?.[0];
+
+  const mappedLocation = winner
+    ? {
+        province_name: winner.place,
+        vote_count: winner.total_score,
       }
     : null;
 
@@ -588,10 +591,17 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
       }
       : null;
 
+    const mappedTrip = {
+        trip_name: summary.trip.tripname ?? summary.trip.trip_name,
+        num_days:  summary.trip.numdays  ?? summary.trip.num_days,
+        trip_code: summary.trip.tripcode ?? summary.trip.trip_code,
+        description: summary.trip.description,
+      };
+
     // เรียก PromptService ด้วย mapped data
     const { prompt, metadata } = PromptService.buildPromptWithMetadata(
       {
-        trip: summary.trip,
+        trip: mappedTrip,
         members: summary.members,
         locationResult: mappedLocation,
         budgetResult: mappedBudget,
