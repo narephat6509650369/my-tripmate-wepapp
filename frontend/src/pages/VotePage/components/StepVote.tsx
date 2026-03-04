@@ -453,11 +453,11 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
                     />
                   </div>
                   <span className="text-xs font-semibold text-blue-900 whitespace-nowrap">
-                    {matchingInfo.summary?.totalMembers || 0}/{trip.members?.length || 1} คน
+                    {matchingInfo.summary?.actualVote || 0}/{matchingInfo.summary?.totalMembers || 1} คน
                   </span>
                 </div>
                 <p className="text-xs text-blue-700">
-                  {(matchingInfo.summary?.totalMembers || 0) >= (trip.members?.length || 1)
+                  {(matchingInfo.summary?.actualVote || 0) >= (trip.members?.length || 1)
                     ? '✅ ทุกคนเลือกวันแล้ว'
                     : '⏳ รอสมาชิกคนอื่นเลือกวัน'}
                 </p>
