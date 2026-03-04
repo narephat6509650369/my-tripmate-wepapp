@@ -149,7 +149,9 @@ export const getActiveMemberCount = async (tripId: string): Promise<number> => {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT COUNT(*) as total 
      FROM trip_members 
-     WHERE trip_id = ? AND is_active = 1`,
+     WHERE trip_id = ? 
+     AND is_active = 1
+     AND status = 'active'`,
     [tripId]
   );
   return rows?.[0]?.total ?? 0;
@@ -400,25 +402,45 @@ export const updateBudget = async (trip_id: string, user_id: string, category: s
     await connection.beginTransaction();
 
     // 1. create budget_votings (ถ้ายังไม่มี)
-    await connection.query(
-      `
-      INSERT INTO budget_votings (budget_voting_id, trip_id, status)
-      VALUES (UUID(), ?, 'active')
-      ON DUPLICATE KEY UPDATE 
-        budget_voting_id = budget_voting_id
-      `,
+    // await connection.query(
+    //   `
+    //   INSERT INTO budget_votings (budget_voting_id, trip_id, status)
+    //   VALUES (UUID(), ?, 'active')
+    //   ON DUPLICATE KEY UPDATE 
+    //     budget_voting_id = budget_voting_id
+    //   `,
+    //   [trip_id]
+    // );
+
+    // 2. get budget_voting_id
+    // const [votingRows]: any = await connection.query(
+    //   `SELECT 
+    //     budget_voting_id 
+    //   FROM budget_votings 
+    //   WHERE trip_id = ?`,
+    //   [trip_id]
+    // );
+    // const budget_voting_id = votingRows[0].budget_voting_id;
+
+    // 1+2. get or create budget_voting_id
+    const [existing]: any = await connection.query(
+      `SELECT budget_voting_id FROM budget_votings WHERE trip_id = ? LIMIT 1`,
       [trip_id]
     );
 
-    // 2. get budget_voting_id
-    const [votingRows]: any = await connection.query(
-      `SELECT 
-        budget_voting_id 
-      FROM budget_votings 
-      WHERE trip_id = ?`,
-      [trip_id]
-    );
-    const budget_voting_id = votingRows[0].budget_voting_id;
+    let budget_voting_id: string;
+
+    if (existing && existing.length > 0) {
+      budget_voting_id = existing[0].budget_voting_id;
+    } else {
+      const { v4: uuidv4 } = await import('uuid');
+      const newId = uuidv4();
+      await connection.query(
+        `INSERT INTO budget_votings (budget_voting_id, trip_id, status) VALUES (?, ?, 'active')`,
+        [newId, trip_id]
+      );
+      budget_voting_id = newId;
+    }
 
     // 3. insert / update budget_options
     await connection.query(
@@ -560,12 +582,12 @@ export const submitLocationVotes = async (trip_id: string,user_id: string,votes:
       );
 
       // 3.3 update score cache
-      await connection.query(
-        `INSERT INTO location_options
-        (location_option_id, location_voting_id, province_name, proposed_by, score)
-        VALUES (UUID(), ?, ?, ?, ?)`,
-      [voting_id, province, user_id, score]
-      );
+      // await connection.query(
+      //   `INSERT INTO location_options
+      //   (location_option_id, location_voting_id, province_name, proposed_by, score)
+      //   VALUES (UUID(), ?, ?, ?, ?)`,
+      // [voting_id, province, user_id, score]
+      // );
     }
 
     await connection.commit();
@@ -740,10 +762,10 @@ export const getActualMembetVote = async (trip_id: string) => {
 export const getActualMembetVoteLocation = async (trip_id: string) => {
   const [rows]: any = await pool.query(
     `
-    SELECT COUNT(DISTINCT dv.user_id) AS total_voted
+    SELECT COUNT(DISTINCT lv.user_id) AS total_voted
     FROM location_votes lv
-    JOIN location_options lo ON lv.date_option_id = lo.date_option_id
-    JOIN location_votings lvt ON lo.date_voting_id = lvt.date_voting_id
+    JOIN location_options lo ON lv.location_option_id = lo.location_option_id
+    JOIN location_votings lvt ON lo.location_voting_id = lvt.location_voting_id
     WHERE lvt.trip_id = ?
     `,
     [trip_id]
@@ -755,15 +777,14 @@ export const getActualMembetVoteLocation = async (trip_id: string) => {
 export const getActualMembetBudgets = async (trip_id: string) => {
   const [rows]: any = await pool.query(
     `
-    SELECT COUNT(DISTINCT dv.user_id) AS total_voted
+    SELECT COUNT(DISTINCT bv.user_id) AS total_voted
     FROM budget_votes bv
     JOIN budget_options bo ON bv.budget_option_id = bo.budget_option_id
     JOIN budget_votings bvt ON bo.budget_voting_id = bvt.budget_voting_id
-    WHERE lvt.trip_id = ?
+    WHERE bvt.trip_id = ?
     `,
     [trip_id]
   );
-
   return rows[0].total_voted;
 };
 
@@ -780,6 +801,7 @@ export default {
   getVoteLocation,
   getAvailabilitiesByTrip,
   getActualMembetVote,
+  getActualMembetVoteLocation,
 };
 
 /*
