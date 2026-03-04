@@ -59,14 +59,14 @@ export const joinRequestTemplate = (ownerName: string,requesterName: string) => 
   `);
 };
 
-export const joinApprovedTemplate = (name: string) => {
+export const joinApprovedTemplate = (name: string, tripName: string) => {
   return baseTemplate(`
     <h2 style="color:#4CAF50;">✅ Request Approved</h2>
 
     <p>Hello ${name},</p>
 
     <p>
-      Your request to join the trip has been approved.
+      Your request to join <b>${tripName ?? 'the trip'}</b> has been approved.
     </p>
 
     <p>
@@ -75,14 +75,14 @@ export const joinApprovedTemplate = (name: string) => {
   `);
 };
 
-export const joinRejectedTemplate = (name: string) => {
+export const joinRejectedTemplate = (name: string, tripName: string) => {
   return baseTemplate(`
     <h2 style="color:#f44336;">❌ Request Rejected</h2>
 
     <p>Hello ${name},</p>
 
     <p>
-      Unfortunately, your request to join the trip was rejected.
+      Unfortunately, your request to join <b>${tripName ?? 'the trip'}</b> has been rejected by the trip owner.
     </p>
 
     <p>
