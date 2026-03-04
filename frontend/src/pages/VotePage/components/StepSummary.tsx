@@ -237,29 +237,37 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
     <div className="space-y-6">
 
       {/* ── Header ── */}
-      <div className="bg-white p-6 rounded-xl shadow-lg text-center">
-        <div className="text-6xl mb-3">🎉</div>
-        <h2 className="text-2xl font-bold mb-2">กรอกข้อมูลครบแล้ว!</h2>
-        <p className="text-gray-500">รอเพื่อนๆ กรอกข้อมูลให้ครบเพื่อดูผลสรุป</p>
-      </div>
+      {/* <div className="bg-blue-400 p-6 rounded-xl text-center text-white">
+        <div className="text-5xl mb-2">✈️</div>
+        <h2 className="text-2xl font-bold mb-1">{trip.tripname}</h2>
+        <p className="text-blue-100 text-sm">สรุปผลการโหวตของทุกคน</p>
+      </div> */}
 
       {/* ── Progress ── */}
-      <div className="bg-white p-5 rounded-xl shadow-lg">
-        <p className="text-sm font-bold text-gray-700 mb-3">📊 ความคืบหน้าของทริป</p>
-        <div className="space-y-3">
+      <div className="bg-blue-100 rounded-xl shadow-xl p-6">
+        <p className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <span className="text-xl">📊</span> ความคืบหน้าของทริป
+        </p>
+        <div className="space-y-4">
           {[
             { label: '📅 กรอกวันที่แล้ว',    count: summaryData?.progress.dates    || 0 },
             { label: '💰 กรอกงบแล้ว',         count: summaryData?.progress.budget   || 0 },
             { label: '📍 โหวตจังหวัดแล้ว',   count: summaryData?.progress.location || 0 },
           ].map(({ label, count }) => (
             <div key={label}>
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
+              <div className="flex justify-between text-sm font-medium text-gray-700 mb-1.5">
                 <span>{label}</span>
-                <span className="font-semibold">{count}/{memberCount} คน</span>
+                <span className={`font-bold ${count >= memberCount ? 'text-green-600' : 'text-blue-600'}`}>
+                  {count}/{memberCount} คน {count >= memberCount ? '✅' : ''}
+                </span>
               </div>
-              <div className="h-2 bg-gray-200 rounded-full">
+              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all"
+                  className={`h-3 rounded-full transition-all duration-500 ${
+                    count >= memberCount
+                      ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                      : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                  }`}
                   style={{ width: `${memberCount > 0 ? Math.min(100, (count / memberCount) * 100) : 0}%` }}
                 />
               </div>
@@ -268,12 +276,11 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
         </div>
       </div>
 
-      {/* ── Summary Data (blurred until open) ── */}
+      {/* ── Hero Summary Card ── */}
       <div className="relative">
-        {/* Blur overlay */}
         {!canViewSummary && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl">
-            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm rounded-xl" />
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-xl" />
             <div className="relative z-10 text-center px-6">
               <div className="text-5xl mb-3">🔒</div>
               <p className="font-bold text-gray-800 text-lg mb-1">
@@ -286,103 +293,200 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
           </div>
         )}
 
-        <div className="bg-white p-5 rounded-xl shadow-lg space-y-5">
-          <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-600" />
-            ผลสรุปของทริป
-          </h3>
+        <div className="bg-blue-100 rounded-xl shadow-xl p-6">
+          {/* Trip title */}
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-blue-600" />
+            <h3 className="font-bold text-lg text-blue-700">สรุปผลทริปนี้</h3>
+            <span className="ml-auto text-blue-600 text-sm">{memberCount} คน · {trip.numdays} วัน</span>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 3 ข้อมูลหลัก */}
+          <div className="grid grid-cols-3 gap-3">
 
             {/* วันที่ */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5" /> วันที่แนะนำ
-              </p>
+            <div className="bg-blue-200 hover:bg-blue-300 rounded-xl p-4 text-center transition">
+              <p className="text-2xl mb-1">📅</p>
+              <p className="text-xs text-blue-600 mb-1">วันที่แนะนำ</p>
               {summaryData?.bestDates.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {summaryData.bestDates.map((date, idx) => (
-                    <div key={date} className="flex items-center gap-1 bg-white border border-gray-100 rounded px-2.5 py-1.5">
-                      <span className="text-xs">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
-                      <span className="text-xs font-medium text-gray-700">
-                        {new Date(date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <p className="font-bold text-sm text-blue-800 leading-tight">
+                    {new Date(summaryData.bestDates[0]).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                  </p>
+                  {summaryData.bestDates.length > 1 && (
+                    <p className="text-xs text-blue-600 mt-0.5">
+                      ถึง {new Date(summaryData.bestDates[summaryData.bestDates.length - 1])
+                        .toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                    </p>
+                  )}
+                </>
               ) : (
-                <p className="text-gray-400 text-xs">ยังไม่มีข้อมูลเพียงพอ</p>
+                <p className="text-xs text-blue-500">รอข้อมูล</p>
               )}
             </div>
 
-            {/* งบประมาณ */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-                <DollarSign className="w-3.5 h-3.5" /> งบประมาณเฉลี่ยแต่ละหมวดต่อ {tripDuration} วัน
-              </p>
-              {summaryData ? (
-                <div className="space-y-1.5">
-                  {[
-                    { key: 'accommodation', label: '🏠 ที่พัก' },
-                    { key: 'transport',     label: '🚗 เดินทาง' },
-                    { key: 'food',          label: '🍜 อาหาร' },
-                    { key: 'other',         label: '🎒 สำรอง' },
-                  ].map(({ key, label }) => (
-                    <div key={key} className="flex justify-between bg-white border border-gray-100 rounded px-2.5 py-1.5">
-                      <span className="text-xs text-gray-600">{label}</span>
-                      <span className="text-xs font-semibold text-gray-800">
-                        ฿{formatCurrency(summaryData.avgBudget[key as keyof typeof summaryData.avgBudget])}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between bg-blue-50 border border-blue-100 rounded px-2.5 py-1.5 mt-1">
-                    <span className="text-xs font-bold text-blue-700">รวม</span>
-                    <span className="text-sm font-bold text-blue-700">฿{formatCurrency(totalAvgBudget)}</span>
-                  </div>
-                </div>
+            {/* งบ */}
+            <div className="bg-blue-200 hover:bg-blue-300 rounded-xl p-4 text-center transition">
+              <p className="text-2xl mb-1">💰</p>
+              <p className="text-xs text-blue-600 mb-1">งบเฉลี่ยต่อคน</p>
+              {summaryData && totalAvgBudget > 0 ? (
+                <p className="font-bold text-sm text-blue-800">฿{formatCurrency(totalAvgBudget)}</p>
               ) : (
-                <p className="text-gray-400 text-xs">ยังไม่มีข้อมูลเพียงพอ</p>
+                <p className="text-xs text-blue-500">รอข้อมูล</p>
               )}
             </div>
 
             {/* จังหวัด */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" /> จังหวัดยอดนิยม
-              </p>
+            <div className="bg-blue-200 hover:bg-blue-300 rounded-xl p-4 text-center transition">
+              <p className="text-2xl mb-1">📍</p>
+              <p className="text-xs text-blue-600 mb-1">จังหวัดชนะเลิศ</p>
               {summaryData?.topLocations.length ? (
-                <div className="space-y-1.5">
-                  {summaryData.topLocations.map((loc, idx) => (
-                    <div key={loc.place} className="flex justify-between bg-white border border-gray-100 rounded px-2.5 py-1.5">
-                      <span className="text-xs font-medium text-gray-700">
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'} {loc.place}
-                      </span>
-                      <span className="text-xs text-gray-400">{loc.total_score} คะแนน</span>
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <p className="font-bold text-sm text-blue-800 leading-tight">{summaryData.topLocations[0].place}</p>
+                  <p className="text-xs text-blue-600 mt-0.5">{summaryData.topLocations[0].total_score} คะแนน</p>
+                </>
               ) : (
-                <p className="text-gray-400 text-xs">ยังไม่มีข้อมูลเพียงพอ</p>
+                <p className="text-xs text-blue-500">รอข้อมูล</p>
               )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── AI Prompt Studio (blurred until open) ── */}
-      <div className="relative">
-        {!canViewSummary && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl">
-            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm rounded-xl" />
-            <div className="relative z-10 text-center px-6">
-              <div className="text-4xl mb-2">🤖🔒</div>
-              <p className="font-bold text-gray-700">AI Prompt พร้อมใช้เมื่อเปิดการโหวต</p>
+      {/* ── ผลสรุปของทริป (MAIN FEATURE) ── */}
+      <details className="group">
+        <summary className="cursor-pointer list-none bg-white border-2 border-indigo-100 rounded-xl px-5 py-4 flex items-center justify-between hover:bg-indigo-50 transition select-none shadow-sm">
+          <span className="font-semibold text-gray-700 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-500" />
+            ดูรายละเอียดผลสรุป
+          </span>
+          <span className="text-gray-400 text-sm group-open:hidden">▼ ขยาย</span>
+          <span className="text-gray-400 text-sm hidden group-open:inline">▲ ซ่อน</span>
+        </summary>
+
+        <div className="mt-3">
+          <div className="relative">
+            {!canViewSummary && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl">
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-xl" />
+                <div className="relative z-10 text-center px-6">
+                  <div className="text-5xl mb-3">🔒</div>
+                  <p className="font-bold text-gray-800 text-lg mb-1">
+                    {isOwner ? 'ปิดการโหวตเพื่อดูผลสรุป' : 'รอเจ้าของทริปปิดการโหวต'}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {isOwner ? 'กดปุ่มด้านล่างเมื่อทุกคนกรอกครบ' : 'หรือรอครบ 7 วันหลังสร้างทริป'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 p-6 rounded-xl shadow-lg space-y-6">
+              <h3 className="font-bold text-gray-900 text-xl flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-purple-600" />
+                ผลสรุปของทริป
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                {/* วันที่ */}
+                <div className="bg-white border-2 border-blue-200 rounded-xl p-5 shadow-sm">
+                  <p className="text-sm font-bold text-blue-700 mb-3 flex items-center gap-2">
+                    <Calendar className="w-4 h-4" /> 📅 วันที่แนะนำ
+                  </p>
+                  {summaryData?.bestDates.length ? (
+                    <div className="space-y-2">
+                      {summaryData.bestDates.map((date, idx) => (
+                        <div key={date} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
+                          <span className="text-lg">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}</span>
+                          <span className="font-bold text-gray-800">
+                            {new Date(date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm text-center py-4">ยังไม่มีข้อมูลเพียงพอ</p>
+                  )}
+                </div>
+
+                {/* งบประมาณ */}
+                <div className="bg-white border-2 border-green-200 rounded-xl p-5 shadow-sm">
+                  <p className="text-sm font-bold text-green-700 mb-3 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" /> 💰 งบประมาณเฉลี่ย
+                  </p>
+                  {summaryData ? (
+                    <div className="space-y-2">
+                      {[
+                        { key: 'accommodation', label: '🏠 ที่พัก' },
+                        { key: 'transport',     label: '🚗 เดินทาง' },
+                        { key: 'food',          label: '🍜 อาหาร' },
+                        { key: 'other',         label: '🎒 สำรอง' },
+                      ].map(({ key, label }) => (
+                        <div key={key} className="flex justify-between items-center bg-green-50 rounded-lg px-3 py-2">
+                          <span className="text-sm text-gray-700">{label}</span>
+                          <span className="font-bold text-gray-900">
+                            ฿{formatCurrency(summaryData.avgBudget[key as keyof typeof summaryData.avgBudget])}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center bg-green-100 border border-green-300 rounded-lg px-3 py-2 mt-1">
+                        <span className="font-bold text-green-800">รวม</span>
+                        <span className="text-lg font-bold text-green-700">฿{formatCurrency(totalAvgBudget)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm text-center py-4">ยังไม่มีข้อมูลเพียงพอ</p>
+                  )}
+                </div>
+
+                {/* จังหวัด */}
+                <div className="bg-white border-2 border-purple-200 rounded-xl p-5 shadow-sm">
+                  <p className="text-sm font-bold text-purple-700 mb-3 flex items-center gap-2">
+                    <MapPin className="w-4 h-4" /> 📍 จังหวัดยอดนิยม
+                  </p>
+                  {summaryData?.topLocations.length ? (
+                    <div className="space-y-2">
+                      {summaryData.topLocations.map((loc, idx) => (
+                        <div key={loc.place} className="flex items-center justify-between bg-purple-50 rounded-lg px-3 py-2">
+                          <span className="font-bold text-gray-800">
+                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'} {loc.place}
+                          </span>
+                          <span className="text-sm font-semibold text-purple-600">{loc.total_score} คะแนน</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm text-center py-4">ยังไม่มีข้อมูลเพียงพอ</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        )}
+        </div>
+      </details>
 
-        <div className="bg-white rounded-xl shadow-lg p-5 space-y-5">
-          {/* Header + Tabs */}
+      {/* ── AI Prompt Studio (collapsed by default) ── */}
+      <details className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <summary className="px-5 py-4 cursor-pointer flex items-center gap-2 text-gray-500 hover:bg-gray-50 transition select-none list-none">
+          <Brain className="w-4 h-4" />
+          <span className="text-sm font-medium">🤖 AI Prompt Studio</span>
+          <span className="ml-auto text-xs text-gray-400">คลิกเพื่อขยาย</span>
+        </summary>
+
+        <div className="border-t border-gray-100 p-5 space-y-5">
+          {/* Blur overlay ถ้ายังไม่ unlock */}
+          {!canViewSummary && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl">
+              <div className="absolute inset-0 bg-white/70 backdrop-blur-sm rounded-xl" />
+              <div className="relative z-10 text-center px-6">
+                <div className="text-4xl mb-2">🤖🔒</div>
+                <p className="font-bold text-gray-700">AI Prompt พร้อมใช้เมื่อปิดการโหวต</p>
+              </div>
+            </div>
+          )}
+
+          {/* Header Tabs */}
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <Brain className="w-5 h-5 text-purple-600" />
@@ -568,7 +672,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
             </div>
           )}
         </div>
-      </div>
+      </details>
 
       {/* ── Quick Edit ── */}
       {onNavigateToStep && !canViewSummary && !(trip.status === 'completed' || trip.status === 'archived') && (
@@ -589,7 +693,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
         </div>
       )}
 
-      {/* ── Action Button ── */}
+      {/* ── Action Buttons ── */}
       {isOwner && !canViewSummary && (
         <button
           onClick={handleCloseVoting}
@@ -611,6 +715,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
           🔒 รอเจ้าของทริปปิดการโหวต หรือรอครบ 7 วัน
         </div>
       )}
+
     </div>
   );
 };
