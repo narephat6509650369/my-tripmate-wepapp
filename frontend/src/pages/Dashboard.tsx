@@ -283,39 +283,55 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* Pie Chart */}
+                
+                {/* สรุปภาพรวม */}
                 <div className="bg-blue-100 rounded-lg p-5">
                   <h3 className="text-lg font-semibold text-blue-900 mb-3">📊 สัดส่วนทริป</h3>
                   
-                  {/* ✅ เช็คก่อนว่ามีข้อมูลจริง */}
                   {stats.myTrips.ongoing === 0 && stats.myTrips.completed === 0 ? (
                     <div className="text-center py-8 text-gray-400">
                       <p>ยังไม่มีข้อมูลเพียงพอ</p>
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={myTripsChartData.filter(d => d.value > 0)}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label={({ name, value, percent }) => 
-                            `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
-                          }
-                        >
-                          {myTripsChartData
-                            .filter(d => d.value > 0)
-                            .map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={myTripsChartData.filter(d => d.value > 0)}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={({ name, value, percent }) =>
+                              `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
+                            }
+                          >
+                            {myTripsChartData
+                              .filter(d => d.value > 0)
+                              .map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-green-500 rounded"></div>
+                          <span className="text-sm text-blue-900">
+                            กำลังดำเนินการ ({stats.myTrips.ongoing} ทริป)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-gray-500 rounded"></div>
+                          <span className="text-sm text-blue-900">
+                            เสร็จสิ้น ({stats.myTrips.completed} ทริป)
+                          </span>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
