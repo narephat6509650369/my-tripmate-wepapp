@@ -333,8 +333,12 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
   if (!trip) throw new Error("Trip not found");
 
   const members = await tripModel.getTripMembers(trip.trip_id);
+
   const isMember = members.some(m => m.user_id === user_id && m.is_active && m.status === 'active');
-  if (!isMember) throw new Error("You are not a member of this trip");
+  
+  if (!isMember) {
+    throw new Error("You are not a member of this trip");
+  }
 
   const result = await voteModel.getBudgetVoting(trip.trip_id, user_id);
 
@@ -359,9 +363,11 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
     const category = vote.category_name;
     const amount = Number(vote.estimated_amount);
     //console.log("vote:",vote);
+
     if (!categoryMap[category]) {
       categoryMap[category] = [];
     }
+    
     categoryMap[category].push(amount);
     userSet.add(vote.user_id);
   });
