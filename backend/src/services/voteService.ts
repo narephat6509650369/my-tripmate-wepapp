@@ -333,12 +333,8 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
   if (!trip) throw new Error("Trip not found");
 
   const members = await tripModel.getTripMembers(trip.trip_id);
-
   const isMember = members.some(m => m.user_id === user_id && m.is_active && m.status === 'active');
-
-  if (!isMember) {
-    throw new Error("You are not a member of this trip");
-  }
+  if (!isMember) throw new Error("You are not a member of this trip");
 
   const result = await voteModel.getBudgetVoting(trip.trip_id, user_id);
 
@@ -351,9 +347,9 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
     };
   }
 
-  const { rows, rowlog , budgetcount, budget} = result;
-  
-  const actualVote =  await voteModel.getActualMembetBudgets(tripid);
+  const { rows, rowlog, budgetcount, budget } = result;
+  const actualVote = await voteModel.getActualMembetBudgets(tripid);
+  const totalMembers = await voteModel.getActiveMemberCount(tripid);
 
   // 1 จัดกลุ่ม vote ล่าสุด (จาก budget_votes)
   const categoryMap: Record<string, number[]> = {};
@@ -363,11 +359,9 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
     const category = vote.category_name;
     const amount = Number(vote.estimated_amount);
     //console.log("vote:",vote);
-
     if (!categoryMap[category]) {
       categoryMap[category] = [];
     }
-
     categoryMap[category].push(amount);
     userSet.add(vote.user_id);
   });
@@ -449,7 +443,7 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
 
     stats[category] = {
       q1: quartile.q1,
-      q2: quartile.q2,
+      q2: quartile.q2,  
       q3: quartile.q3,
       iqr: quartile.iqr,
       lowerBound: quartile.lowerBound,
@@ -477,6 +471,7 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
       minTotal,
       maxTotal,
       filledMembers: userSet.size,
+      totalMembers,
       actualVote,
       rowlog
   };
@@ -559,13 +554,15 @@ export const voteLocation = async (tripid: string,user_id: string,votes: Locatio
 export const getvoteLocation = async (tripId: string, user_id: string) => {
   const { rows, rowlog, locationVotesTotal } = await voteModel.getVoteLocation(tripId, user_id);
   const actualVote =  await voteModel.getActualMembetVoteLocation(tripId);
+  const totalMembers = await voteModel.getActiveMemberCount(tripId);
 
   if (!Array.isArray(locationVotesTotal) || locationVotesTotal.length === 0) {
     return {
       rows,
       analysis: null,
       rowlog,
-      locationVotesTotal: []
+      locationVotesTotal: [],
+      totalMembers
     };
   }
 
@@ -663,6 +660,7 @@ export const getvoteLocation = async (tripId: string, user_id: string) => {
     analysis,
     locationVotesTotal: provinceScores,
     actualVote,
+    totalMembers,
     rowlog
   };
 };
