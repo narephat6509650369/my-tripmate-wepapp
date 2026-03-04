@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, voteAPI } from '../services/tripService';
 import type { TripDetail, LocationVote, DateMatchingResponse, BudgetVotingResponse } from '../types';
 type MatchingData = Pick<DateMatchingResponse, 'availability' | 'recommendation' | 'summary'>;
-type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers'>;
+type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers' | 'totalMembers'>;
 
 interface PendingRequest {
   member_id: string;
@@ -45,7 +45,10 @@ const VotePage: React.FC = () => {
   const [userDates, setUserDates] = useState<string[]>([]);
   const [matchingData, setMatchingData] = useState<MatchingData | null>(null);
   const [budgetInfo, setBudgetInfo] = useState<BudgetInfo | null>(null);
+  const [budgetAnalysis, setBudgetAnalysis] = useState<any>(null);
   const [userLocations, setUserLocations] = useState<{ place: string; score: number }[]>([]);
+  const [locationAnalysis, setLocationAnalysis] = useState<any>(null);
+  const [locationVotedCount, setLocationVotedCount] = useState(0);
 
   // ✅ Pending Requests state
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
@@ -140,6 +143,7 @@ const VotePage: React.FC = () => {
           // ========== งบประมาณ ==========
           const budgetRes = await voteAPI.getBudgetVoting(tripData.tripid);
           if (budgetRes?.data) setBudgetInfo(budgetRes.data);
+          if (budgetRes?.data?.stats) setBudgetAnalysis(budgetRes.data.stats);
           const hasBudget = budgetRes?.data?.rows?.some(
             (r: any) => r.user_id === user?.user_id
           );
@@ -156,6 +160,8 @@ const VotePage: React.FC = () => {
               .filter((log: any) => log.proposed_by === user.user_id)
               .map((log: any) => ({ place: log.province_name, score: log.score }));
             if (myVotes.length > 0) setUserLocations(myVotes);
+            if (locRes?.data?.analysis) setLocationAnalysis(locRes.data.analysis);
+            if (locRes?.data?.actualVote) setLocationVotedCount(locRes.data.actualVote);
           }
 
           const isCompleted = tripData.status === 'completed' || tripData.status === 'archived' || tripData.status === 'confirmed';
@@ -241,15 +247,35 @@ const VotePage: React.FC = () => {
 
   // ✅ Approve All
   const handleApproveAll = async () => {
-    for (const req of pendingRequests) {
-      await handleApprove(req.user_id);
+    if (!trip) return;
+    const toApprove = [...pendingRequests];
+    
+    // ✅ clear ทันทีก่อน call API เพื่อป้องกัน double trigger
+    setPendingRequests([]);
+    
+    for (const req of toApprove) {
+      try {
+        await tripAPI.approveRequest(trip.tripid, req.user_id);
+      } catch (e) {
+        console.error('Approve failed:', e);
+      }
     }
   };
 
   // ✅ Reject All
   const handleRejectAll = async () => {
-    for (const req of pendingRequests) {
-      await handleReject(req.user_id);
+    if (!trip) return;
+    const toReject = [...pendingRequests];
+    
+    // ✅ clear ทันทีก่อน call API
+    setPendingRequests([]);
+    
+    for (const req of toReject) {
+      try {
+        await tripAPI.rejectRequest(trip.tripid, req.user_id);
+      } catch (e) {
+        console.error('Reject failed:', e);
+      }
     }
   };
 
@@ -308,6 +334,11 @@ const VotePage: React.FC = () => {
       if (response.success) {
         console.log('บันทึกงบประมาณสำเร็จ');
         setStepCompleted(prev => ({ ...prev, 3: true }));
+        const budgetRes = await voteAPI.getBudgetVoting(trip.tripid);
+        if (budgetRes?.data) {
+          setBudgetInfo(budgetRes.data);
+          if (budgetRes.data.stats) setBudgetAnalysis(budgetRes.data.stats);
+        }
       } else {
         throw new Error(response.message);
       }
@@ -330,6 +361,8 @@ const VotePage: React.FC = () => {
           score: v.score
         }));
         setUserLocations(updatedLocations);
+        const locRes = await voteAPI.getLocationVote(trip.tripid);
+        if (locRes?.data?.analysis) setLocationAnalysis(locRes.data.analysis);
         setStepCompleted(prev => ({ ...prev, 4: true }));
       } else {
         throw new Error(response.message);
@@ -487,10 +520,10 @@ const VotePage: React.FC = () => {
             <p className="text-sm text-gray-400 mt-1">
               {trip.description || 'ไม่มีคำอธิบายเพิ่มเติม'}
             </p>
-            <p className="text-sm text-gray-400 mt-1">
+            {/* <p className="text-sm text-gray-400 mt-1">
               สร้างโดย {(trip.members?.find(m => m.user_id === trip.ownerid) as any)?.name || 'ไม่ระบุชื่อ'}
               {trip.createdat && ` · ${new Date(trip.createdat).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}`}
-            </p>
+            </p> */}
 
             {/* ✅ Closed trip banner */}
             {isClosed && (
@@ -565,6 +598,7 @@ const VotePage: React.FC = () => {
               budgetInfo={budgetInfo}
               onSave={handleSaveBudget}
               onManualNext={next}
+              initialAnalysis={budgetAnalysis}
               isLocked={isClosed}
             />
           )}
@@ -574,6 +608,8 @@ const VotePage: React.FC = () => {
               onVote={handleVoteLocation}
               initialVotes={userLocations}
               initialVotingResults={userLocations}
+              initialAnalysis={locationAnalysis}
+              initialVotedCount={locationVotedCount}
               isLocked={isClosed}
             />
           )}
@@ -759,7 +795,7 @@ const VotePage: React.FC = () => {
       )}
 
       {/* Delete Confirm Modal */}
-      {showDeleteConfirm && (
+      {showDeleteConfirm && !isClosed && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
           onClick={() => setShowDeleteConfirm(false)}
@@ -783,15 +819,16 @@ const VotePage: React.FC = () => {
               >
                 ยกเลิก
               </button>
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  handleDeleteTrip();
-                }}
-                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition"
-              >
-                ลบทริป
-              </button>
+              {isOwner && !isClosed && (
+                <button
+                  onClick={handleDeleteTrip}
+                  className="relative px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 bg-red-100 hover:bg-red-200 text-red-700 transition-all text-sm min-w-[44px] min-h-[44px]"
+                  title="ลบทริป"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">ลบทริป</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
