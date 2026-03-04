@@ -556,6 +556,7 @@ export const voteLocation = async (tripid: string,user_id: string,votes: Locatio
 // get location vote
 export const getvoteLocation = async (tripId: string, user_id: string) => {
   const { rows, rowlog, locationVotesTotal } = await voteModel.getVoteLocation(tripId, user_id);
+  const actualVote =  await voteModel.getActualMembetVoteLocation(tripId);
 
   if (!Array.isArray(locationVotesTotal) || locationVotesTotal.length === 0) {
     return {
@@ -659,6 +660,7 @@ export const getvoteLocation = async (tripId: string, user_id: string) => {
     rows,
     analysis,
     locationVotesTotal: provinceScores,
+    actualVote,
     rowlog
   };
 };

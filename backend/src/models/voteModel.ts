@@ -737,6 +737,21 @@ export const getActualMembetVote = async (trip_id: string) => {
   return rows[0].total_voted;
 };
 
+export const getActualMembetVoteLocation = async (trip_id: string) => {
+  const [rows]: any = await pool.query(
+    `
+    SELECT COUNT(DISTINCT dv.user_id) AS total_voted
+    FROM location_votes lv
+    JOIN location_options lo ON lv.date_option_id = lo.date_option_id
+    JOIN location_votings lvt ON lo.date_voting_id = lvt.date_voting_id
+    WHERE lvt.trip_id = ?
+    `,
+    [trip_id]
+  );
+
+  return rows[0].total_voted;
+};
+
 export default {
   getConnection,
   addAvailability,
