@@ -163,47 +163,27 @@ export const getMockTripDetail = (tripId: string): ApiResponse<TripDetail> => {
       createdat: trip.created_at,
       members: [
       {
-        id: 'member-001',
-        userId: 'user-001',
-        role: 'owner',
-        fullName: 'สมชาย ใจดี',
-        avatarUrl: null,
-        joinedAt: Date.now() - 5 * 86400000,
-        isActive: true
+        user_id: 'user-003',
+        name: 'Charlie',
+        email: 'charlie@example.com',
+        role: 'member',
+        status: 'active',
+        joined_at: new Date(Date.now() - 3 * 86400000).toISOString()
       },
       {
-        id: 'member-002',
-        userId: 'user-002',
+        user_id: 'user-004',
+        name: 'David',
+        email: 'david@example.com',
         role: 'member',
-        fullName: 'สมหญิง รักดี',
-        avatarUrl: null,
-        joinedAt: Date.now() - 4 * 86400000,
-        isActive: true
-      },
-      {
-        id: 'member-003',
-        userId: 'user-003',
-        role: 'member',
-        fullName: 'Charlie',
-        avatarUrl: null,
-        joinedAt: Date.now() - 3 * 86400000,
-        isActive: true
-      },
-      {
-        id: 'member-004',
-        userId: 'user-004',
-        role: 'member',
-        fullName: 'David',
-        avatarUrl: null,
-        joinedAt: Date.now() - 2 * 86400000,
-        isActive: true
+        status: 'active',
+        joined_at: new Date(Date.now() - 2 * 86400000).toISOString()
       }
     ],
       dateRanges: [],
       provinceVotes: [],
       budgetOptions: [],
       memberAvailabilitys: [],
-      membercount: 0
+      membercount: 4
     }
   };
 };
@@ -523,6 +503,7 @@ export const getMockDateMatchingResult = (tripId: string): ApiResponse<DateMatch
       countrows: 3,
       summary: {
         totalMembers: 4,
+        actualVote: 2,
         totalAvailableDays: 10
       },
       availability: [
@@ -628,7 +609,8 @@ export const getMockGetBudgetVoting = (tripCode: string): ApiResponse => {
       minTotal: 8800,        // รวม Q1 ทุก category
       maxTotal: 16000,       // รวม Q3 ทุก category
       filledMembers: 4,      // จำนวนคนที่กรอบ 
-
+      totalMembers: 4,
+      actualVote: 4,
       // ✅ 4. ประวัติการเสนอทั้งหมด (rowlog)
       rowlog: [
         {
