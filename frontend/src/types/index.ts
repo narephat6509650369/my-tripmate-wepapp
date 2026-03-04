@@ -130,6 +130,9 @@ export interface Member {
   avatarUrl?: string | null;
   joinedAt?: number;
   isActive?: boolean;
+  email?: string;
+  status?: string;
+  joined_at?: string;
 }
 
 export interface DateRange {
@@ -300,7 +303,7 @@ export type BudgetVotingResponse = {
       iqr: number;
       lowerBound: number;
       upperBound: number;
-      filteredCount: number;
+      filteredCount: number;   
       removedCount: number;
       removedValues: number[];
     };
@@ -310,7 +313,7 @@ export type BudgetVotingResponse = {
   minTotal: number;
   maxTotal: number;
   filledMembers: number;
-
+  totalMembers: number; 
   rowlog: Array<{
     proposed_by: string;
     proposed_by_name: string;
@@ -359,7 +362,8 @@ export interface LocationVoteResponse {
     score: number;
     province_name: string;
   }>;
-  
+  actualVote: number; 
+  totalMembers: number;
   analysis: {
     hasWinner: boolean;
     winner?: {
