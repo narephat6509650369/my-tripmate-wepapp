@@ -353,6 +353,7 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
 
   const { rows, rowlog , budgetcount, budget} = result;
   
+  const actualVote =  await voteModel.getActualMembetBudgets(tripid);
 
   // 1 จัดกลุ่ม vote ล่าสุด (จาก budget_votes)
   const categoryMap: Record<string, number[]> = {};
@@ -476,6 +477,7 @@ export const getvoteBudget = async (tripid: string, user_id: string) => {
       minTotal,
       maxTotal,
       filledMembers: userSet.size,
+      actualVote,
       rowlog
   };
 };
