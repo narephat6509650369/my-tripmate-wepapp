@@ -24,14 +24,14 @@ interface BudgetStatsMap {
 
 // ============== COMPONENT TYPES ==============
 
-type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers'>;
-
+type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers' | 'totalMembers'>;
 interface StepBudgetProps {
   trip: TripDetail;
   budgetInfo?: BudgetInfo | null;
   onSave: (category: string, amount: number) => Promise<void>;
   onManualNext?: () => void;
   isLocked?: boolean;
+  initialAnalysis?: any;
 }
 
 interface BudgetState {
@@ -54,7 +54,7 @@ const MAX_BUDGET = 10_000_000; // 10 ล้านบาท
 const MIN_BUDGET = 0;
 
 // ============== COMPONENT ==============
-export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave, onManualNext, isLocked }) => {
+export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave, onManualNext, isLocked, initialAnalysis }, ) => {
   // ============== STATE ==============
   const [budget, setBudget] = useState<BudgetState>({
     accommodation: 0,
@@ -70,6 +70,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     minTotal: number;
     maxTotal: number;
     filledMembers: number;
+    totalMembers: number;
   } | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   // ✅ เปลี่ยนจาก justSaved เป็น hasSaved + isAnalysisOpen เหมือน StepVote
@@ -144,13 +145,14 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
         budgetTotal: budgetInfo.budgetTotal || 0,
         minTotal: budgetInfo.minTotal || 0,
         maxTotal: budgetInfo.maxTotal || 0,
-        filledMembers: budgetInfo.filledMembers || 0
+        filledMembers: budgetInfo.filledMembers || 0,
+        totalMembers: budgetInfo.totalMembers || 0,
       });
     }
 
     if (budgetInfo?.rows && budgetInfo.rows.length > 0) {
       setHasSaved(true);
-      // setIsAnalysisOpen(true);
+      setIsAnalysisOpen(true);
     }
 
     setIsLoading(false);
@@ -176,6 +178,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     try {
       await onSave(category, amount);
       console.log(`✅ บันทึก ${category} สำเร็จ: ฿${amount}`);
+      setHasSaved(true);
+      setIsAnalysisOpen(true);
     } catch (error) {
       console.error(`Error saving ${category}:`, error);
       const errorMsg = error instanceof Error ? error.message : 'ไม่สามารถบันทึกได้';
@@ -242,7 +246,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
           other:         { avg: budget.other,         min: budget.other,         max: budget.other,         myValue: budget.other },
         });
       setHasSaved(true);
-      // setIsAnalysisOpen(true);
+      setIsAnalysisOpen(true);
       }
     } catch (error) {
       console.error('Error saving budget:', error);
@@ -312,7 +316,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                   />
                 </div>
                 <span className="text-sm font-semibold text-blue-900">
-                  {filledBudgetMembers}/{trip.members?.length || 1} คน
+                  {filledBudgetMembers}/{totalBudgetInfo?.totalMembers || 1} คน
                 </span>
               </div>
               <p className="text-xs text-blue-700 mt-2">
@@ -344,7 +348,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
               <div className="grid grid-cols-2 gap-4">
                 {BUDGET_CATEGORIES.map(({ key, label, color }) => {
                   const stat = budgetStats[key];
-                  if (!stat || stat.myValue === 0) return null;
+                  if (!stat || budget[key] === 0) return null;
 
                   const range = stat.max - stat.min;
                   const position = range > 0
@@ -640,12 +644,9 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
             {/* Content — แสดงเมื่อ isAnalysisOpen */}
             {isAnalysisOpen && budgetStats && (() => {
               const voterCount = totalBudgetInfo?.filledMembers || 0;
-              const hasRealStats = voterCount >= 2 && Object.values(budgetStats).some(s => {
-                if (s.avg === 0 && s.min === 0 && s.max === 0) return false;
-                if (voterCount === 2) return s.min !== s.max;
-                return s.median !== undefined && s.median > 0;
+              const hasRealStats = voterCount >= 1 && Object.values(budgetStats).some(s => {
+                return s.avg > 0 || s.min > 0 || s.max > 0;
               });
-
               const totalAvg = Object.values(budgetStats).reduce((sum, s) => sum + s.avg, 0);
 
               return (
@@ -657,11 +658,11 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full transition-all"
-                          style={{ width: `${Math.min(100, (filledBudgetMembers / (trip.members?.length || 1)) * 100)}%` }}
+                          style={{ width: `${Math.min(100, (filledBudgetMembers / (totalBudgetInfo?.totalMembers || 1)) * 100)}%` }}
                         />
                       </div>
                       <span className="text-xs font-semibold text-blue-900 whitespace-nowrap">
-                        {filledBudgetMembers}/{trip.members?.length || 1} คน
+                        {filledBudgetMembers}/{totalBudgetInfo?.totalMembers || 1} คน
                       </span>
                     </div>
                     <p className="text-xs text-blue-700">
@@ -672,7 +673,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                   {/* รายหมวด */}
                   {BUDGET_CATEGORIES.map(({ key, label, color }) => {
                     const stat = budgetStats[key];
-                    if (!stat || stat.myValue === 0) return null;
+                    if (!stat || budget[key] === 0) return null;
 
                     const diffFromAvg = stat.myValue - stat.avg;
                     const diffPercent = stat.avg > 0 ? Math.round((diffFromAvg / stat.avg) * 100) : 0;
@@ -685,7 +686,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                             <span className="text-sm font-semibold text-gray-800">{label}</span>
                           </div>
                           <span className="text-lg font-bold" style={{ color }}>
-                            ฿{formatCurrency(stat.myValue)}
+                            ฿{formatCurrency(budget[key])}
                           </span>
                         </div>
 
