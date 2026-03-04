@@ -548,7 +548,7 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
     if (!isMember) {
       throw new Error("FORBIDDEN");
     }
-
+    
     const getVoteNumber = await tripModel.getStatusVoteResult(tripId);
     const tripStatus = summary.trip.status;
 
@@ -632,7 +632,7 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
   }
 }
 
-export const closeTripService = async (tripId: string,type: string,user_id?: string) => {
+export const closeTripService = async (tripId: string, type: string, user_id?: string) => {
 
   const trip = await tripModel.findTripById(tripId);
 
@@ -646,7 +646,7 @@ export const closeTripService = async (tripId: string,type: string,user_id?: str
 
   const memberCount = await tripModel.getTripMemberCount(tripId);
 
-  // AUTO CLOSE 
+  // AUTO CLOSE
   if (type === "auto") {
 
     if (memberCount <= 1) {
@@ -675,40 +675,36 @@ export const closeTripService = async (tripId: string,type: string,user_id?: str
     }
 
     // 2 Vote Complete → Completed
-    const votes = await tripModel.getStatusVoteResult(tripId);
+    // const votes = await tripModel.getStatusVoteResult(tripId);
 
-    const isVoteComplete =
-      votes.dateVoteNum === votes.totalMembers &&
-      votes.budgetVoteNum === votes.totalMembers &&
-      votes.locationVoteNum === votes.totalMembers;
+    // const isVoteComplete =
+    //   votes.dateVoteNum === votes.totalMembers &&
+    //   votes.budgetVoteNum === votes.totalMembers &&
+    //   votes.locationVoteNum === votes.totalMembers;
 
-    if (isVoteComplete) {
+    // if (isVoteComplete) {
 
-      // notify voting closed (ตอนโหวตครบจริง)
-      await notiService.notifyTripCompleted(tripId);
+    //   // notify voting closed (ตอนโหวตครบจริง)
+    //   await notiService.notifyTripCompleted(tripId);
 
-      await closeTrip(tripId, "completed");
+    //   await closeTrip(tripId, "completed");
 
-      return {
-        success: true,
-        message: "ทริปถูกปิดอัตโนมัติเนื่องจากสมาชิกโหวตครบทุกคนแล้ว"
-      };
-    }
+    //   return {
+    //     success: true,
+    //     message: "ทริปถูกปิดอัตโนมัติเนื่องจากสมาชิกโหวตครบทุกคนแล้ว"
+    //   };
+    // }
 
   }
 
-  // MANUAL CLOSE 
+  // MANUAL CLOSE
   else if (type === "manual") {
 
     const owner = await tripModel.getTripOwner(tripId);
 
     if (user_id === owner.user_id) {
-
       await closeTrip(tripId, "confirmed");
-
-      // notify confirmed
       await notiService.notifyTripConfirmed(tripId);
-
       return {
         success: true,
         message: "ทริปถูกปิดโดยเจ้าของทริป"
@@ -790,7 +786,3 @@ export default {
   
 };
 
-
-
- // TripDetail,
- // findById,
