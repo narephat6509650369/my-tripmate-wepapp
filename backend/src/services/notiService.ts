@@ -307,7 +307,7 @@ export const notifyOwnerJoinRequest = async (trip_id: string,requestUserId: stri
       owner.user_id,
       "member_joined",
       "New join request",
-      `${member.email} requested to join "${tripName}"`
+      `${member.full_name} requested to join "${tripName}"`
     );
 
     if (!result.success) return result;
@@ -361,12 +361,15 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
       };
     }
 
+    const trip = await tripModel.findTripById(trip_id);
+    const tripName = trip?.trip_name ?? trip_id;
+
     const result = await notiModel.createNotification(
       trip_id,
       user_id,
       "member_joined",
       "Join request approved",
-      "Your request to join the trip has been approved"
+      `Your request to join the trip "${tripName}" has been approved`
     );
   
     if (!result.success) {
@@ -379,7 +382,7 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
         member.email,
         "TripMate - Request Approved",
         "Your join request has been approved",
-        joinApprovedTemplate(member.full_name)
+        joinApprovedTemplate(member.full_name, tripName)
       );
 
     }
@@ -404,6 +407,8 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
 
 export const notifyMemberRejected = async (trip_id: string,user_id: string,email: string,fullname: string) => {
   try {
+    const trip = await tripModel.findTripById(trip_id);
+    const tripName = trip?.trip_name ?? trip_id;
 
     const result = await notiModel.createNotification(
       trip_id,
@@ -423,7 +428,7 @@ export const notifyMemberRejected = async (trip_id: string,user_id: string,email
         email,
         "TripMate - Request Rejected",
         "Your join request has been rejected",
-        joinRejectedTemplate(fullname)
+        joinRejectedTemplate(fullname, tripName)
       );
 
     }
