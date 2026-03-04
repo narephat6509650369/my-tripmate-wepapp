@@ -17,15 +17,11 @@ interface StepPlaceProps {
   onManualNext?: () => void;
   onInputChange?: () => void;
   isLocked?: boolean;
+  initialAnalysis?: any;
+  initialVotedCount?: number;
 }
 
 type AnalysisResult = NonNullable<LocationVoteResponse['analysis']>;
-
-// ============== HELPER FUNCTIONS ==============
-const calculateUniqueVoters = (results: LocationVoteResult[]): number => {
-  // ใช้ voteCount สูงสุด = จำนวนคนที่โหวตมากที่สุด
-  return results.length > 0 ? Math.max(...results.map(r => r.voteCount)) : 0;
-};
 
 // ============== MAIN COMPONENT ==============
 export const StepPlace: React.FC<StepPlaceProps> = ({
@@ -35,7 +31,9 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   onVote,
   onManualNext,
   onInputChange,
-  isLocked = false
+  isLocked = false,
+  initialVotedCount = 0,
+  initialAnalysis
 }) => {
   // ============== STATE ==============
   const [myVote, setMyVote] = useState<[string, string, string]>(["", "", ""]);
@@ -46,6 +44,9 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [hasSaved, setHasSaved] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+  const [votedCount, setVotedCount] = useState(0);
+  const [totalMembers, setTotalMembers] = useState(0);
+  const [locationAnalysis, setLocationAnalysis] = useState<any>(null);
 
   // ============== EFFECTS ==============
 
@@ -61,6 +62,9 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     }
     if (initialVotes && initialVotes.length > 0) {
       setHasSaved(true);
+      setIsAnalysisOpen(true);
+      if (initialAnalysis) setAnalysisResult(initialAnalysis);
+      if (initialVotedCount) setVotedCount(initialVotedCount);
     }
   }, [initialVotes]);
 
@@ -76,41 +80,35 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         const response = await voteAPI.getLocationVote(trip.tripid);
         const votingData = response?.data as LocationVoteResponse | undefined; 
 
-        // Validate structure
         if (!votingData?.locationVotesTotal || !Array.isArray(votingData.locationVotesTotal)) {
-          console.warn('Invalid voting results structure:', votingData);
           setVotingResults([]);
           setAnalysisResult(null);
           return;
         }
 
-        // Validate each result
         const validResults = votingData.locationVotesTotal.filter((r: any) => {
-          if (!r.place || typeof r.total_score !== 'number' || typeof r.voteCount !== 'number') {
-            return false;
-          }
-          
-          if (r.total_score < 0 || r.voteCount < 0) {
-            console.warn(`Invalid negative values for ${r.place}`);
-            return false;
-          }
+          if (!r.place || typeof r.total_score !== 'number' || typeof r.voteCount !== 'number') return false;
+          if (r.total_score < 0 || r.voteCount < 0) return false;
           return true;
         });
 
         setVotingResults(validResults);
+        setVotedCount(votingData?.actualVote || 0);
+        setTotalMembers(votingData?.totalMembers || 0);
 
-        // Use analysis from backend if available
         if (votingData.analysis) {
           setAnalysisResult(votingData.analysis);
         } else {
-          console.warn('⚠️ Backend did not return analysis');
           setAnalysisResult(null);
-          
-          // ✅ set error เฉพาะเมื่อมี results แต่ไม่มี analysis
-          if (validResults.length > 0) {
-            setError('ไม่สามารถวิเคราะห์ผลโหวตได้');
-          }
         }
+
+        // ✅ เช็คจาก rows ของ user (votes ที่ user นี้โหวต)
+        const userVotes = votingData.rows as any[];
+        if (userVotes && userVotes.length > 0) {
+          setHasSaved(true);
+          setIsAnalysisOpen(true);
+        }
+
       } catch (err) {
         console.error("Failed to load voting results:", err);
         setVotingResults([]);
@@ -188,6 +186,8 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
 
         if (hasMyVote && newResults.length > 0) {
           setVotingResults(newResults);
+          setVotedCount(votingData?.actualVote || 0);
+          setTotalMembers(votingData?.totalMembers || 0);
           
           if (votingData?.analysis) {
             setAnalysisResult(votingData.analysis);
@@ -333,22 +333,23 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
               {/* Progress bar */}
               {(() => {
                 const totalMembers = trip.members?.length || 0;
-                const uniqueVoters = calculateUniqueVoters(votingResults);
                 return (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <div className="flex items-center gap-3 mb-1">
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-gradient-to-r from-purple-500 to-pink-600 h-2 rounded-full transition-all"
-                          style={{ width: `${totalMembers > 0 ? Math.min(100, (uniqueVoters / totalMembers) * 100) : 0}%` }}
+                          style={{ width: `${totalMembers > 0 ? Math.min(100, (votedCount / totalMembers) * 100) : 0}%` }}
                         />
                       </div>
                       <span className="text-xs font-semibold text-blue-900 whitespace-nowrap">
-                        {uniqueVoters}/{totalMembers} คน
+                        {votedCount}/{totalMembers || trip.members?.length || 0} คน
                       </span>
                     </div>
                     <p className="text-xs text-blue-700">
-                      {uniqueVoters >= totalMembers ? '✅ ทุกคนโหวตแล้ว' : '⏳ รอสมาชิกคนอื่นโหวต'}
+                      {votedCount >= (trip.members?.length || 0)
+                      ? '✅ ทุกคนโหวตแล้ว'
+                      : '⏳ รอสมาชิกคนอื่นโหวต'}
                     </p>
                   </div>
                 );
