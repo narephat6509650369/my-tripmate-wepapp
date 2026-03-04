@@ -591,7 +591,10 @@ export const voteAPI = {
         rows: [],
         analysis: null,
         locationVotesTotal: [],
-        rowlog: []
+        rowlog: [],
+        actualVote: 0,
+        totalMembers: 0
+        
       }
     };
   }
