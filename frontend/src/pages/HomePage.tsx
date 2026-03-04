@@ -296,17 +296,18 @@ const HomePage: React.FC = () => {
                           <User className="w-4 h-4" />
                           <span>{trip.people} คน</span>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTripToDelete(trip);
-                          }}
-                          className="absolute bottom-3 right-3 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="ลบทริป"
-                        >
-                          <Trash2 className="w-4 h-4" />
+                        {!trip.isCompleted && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTripToDelete(trip);
+                            }}
+                            className="absolute bottom-3 right-3 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="ลบทริป"
+                          >
+                            <Trash2 className="w-4 h-4" />
                         </button>
-
+                        )}
                       </div>
                     ))
                   )}
@@ -413,7 +414,7 @@ const HomePage: React.FC = () => {
       )}
 
       {/* Delete Confirm Modal */}
-      {tripToDelete && (
+      {tripToDelete && !tripToDelete.isCompleted && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4"
           onClick={() => setTripToDelete(null)}
