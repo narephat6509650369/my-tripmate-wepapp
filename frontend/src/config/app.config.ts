@@ -9,6 +9,7 @@
 export const CONFIG = {
   USE_MOCK_DATA: false, // 🔥 สำหรับ development: เปิดใช้งาน mock data
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
+  SOCKET_URL: import.meta.env.VITE_SOCKET_URL,
   API_TIMEOUT: 10000,
   DEBUG_MODE: import.meta.env.DEV,
   ENABLE_CONSOLE_LOGS: true,

@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, notiApi } from '../services/tripService';
 import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils';
 import type { TripSummary } from '../types';
+import socket from "../socket";
 
 interface TripCard {
   id: string;
@@ -53,13 +54,26 @@ const HomePage: React.FC = () => {
 
   // ================= EFFECTS =================
   useEffect(() => {
+
+  loadTrips();
+
+  socket.on("connect", () => {
+    console.log("Socket connected:", socket.id);
+  });
+
+  socket.on("new_notification", (data) => {
+    console.log("🔔 notification:", data);
+
+    setDialogMessage(data.message);
     loadTrips();
-    const fetchNoti = async () => {
-      const noti = await notiApi.getNoti();
-      console.log("GET NOTI:", noti);
-    };
-    fetchNoti();
-  }, []);
+  });
+
+  return () => {
+    socket.off("connect");
+    socket.off("new_notification");
+  };
+
+}, []);
 
   useEffect(() => {
   const state = location.state as any;

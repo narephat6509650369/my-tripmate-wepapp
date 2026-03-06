@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { getUserTrips, requestJoinTripByCode, removeMemberService, approveMember, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate, getMemberService, getPendingRequests, rejectMember} from "../services/tripService.js";
 import voteService from "../services/voteService.js";
 import { findOwnerByTrip } from "../models/tripModel.js";
+import { getIO } from "../socket/socket.js";
 
 //เพิ่มสมาชิก
 export const addTripController = async (req: Request, res: Response) => {
@@ -194,6 +195,7 @@ export const requestJoinTripController = async (req: Request,res: Response) => {
 
     const result =await requestJoinTripByCode(invite_code,user_id);
     console.log("requestJoinTripController",result)
+    const io = getIO();
 
     if (!result.success) {
       return res.status(400).json({
@@ -202,6 +204,12 @@ export const requestJoinTripController = async (req: Request,res: Response) => {
         message: result.message
       });
     }
+
+    io.emit("new_join_request", {
+      trip_id: result.trip_id,
+      trip_name: result.trip_name,
+      user_id: user_id
+    });
 
     return res.status(200).json({
       success: true,
