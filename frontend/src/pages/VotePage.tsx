@@ -314,6 +314,14 @@ const VotePage: React.FC = () => {
         console.log('✅ บันทึกวันที่สำเร็จ');
         setUserDates(dates);
         setStepCompleted(prev => ({ ...prev, 2: true }));
+        const dateRes = await voteAPI.getDateMatchingResult(trip.tripid);
+        if (dateRes?.data) {
+          setMatchingData({
+            availability: dateRes.data.availability || [],
+            recommendation: dateRes.data.recommendation || null,
+            summary: dateRes.data.summary || { totalMembers: 0, actualVote: 0, totalAvailableDays: 0 }
+          });
+        }
       } else {
         throw new Error(response.message);
       }
@@ -335,6 +343,8 @@ const VotePage: React.FC = () => {
         console.log('บันทึกงบประมาณสำเร็จ');
         setStepCompleted(prev => ({ ...prev, 3: true }));
         const budgetRes = await voteAPI.getBudgetVoting(trip.tripid);
+        console.log("getBudgetVoting after update:", budgetRes);
+        console.log('budgetRes.data:', JSON.stringify(budgetRes.data));
         if (budgetRes?.data) {
           setBudgetInfo(budgetRes.data);
           if (budgetRes.data.stats) setBudgetAnalysis(budgetRes.data.stats);
