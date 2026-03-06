@@ -96,7 +96,10 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     [budget]
   );
 
+  const totalMembers = totalBudgetInfo?.totalMembers || trip.members?.length || 1;
   const filledBudgetMembers = totalBudgetInfo?.filledMembers || 0;
+  console.log("filledBudgetMembers:", filledBudgetMembers);
+  console.log("totalMembers:", totalBudgetInfo?.totalMembers);
   const tripDuration = trip.numdays;
 
   const validateBudget = useCallback((amount: number): { valid: boolean; error?: string } => {
@@ -114,45 +117,67 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
 
   // ============== LOAD BUDGET DATA ==============
   useEffect(() => {
-    if (!budgetInfo) {
-      setIsLoading(false);
-      return;
-    }
+    if (!budgetInfo) { setIsLoading(false); return; }
 
-    let loadedBudget: BudgetState = { accommodation: 0, transport: 0, food: 0, other: 0 };
+    setTotalBudgetInfo({
+      budgetTotal: budgetInfo.budgetTotal || 0,
+      minTotal: budgetInfo.minTotal || 0,
+      maxTotal: budgetInfo.maxTotal || 0,
+      filledMembers: budgetInfo.filledMembers || 0,
+      totalMembers: budgetInfo.totalMembers || 0,
+    });
 
+    // 1. build loadedBudget ก่อน
+    const loadedBudget: BudgetState = { accommodation: 0, transport: 0, food: 0, other: 0 };
     if (budgetInfo.rows && Array.isArray(budgetInfo.rows)) {
       budgetInfo.rows.forEach((vote: any) => {
         const category = vote.category_name as keyof BudgetState;
-        if (category in loadedBudget)
+        if (category in loadedBudget) {
           loadedBudget[category] = Number(vote.estimated_amount) || 0;
+        }
       });
+    }
+
+    // 2. set budget จาก loadedBudget ที่ build แล้ว
+    if (budgetInfo.rows?.length > 0) {
       setBudget(loadedBudget);
-    }
-
-    if (budgetInfo.stats) {
-      const statsMap: BudgetStatsMap = {
-        accommodation: { avg: Math.round(budgetInfo.stats.accommodation?.q2 || 0), min: Math.round(budgetInfo.stats.accommodation?.q1 || 0), max: Math.round(budgetInfo.stats.accommodation?.q3 || 0), myValue: loadedBudget.accommodation, median: Math.round(budgetInfo.stats.accommodation?.q2 || 0) },
-        transport:     { avg: Math.round(budgetInfo.stats.transport?.q2 || 0),     min: Math.round(budgetInfo.stats.transport?.q1 || 0),     max: Math.round(budgetInfo.stats.transport?.q3 || 0),     myValue: loadedBudget.transport,     median: Math.round(budgetInfo.stats.transport?.q2 || 0) },
-        food:          { avg: Math.round(budgetInfo.stats.food?.q2 || 0),          min: Math.round(budgetInfo.stats.food?.q1 || 0),          max: Math.round(budgetInfo.stats.food?.q3 || 0),          myValue: loadedBudget.food,          median: Math.round(budgetInfo.stats.food?.q2 || 0) },
-        other:         { avg: Math.round(budgetInfo.stats.other?.q2 || 0),         min: Math.round(budgetInfo.stats.other?.q1 || 0),         max: Math.round(budgetInfo.stats.other?.q3 || 0),         myValue: loadedBudget.other,         median: Math.round(budgetInfo.stats.other?.q2 || 0) }
-      };
-      setBudgetStats(statsMap);
-    }
-
-    if (budgetInfo.budgetTotal !== undefined) {
-      setTotalBudgetInfo({
-        budgetTotal: budgetInfo.budgetTotal || 0,
-        minTotal: budgetInfo.minTotal || 0,
-        maxTotal: budgetInfo.maxTotal || 0,
-        filledMembers: budgetInfo.filledMembers || 0,
-        totalMembers: budgetInfo.totalMembers || 0,
-      });
-    }
-
-    if (budgetInfo?.rows && budgetInfo.rows.length > 0) {
       setHasSaved(true);
       setIsAnalysisOpen(true);
+    }
+
+    // 3. statsMap ใช้ loadedBudget ที่มีค่าแล้ว ✅
+    if (budgetInfo.stats) {
+      const statsMap: BudgetStatsMap = {
+        accommodation: {
+          avg: Math.round(budgetInfo.stats.accommodation?.q2 || 0),
+          min: Math.round(budgetInfo.stats.accommodation?.q1 || 0),
+          max: Math.round(budgetInfo.stats.accommodation?.q3 || 0),
+          myValue: loadedBudget.accommodation,  // ✅ ใช้ loadedBudget แทน 0
+          median: Math.round(budgetInfo.stats.accommodation?.q2 || 0)
+        },
+        transport: {
+          avg: Math.round(budgetInfo.stats.transport?.q2 || 0),
+          min: Math.round(budgetInfo.stats.transport?.q1 || 0),
+          max: Math.round(budgetInfo.stats.transport?.q3 || 0),
+          myValue: loadedBudget.transport,
+          median: Math.round(budgetInfo.stats.transport?.q2 || 0)
+        },
+        food: {
+          avg: Math.round(budgetInfo.stats.food?.q2 || 0),
+          min: Math.round(budgetInfo.stats.food?.q1 || 0),
+          max: Math.round(budgetInfo.stats.food?.q3 || 0),
+          myValue: loadedBudget.food,
+          median: Math.round(budgetInfo.stats.food?.q2 || 0)
+        },
+        other: {
+          avg: Math.round(budgetInfo.stats.other?.q2 || 0),
+          min: Math.round(budgetInfo.stats.other?.q1 || 0),
+          max: Math.round(budgetInfo.stats.other?.q3 || 0),
+          myValue: loadedBudget.other,
+          median: Math.round(budgetInfo.stats.other?.q2 || 0)
+        }
+      };
+      setBudgetStats(statsMap);
     }
 
     setIsLoading(false);
@@ -215,17 +240,17 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     setError(null);
 
     try {
-      const savePromises = BUDGET_CATEGORIES
-        .filter(category => budget[category.key] > 0)
-        .map(category =>
-          onSave(category.key, budget[category.key])
-            .catch(err => {
-              console.error(`Failed to save ${category.key}:`, err);
-              return { error: err, category: category.key };
-            })
-        );
-
-      const results = await Promise.all(savePromises);
+      const results = [];
+      for (const category of BUDGET_CATEGORIES) {
+        if (budget[category.key] === 0) continue;
+        try {
+          await onSave(category.key, budget[category.key]);
+          results.push({ category: category.key });
+        } catch (err) {
+          console.error(`Failed to save ${category.key}:`, err);
+          results.push({ error: err, category: category.key });
+        }
+      }
       const failures = results.filter(r => r && 'error' in r);
 
       if (failures.length > 0) {
@@ -310,13 +335,13 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                     style={{
                       width: `${Math.min(
                         100,
-                        (filledBudgetMembers / Math.max(filledBudgetMembers, trip.members?.length || 1)) * 100
+                        (filledBudgetMembers / totalMembers) * 100
                       )}%`
                     }}
                   />
                 </div>
                 <span className="text-sm font-semibold text-blue-900">
-                  {filledBudgetMembers}/{totalBudgetInfo?.totalMembers || 1} คน
+                  {filledBudgetMembers}/{totalMembers} คน
                 </span>
               </div>
               <p className="text-xs text-blue-700 mt-2">
@@ -348,7 +373,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
               <div className="grid grid-cols-2 gap-4">
                 {BUDGET_CATEGORIES.map(({ key, label, color }) => {
                   const stat = budgetStats[key];
-                  if (!stat || budget[key] === 0) return null;
+                  if (!stat || stat.myValue === 0) return null;
 
                   const range = stat.max - stat.min;
                   const position = range > 0
@@ -658,11 +683,11 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full transition-all"
-                          style={{ width: `${Math.min(100, (filledBudgetMembers / (totalBudgetInfo?.totalMembers || 1)) * 100)}%` }}
+                          style={{ width: `${Math.min(100, (filledBudgetMembers / totalMembers) * 100)}%` }}
                         />
                       </div>
                       <span className="text-xs font-semibold text-blue-900 whitespace-nowrap">
-                        {filledBudgetMembers}/{totalBudgetInfo?.totalMembers || 1} คน
+                        {filledBudgetMembers}/{totalMembers} คน
                       </span>
                     </div>
                     <p className="text-xs text-blue-700">
@@ -673,7 +698,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                   {/* รายหมวด */}
                   {BUDGET_CATEGORIES.map(({ key, label, color }) => {
                     const stat = budgetStats[key];
-                    if (!stat || budget[key] === 0) return null;
+                    if (!stat || stat.myValue === 0) return null;
 
                     const diffFromAvg = stat.myValue - stat.avg;
                     const diffPercent = stat.avg > 0 ? Math.round((diffFromAvg / stat.avg) * 100) : 0;
@@ -686,7 +711,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                             <span className="text-sm font-semibold text-gray-800">{label}</span>
                           </div>
                           <span className="text-lg font-bold" style={{ color }}>
-                            ฿{formatCurrency(budget[key])}
+                            ฿{formatCurrency(stat.myValue)}
                           </span>
                         </div>
 
