@@ -45,6 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAuthenticated: false,
     isLoading: true
   });
+
 /*
   useEffect(() => {
     const initializeAuth = () => {
@@ -111,6 +112,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
      initializeAuth();
    }, []);
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${API_URL}/auth/me`, {
+          method: "GET",
+          credentials: "include"
+        });
+
+        if (!res.ok) {
+          setAuthState({ user: null, isAuthenticated: false, isLoading: false });
+          return;
+        }
+
+        const result = await res.json();
+        setAuthState({ user: result.data, isAuthenticated: true, isLoading: false });
+
+      } catch {
+        setAuthState({ user: null, isAuthenticated: false, isLoading: false });
+      }
+    };
+
+    initializeAuth();
+  }, []);
 
 
   // ✅ Login with Google

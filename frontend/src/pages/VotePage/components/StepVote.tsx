@@ -29,6 +29,24 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
   const [hasSaved, setHasSaved] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false); 
   const tripDuration = trip.numdays;
+  const parseLocalDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year!, month! - 1, day!);
+  };
+
+  const formatThaiDate = (dateStr: string) => {
+    console.log("formatThaiDate result:", dateStr);
+    const [, month, day] = dateStr.slice(0, 10).split('-').map(Number);
+    const monthNames = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
+                        'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    return `${day} ${monthNames[month! - 1]}`;
+  };
+
+  const toLocalDateStr = (dateStr: string) => {
+    if (!dateStr.includes('T')) return dateStr; // ถ้าเป็น YYYY-MM-DD แล้ว ไม่ต้องแปลง
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  };
 
   const prevDatesRef = React.useRef<string>("");
 
@@ -40,7 +58,14 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
 
   useEffect(() => {
     if (initialDates?.length) {
-      const normalized = initialDates.map(d => d.slice(0, 10));
+      const normalized = initialDates.map(d => {
+        // แปลง UTC → local date ก่อน slice
+        const date = new Date(d);
+        const localYear = date.getFullYear();
+        const localMonth = String(date.getMonth() + 1).padStart(2, '0');
+        const localDay = String(date.getDate()).padStart(2, '0');
+        return `${localYear}-${localMonth}-${localDay}`;
+      });
       
       const newDatesStr = JSON.stringify([...normalized].sort());
       if (newDatesStr !== prevDatesRef.current) {
@@ -49,7 +74,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
 
         const firstDate = [...normalized].sort()[0];
         if (firstDate) {
-          const d = new Date(firstDate);
+          const d = parseLocalDate(firstDate);
           setCalendarMonth(new Date(d.getFullYear(), d.getMonth(), 1));
         }
       }
@@ -162,7 +187,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
                 <div className="bg-white rounded-lg p-3 border border-gray-200">
                   <div className="flex flex-wrap gap-2 items-center">
                     {recommendation.dates.map((date, idx) => {
-                      const d = new Date(date);
+                      const d = parseLocalDate(date);
                       const availInfo = availability.find(a => a.date === date);
                       const peopleCount = availInfo?.count || 0;
                       
@@ -174,10 +199,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
                                 ? 'bg-green-100 text-green-800' 
                                 : 'bg-yellow-100 text-yellow-800'
                             }`}>
-                              {d.toLocaleDateString('th-TH', { 
-                                day: 'numeric', 
-                                month: 'short' 
-                              })}
+                              {formatThaiDate(date)}
                             </div>
                             <span className="text-xs text-gray-600 mt-1">
                               👥 {peopleCount}
@@ -187,7 +209,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
                           {idx < recommendation.dates.length - 1 && (
                             <span className="text-gray-400 text-xl">
                               {(() => {
-                                const gap = (new Date(recommendation.dates[idx + 1]).getTime() - d.getTime()) 
+                                const gap = (parseLocalDate(recommendation.dates[idx + 1]!).getTime() - d.getTime())
                                           / (1000 * 60 * 60 * 24) - 1;
                                 return gap > 0 ? `··· ${gap}วัน ···` : '→';
                               })()}
@@ -267,7 +289,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const isSelected = selectedDates.includes(dateStr);
-      const isPast = new Date(dateStr) < new Date(new Date().setHours(0, 0, 0, 0));
+      const isPast = parseLocalDate(dateStr) < new Date(new Date().setHours(0,0,0,0));
 
       days.push(
         <button
@@ -448,7 +470,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
                     <div
                       className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full transition-all"
                       style={{
-                        width: `${Math.min(100, ((matchingInfo.summary?.totalMembers || 0) / (trip.members?.length || 1)) * 100)}%`
+                        width: `${Math.min(100, ((matchingInfo.summary?.actualVote || 0) / (matchingInfo.summary?.totalMembers || 1)) * 100)}%`
                       }}
                     />
                   </div>
@@ -457,7 +479,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
                   </span>
                 </div>
                 <p className="text-xs text-blue-700">
-                  {(matchingInfo.summary?.actualVote || 0) >= (trip.members?.length || 1)
+                  {(matchingInfo.summary?.actualVote || 0) >= (matchingInfo.summary?.totalMembers || 1)
                     ? '✅ ทุกคนเลือกวันแล้ว'
                     : '⏳ รอสมาชิกคนอื่นเลือกวัน'}
                 </p>
@@ -493,8 +515,11 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
                   <div className="bg-white rounded-lg p-3 border border-gray-200">
                     <div className="flex flex-wrap gap-2 items-center">
                       {matchingInfo.recommendation.dates.map((date, idx) => {
-                        const d = new Date(date);
-                        const availInfo = matchingInfo.availability.find(a => a.date === date);
+                        console.log("Processing date:", date);
+                        const localDate = toLocalDateStr(date);
+                        const availInfo = matchingInfo.availability.find(a => 
+                          toLocalDateStr(a.date) === localDate  // ← normalize ทั้งสองฝั่ง
+                        );
                         const peopleCount = availInfo?.count || 0;
 
                         return (
@@ -505,7 +530,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-yellow-100 text-yellow-800'
                               }`}>
-                                {d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                                {formatThaiDate(localDate)}
                               </div>
                               <span className="text-xs text-gray-600 mt-1">👥 {peopleCount}</span>
                             </div>

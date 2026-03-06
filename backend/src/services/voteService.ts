@@ -47,11 +47,9 @@ export const submitAvailability = async ( trip_id: string, user_id: string, date
   await voteModel.clearUserAvailability(trip_id, user_id);
   
   for (const date of dates) {
-    await voteModel.addAvailability(
-      trip_id,
-      user_id,
-      new Date(date)
-    );
+    const [y, m, d] = date.split('-').map(Number);
+    const localDate = new Date(y!, m! - 1, d!);
+    await voteModel.addAvailability(trip_id, user_id, localDate);
   }
 
   return {
@@ -163,9 +161,11 @@ export const getvoteDate = async (tripId: string,userId: string) => {
   const table: Record<string, string[]> = {};
 
   for (const row of availabilities) {
-    const day = new Date(row.available_date)
-      .toISOString()
-      .split("T")[0];
+    const d = row.available_date instanceof Date
+    ? row.available_date
+    : new Date(row.available_date);
+
+  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     if (!day) continue;
 
@@ -201,12 +201,11 @@ export const getvoteDate = async (tripId: string,userId: string) => {
 
   const isConsecutive = (dates: string[]) => {
     for (let i = 1; i < dates.length; i++) {
-      const diff =
-        (new Date(dates[i]!).getTime() -
-          new Date(dates[i - 1]!).getTime()) /
-        86400000;
-
-      if (diff !== 1) return false;
+      const [y1, m1, d1] = dates[i-1]!.split('-').map(Number);
+      const [y2, m2, d2] = dates[i]!.split('-').map(Number);
+      const prev = new Date(y1!, m1! - 1, d1!);
+      const curr = new Date(y2!, m2! - 1, d2!);
+      if ((curr.getTime() - prev.getTime()) / 86400000 !== 1) return false;
     }
     return true;
   };
