@@ -8,8 +8,10 @@
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
+    "moduleResolution": "nodenext",
     "target": "esnext",
-    "types": ["node", "express", "jest"],
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "./node_modules/vitest/dist"],
 
     //"typeRoots": ["./node_modules/@types", "./src"],
     // For nodejs:
