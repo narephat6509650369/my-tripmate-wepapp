@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 import type { ApiResponse } from '../types/index';
 import { CONFIG } from '../config/app.config';
+import { initSocket, disconnectSocket } from "../socket";
 
 // ============== TYPES ==============
 export interface User {
@@ -113,6 +114,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
      initializeAuth();
    }, []);
 
+   // ============== Socket ==============
+
+   useEffect(() => {
+  if (authState.user?.user_id) {
+    console.log("🔌 Init socket for user:", authState.user.user_id);
+    initSocket(authState.user.user_id);
+    }
+  }, [authState.user]);
+
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -172,7 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   console.log("✅ Login successful:", result.data.user.email);
 
   navigate(redirectPath || "/homepage");
-};
+  };
 
 const logout = async (): Promise<void> => {
   try {
@@ -189,6 +199,8 @@ const logout = async (): Promise<void> => {
     console.error("Logout API error:", error);
   }
 
+  disconnectSocket(); 
+
   setAuthState({
     user: null,
     isAuthenticated: false,
@@ -197,8 +209,6 @@ const logout = async (): Promise<void> => {
 
   navigate("/");
 };
-
-
 
   // ✅ Update user data
   const updateUser = useCallback((userData: Partial<User>) => {

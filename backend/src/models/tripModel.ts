@@ -688,7 +688,8 @@ export const removeMemberById = async (trip_id: string,member_id: string) => {
 
     return {
       success: true,
-      message: "Member removed successfully"
+      message: "Member removed successfully",
+      user_id: user_id
     };
 
   } catch (error) {
@@ -706,7 +707,7 @@ export const removeMemberById = async (trip_id: string,member_id: string) => {
 // หาข้อมูลทริปจาก Invite Code 
 export const getTripByInviteCode = async (invite_code: string) => {
     const [rows] = await pool.query<RowDataPacket[]>(
-        `SELECT trip_id, trip_name, status FROM trips WHERE invite_code = ?`,
+        `SELECT trip_id, trip_name, status, owner_id FROM trips WHERE invite_code = ?`,
         [invite_code]
     );
     return rows[0]; // คืนค่า undefined ถ้าหาไม่เจอ

@@ -5,6 +5,7 @@ import { Users, Vote, CheckCircle } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { formatRelativeTime } from "../utils";
 import { notiApi } from "../services/tripService";
+import { getSocket } from "../socket";
 
 // ============================================================================
 // TYPES
@@ -79,6 +80,50 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
     };
     fetchNoti();
   }, []);
+
+  // ============== Socket ==============
+
+  useEffect(() => {
+
+  if (!user?.user_id) return;
+
+  const socket = getSocket();
+  if (!socket) return;
+
+  const handleNewNotification = async () => {
+
+    console.log("🔔 socket notification received");
+
+    try {
+      const res = await notiApi.getNoti();
+
+      if (res?.success && Array.isArray(res.data?.notifications)) {
+        setNotifications(
+          res.data.notifications.map((n: any) => ({
+            id: n.notification_id,
+            type: n.notification_type,
+            text: n.message || n.title,
+            subText: n.email,
+            read: Boolean(n.is_read),
+            timestamp: new Date(new Date(n.created_at).getTime() + 7 * 60 * 60 * 1000),
+            tripId: n.trip_id,
+          }))
+        );
+      }
+
+    } catch (err) {
+      console.error("Failed to reload notifications:", err);
+    }
+
+  };
+
+  socket.on("new_notification", handleNewNotification);
+
+  return () => {
+    socket.off("new_notification", handleNewNotification);
+  };
+
+}, [user?.user_id]);
 
   useEffect(() => {
     const interval = setInterval(() => {

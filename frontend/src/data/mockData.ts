@@ -237,6 +237,7 @@ export const getMockJoinTrip = (inviteCode: string): ApiResponse<JoinTripRespons
     data: {
       trip_id: trip.trip_id,
       trip_name: trip.trip_name,
+      owner_id: trip.owner_id,
       rejoined: false
     }
   };

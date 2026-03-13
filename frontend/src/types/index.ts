@@ -24,7 +24,7 @@ export interface ApiError {
 // ============================================================================
 // USER & AUTH TYPES
 // ============================================================================
-
+/*
 export interface User {
   user_id: string;
   email: string;
@@ -35,7 +35,7 @@ export interface User {
   updated_at?: string;
   is_active?: boolean;
 }
-
+*/
 export interface GoogleLoginRequest {
   access_token: string;
 }
@@ -246,6 +246,7 @@ export interface JoinTripPayload {
 export interface JoinTripResponse {
   trip_id: string;
   trip_name: string;
+  owner_id: string;
   rejoined: boolean;
 }
 

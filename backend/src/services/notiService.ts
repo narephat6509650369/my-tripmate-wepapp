@@ -2,31 +2,45 @@ import notiModel from "../models/notiModel.js";
 import tripModel, { findMember,getMemberWithEmailPending } from "../models/tripModel.js";
 import { sendEmail } from "./email.service.js";
 import {tripCompletedTemplate,tripArchivedTemplate,joinRequestTemplate,joinApprovedTemplate,joinRejectedTemplate, tripConfirmedTemplate} from "../templates/emailTemplates.js";
+import { getIO, getUserSocket } from "../socket/socket.js";
 
 /*
 enum('trip_invitation','new_voting_session','voting_closed','trip_confirmed','member_joined','member_removed')
 */
-export const notifyMemberJoined = async (trip_id: string,joinedUserId: string) => {
+export const notifyMemberJoined = async (trip_id: string, joinedUserId: string) => {
   try {
+
     const members = await tripModel.getTripMembersWithEmail(trip_id);
+
+    const io = getIO();
 
     const results = await Promise.all(
       members
         .filter(m => m.user_id !== joinedUserId)
-        .map(m =>
-          notiModel.createNotification(
+        .map(async (m) => {
+
+          const result = await notiModel.createNotification(
             trip_id,
             m.user_id,
-            'member_joined',
-            'A new member has joined your trip',
+            "member_joined",
+            "A new member has joined your trip",
             `User ${joinedUserId} joined trip ${trip_id}`
-          )
-        )
+          );
 
-       
+          // realtime socket
+          const socketId = getUserSocket(m.user_id);
+
+          if (socketId) {
+            io.to(socketId).emit("new_notification", {
+              trip_id: trip_id
+            });
+          }
+
+          return result;
+
+        })
     );
 
-    // เช็คว่ามีตัวไหน fail ไหม
     const failed = results.find(r => !r.success);
 
     if (failed) {
@@ -42,6 +56,7 @@ export const notifyMemberJoined = async (trip_id: string,joinedUserId: string) =
     };
 
   } catch (error) {
+
     return {
       success: false,
       message:
@@ -49,9 +64,9 @@ export const notifyMemberJoined = async (trip_id: string,joinedUserId: string) =
           ? error.message
           : "Error notifying member joined"
     };
+
   }
 };
-
 
 export const notifyTripConfirmed = async (trip_id: string) => {
   try {
@@ -66,6 +81,15 @@ export const notifyTripConfirmed = async (trip_id: string) => {
         "Trip confirmed ",
         "The trip owner has confirmed your trip successfully."
       );
+
+      const io = getIO();
+      const socketId = getUserSocket(m.user_id);
+
+      if (socketId) {
+        io.to(socketId).emit("new_notification", {
+          trip_id: trip_id
+        });
+      }
 
       
       if (m.email) {
@@ -104,6 +128,15 @@ export const notifyTripArchived = async (trip_id: string) => {
         "This trip has been archived because it was inactive for 7 days."
       );
 
+      const io = getIO();
+      const socketId = getUserSocket(m.user_id);
+
+      if (socketId) {
+        io.to(socketId).emit("new_notification", {
+          trip_id: trip_id
+        });
+      }
+
       if (m.email) {
         await sendEmail(
           m.email,
@@ -140,6 +173,15 @@ export const notifyTripCompleted = async (trip_id: string) => {
         "Voting completed ",
         "All members have voted. The trip is now completed."
       );
+
+      const io = getIO();
+      const socketId = getUserSocket(m.user_id);
+
+      if (socketId) {
+        io.to(socketId).emit("new_notification", {
+          trip_id: trip_id
+        });
+      }
 
       if (m.email) {
         await sendEmail(
@@ -376,6 +418,16 @@ export const notifyMemberApproved = async (trip_id: string,user_id: string) => {
       return result;
     }
 
+    const io = getIO();
+    const memberSocketId = getUserSocket(user_id);
+    //console.log("member approve:",user_id)
+    
+    if (memberSocketId) {
+      io.to(memberSocketId).emit("new_notification", {
+      trip_id: trip_id
+      });
+    }
+
     if (member.email) {
 
       await sendEmail(
@@ -420,6 +472,15 @@ export const notifyMemberRejected = async (trip_id: string,user_id: string,email
 
     if (!result.success) {
       return result;
+    }
+
+    const io = getIO();
+    const memberSocketId = getUserSocket(user_id);
+    //console.log("member Rejected:",user_id)
+     if (memberSocketId) {
+      io.to(memberSocketId).emit("new_notification", {
+      trip_id: trip_id
+      });
     }
 
     if (email) {

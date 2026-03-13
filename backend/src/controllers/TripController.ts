@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { getUserTrips, requestJoinTripByCode, removeMemberService, approveMember, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate, getMemberService, getPendingRequests, rejectMember} from "../services/tripService.js";
 import voteService from "../services/voteService.js";
 import { findOwnerByTrip } from "../models/tripModel.js";
-import { getIO } from "../socket/socket.js";
+import { getIO, getUserSocket} from "../socket/socket.js";
 
 //เพิ่มสมาชิก
 export const addTripController = async (req: Request, res: Response) => {
@@ -153,6 +153,11 @@ export const deleteTripController = async (req: Request, res: Response) => {
 
     await deleteTripService(tripId,user_id);
 
+    const io = getIO();
+    io.to(`trip_${tripId}`).emit("trip_deleted", {
+      trip_id: tripId,
+    });
+
     return res.status(200).json({
       success: true,
       code: "TRIP_DELETED",
@@ -194,7 +199,7 @@ export const requestJoinTripController = async (req: Request,res: Response) => {
     }
 
     const result =await requestJoinTripByCode(invite_code,user_id);
-    console.log("requestJoinTripController",result)
+    //console.log("requestJoinTripController",result)
     const io = getIO();
 
     if (!result.success) {
@@ -205,11 +210,28 @@ export const requestJoinTripController = async (req: Request,res: Response) => {
       });
     }
 
-    io.emit("new_join_request", {
-      trip_id: result.trip_id,
-      trip_name: result.trip_name,
-      user_id: user_id
-    });
+    //console.log("🔥 EMIT notification", {trip_id: result.trip_id,owner_id: result.owner_id});
+
+    // หา socket ของ owner
+    const ownerSocketId = getUserSocket(result.owner_id);
+
+    //console.log("owner_id:", result.owner_id);
+    //console.log("ownerSocketId:", ownerSocketId);
+
+     // ส่งเฉพาะ owner
+    if (ownerSocketId) {
+      io.to(ownerSocketId).emit("new_notification", {
+        trip_id: result.trip_id,
+        trip_name: result.trip_name,
+        user_id: user_id,
+        owner_id: result.owner_id
+      });
+
+      io.to(ownerSocketId).emit("member_updated", {
+        tripId: result.trip_id
+      });
+    }
+
 
     return res.status(200).json({
       success: true,
@@ -328,6 +350,21 @@ export const approveMemberController = async (req: Request,res: Response) => {
       });
     }
 
+    const io = getIO();
+    const memberSocketId = getUserSocket(userId);
+
+    // แจ้ง member ที่ถูก approve
+    if (memberSocketId) {
+      io.to(memberSocketId).emit("new_notification", {
+        trip_id: tripId
+      });
+    }
+    console.log("emit member_updated", tripId);
+    // แจ้งสมาชิกทุกคนใน trip
+    io.to(`trip_${tripId}`).emit("member_updated", {
+      tripId
+    });
+
     return res.status(200).json({
       success: true,
       message: "Member approved successfully"
@@ -385,6 +422,18 @@ export const rejectMemberController = async (req: Request,res: Response) => {
       return res.status(400).json({
         success: false,
         message: result.message
+      });
+    }
+
+    const io = getIO();
+    const memberSocketId = getUserSocket(userId);
+    if (memberSocketId) {
+      io.to(memberSocketId).emit("join_rejected", {
+        trip_id: tripId,
+      });
+
+      io.to(memberSocketId).emit("new_notification", {
+        trip_id: tripId
       });
     }
 
@@ -512,6 +561,27 @@ export const removeMemberController = async (req: Request, res: Response) => {
         }
       });
     }
+    console.log("member id had been remove:",result.member_id)
+    const io = getIO();
+    const memberSocketId = getUserSocket(result.member_id);
+    if (memberSocketId) {
+      io.to(memberSocketId).emit("you_were_removed", {
+        trip_id: tripId,
+      });
+      // แจ้ง notification
+      io.to(memberSocketId).emit("new_notification", {
+      trip_id: tripId
+      });
+    }
+
+    //  แจ้งสมาชิกทุกคนใน trip
+    io.to(`trip_${tripId}`).emit("new_notification", {
+      trip_id: tripId,
+      type: "member_removed"
+    });
+
+    io.to(`trip_${tripId}`).emit("member_updated", { tripId });
+    io.to(`trip_${tripId}`).emit("vote_updated", { tripId });
 
     return res.status(200).json({
       success: true,
@@ -770,6 +840,19 @@ export const manualCloseController = async (req: Request, res: Response) => {
       });
     }
 
+    const io = getIO();
+
+      io.to(`trip_${tripId}`).emit("trip_closed", {
+        trip_id: tripId,
+      });
+
+    const ownerSocketId = getUserSocket(user_id);
+      if (ownerSocketId) {
+        io.to(ownerSocketId).emit("new_notification", {
+          trip_id: tripId
+        });
+      }
+
     return res.status(200).json({
       success: true,
       code: "TRIP_CLOSED",
@@ -789,7 +872,7 @@ export const manualCloseController = async (req: Request, res: Response) => {
 }
 };
 
-
+/*
 export const deleteMemberController = async (req: Request, res: Response) => {
   try {
     const { tripId, memberId } = req.params;
@@ -813,6 +896,17 @@ export const deleteMemberController = async (req: Request, res: Response) => {
 
     const result = await removeMemberService(tripId,ownerId,memberId);
 
+    const io = getIO();
+    const memberSocketId = getUserSocket(memberId);
+    if (memberSocketId) {
+      io.to(memberSocketId).emit("join_rejected", {
+        trip_id: tripId,
+      });
+      io.to(memberSocketId).emit("new_notification", {
+          trip_id: tripId
+      });
+    }
+
     return res.status(200).json({
       success: true,
       message: "Member removed successfully",
@@ -828,6 +922,7 @@ export const deleteMemberController = async (req: Request, res: Response) => {
     });
   }
 };
+*/
 
 export const getMemberController = async (req: Request, res: Response) => {
   try {
@@ -886,4 +981,5 @@ export const getMemberController = async (req: Request, res: Response) => {
 };
 
 
-export default {addTripController, deleteTripController, getMyTripsController, requestJoinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,deleteMemberController};
+export default {addTripController, deleteTripController, getMyTripsController, requestJoinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,getMemberController};
+//deleteMemberController

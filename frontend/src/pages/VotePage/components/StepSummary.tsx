@@ -1,9 +1,10 @@
 // src/pages/VotePage/components/StepSummary.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Calendar, DollarSign, MapPin, Sparkles, Brain, Settings,
          Check, ChevronDown, ChevronUp, Loader2, Copy, Code } from 'lucide-react';
 import type { TripDetail, DateMatchingResponse, BudgetVotingResponse } from '../../../types';
 import { voteAPI, tripAPI } from '../../../services/tripService';
+import { getSocket } from '../../../socket';
 
 // ── Local Types ──
 type AIModel = 'gpt-4' | 'gpt-3.5-turbo' | 'claude-3-opus' | 'claude-3-sonnet' | 'gemini-pro';
@@ -111,6 +112,58 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   const [isClosing, setIsClosing] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
   const [aiMeta, setAiMeta] = useState<any>(null);
+  const voteTimerRef = useRef<any>(null);
+
+  const fetchVoteData = useCallback(async () => {
+
+    if (!trip?.tripid) return;
+
+    try {
+
+      setIsLoading(true);
+
+      const [dateRes, budgetRes, locRes] = await Promise.all([
+        voteAPI.getDateMatchingResult(trip.tripid),
+        voteAPI.getBudgetVoting(trip.tripid),
+        voteAPI.getLocationVote(trip.tripid)
+      ]);
+
+      const dateData = dateRes?.data;
+      const budgetData = budgetRes?.data;
+      const locData = locRes?.data;
+
+      setSummaryData({
+        bestDates: dateData?.recommendation?.dates || [],
+
+        avgBudget: {
+          accommodation: Math.round(budgetData?.stats?.accommodation?.q2 || 0),
+          transport: Math.round(budgetData?.stats?.transport?.q2 || 0),
+          food: Math.round(budgetData?.stats?.food?.q2 || 0),
+          other: Math.round(budgetData?.stats?.other?.q2 || 0)
+        },
+
+        topLocations: (locData?.locationVotesTotal || [])
+          .sort((a: any, b: any) => b.total_score - a.total_score)
+          .slice(0, 3)
+          .map((l: any) => ({
+            place: l.place,
+            total_score: l.total_score
+          })),
+
+        progress: {
+          dates: dateData?.summary?.actualVote || 0,
+          budget: budgetData?.filledMembers || 0,
+          location: locData?.actualVote || 0
+        }
+      });
+
+    } catch (err) {
+      console.error("load vote data error", err);
+    } finally {
+      setIsLoading(false);
+    }
+
+  }, [trip?.tripid]);
 
   // ── Sync config ──
   useEffect(() => {
@@ -119,6 +172,22 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
 
   // ── Fetch summary data ──
   // useEffect 1: fetch vote data ครั้งเดียวตอน mount
+  useEffect(() => {
+
+    if (!trip?.tripid) return;
+
+    fetchVoteData();
+
+  }, [trip?.tripid, fetchVoteData]);
+
+  useEffect(() => {
+  const socket = getSocket();
+  if (!socket || !trip?.tripid) return;
+
+  socket.emit("join_trip", trip.tripid);
+
+}, [trip?.tripid]);
+  /*
   useEffect(() => {
     if (!trip?.tripid) return;
 
@@ -138,20 +207,19 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
           bestDates: dateData?.recommendation?.dates || [],
           avgBudget: {
             accommodation: Math.round(budgetData?.stats?.accommodation?.q2 || 0),
-            transport:     Math.round(budgetData?.stats?.transport?.q2 || 0),
-            food:          Math.round(budgetData?.stats?.food?.q2 || 0),
-            other:         Math.round(budgetData?.stats?.other?.q2 || 0),
+            transport: Math.round(budgetData?.stats?.transport?.q2 || 0),
+            food: Math.round(budgetData?.stats?.food?.q2 || 0),
+            other: Math.round(budgetData?.stats?.other?.q2 || 0),
           },
           topLocations: (locData?.locationVotesTotal || [])
             .sort((a: any, b: any) => b.total_score - a.total_score)
             .slice(0, 3)
             .map((l: any) => ({ place: l.place, total_score: l.total_score })),
+
           progress: {
-            dates:    dateData?.summary?.actualVote|| 0,
-            budget:   budgetData?.filledMembers || 0,
-            location: locData?.locationVotesTotal?.length
-              ? Math.max(...(locData.locationVotesTotal.map((r: any) => r.voteCount || 0)))
-              : 0,
+            dates: dateData?.summary?.actualVote || 0,
+            budget: budgetData?.filledMembers || 0,
+            location: locData?.actualVote || 0
           }
         });
       } catch (err) {
@@ -162,8 +230,45 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
     };
 
     fetchVoteData();
-  }, [trip?.tripid]);
+  }, [trip?.tripid, trip?.membercount]);*/
 
+//======== SOCKET ========
+
+useEffect(() => {
+
+  if (!trip?.tripid) return;
+
+  const socket = getSocket();
+  if (!socket) return;
+
+  const handleVoteUpdate = (data: any) => {
+
+    if (!data) return;
+    if (data.tripId !== trip.tripid) return;
+
+    console.log("vote updated -> reload summary");
+
+    if (voteTimerRef.current) {
+      clearTimeout(voteTimerRef.current);
+    }
+
+    voteTimerRef.current = setTimeout(() => {
+      fetchVoteData();
+    }, 300);
+
+  };
+
+  socket.on("vote_updated", handleVoteUpdate);
+
+  return () => {
+    socket.off("vote_updated", handleVoteUpdate);
+
+    if (voteTimerRef.current) {
+      clearTimeout(voteTimerRef.current);
+    }
+  };
+
+}, [trip?.tripid]);
 
   // useEffect 2: fetch AI summary เฉพาะตอน canViewSummary = true
   useEffect(() => {

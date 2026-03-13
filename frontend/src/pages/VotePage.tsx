@@ -14,6 +14,7 @@ import StepSummary from './VotePage/components/StepSummary';
 import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, voteAPI } from '../services/tripService';
 import type { TripDetail, LocationVote, DateMatchingResponse, BudgetVotingResponse } from '../types';
+import { getSocket } from "../socket";
 type MatchingData = Pick<DateMatchingResponse, 'availability' | 'recommendation' | 'summary'>;
 type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers' | 'totalMembers'>;
 
@@ -202,6 +203,185 @@ const VotePage: React.FC = () => {
     loadTripData();
   }, [tripCode, navigate]);
 
+  // ============== Socket ==============
+
+useEffect(() => {
+
+  if (!trip?.tripid) return;
+
+  const socket = getSocket();
+  if (!socket) return;
+
+  console.log("🔌 VotePage socket listen:", trip.tripid);
+
+  // join room
+  socket.emit("join_trip", trip.tripid);
+
+  let reloadTimer: any = null;
+
+  const handleVoteUpdate = (data: any) => {
+
+    if (String(data.tripId) !== String(trip.tripid)) return;
+
+    console.log("🗳 vote updated");
+
+    clearTimeout(reloadTimer);
+
+    reloadTimer = setTimeout(() => {
+      reloadTripData();
+    }, 300);
+
+  };
+
+  const handleMemberUpdate = async (data: any) => {
+
+    if (String(data.tripId) !== String(trip.tripid)) return;
+
+    console.log("👥 member updated");
+
+    await reloadTripData();
+
+  };
+
+  socket.on("vote_updated", handleVoteUpdate);
+  socket.on("member_updated", handleMemberUpdate);
+
+  return () => {
+    socket.off("vote_updated", handleVoteUpdate);
+    socket.off("member_updated", handleMemberUpdate);
+  };
+
+}, [trip?.tripid]);
+
+const reloadTripData = async () => {
+
+  if (!trip?.tripid) return;
+
+  try {
+
+    const [
+      tripRes,
+      membersRes,
+      pendingRes,
+      dateRes,
+      budgetRes,
+      locRes
+    ] = await Promise.all([
+      tripAPI.getTripDetail(trip.tripid),
+      tripAPI.getMembers(trip.tripid),
+      tripAPI.getPendingRequests(trip.tripid),
+      voteAPI.getDateMatchingResult(trip.tripid),
+      voteAPI.getBudgetVoting(trip.tripid),
+      voteAPI.getLocationVote(trip.tripid)
+    ]) as any[];
+    // trip
+    if (tripRes?.data) {
+      setTrip(tripRes.data);
+    }
+
+    // members
+    if (membersRes?.success) {
+      setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
+    }
+
+    // pending
+    if (pendingRes?.success) {
+      const list =
+        pendingRes.data?.data?.data ??
+        pendingRes.data?.data ??
+        pendingRes.data ??
+        [];
+
+      setPendingRequests(Array.isArray(list) ? list : []);
+    }
+
+  // date voting
+  if (dateRes?.data) {
+
+  const summary = dateRes.data.summary || {};
+
+  const actualVote =
+    summary.actualVote ??
+    dateRes.data.rowlog?.length ??
+    0;
+
+  setMatchingData({
+    availability: dateRes.data.availability || [],
+    recommendation: dateRes.data.recommendation || null,
+    summary: {
+      ...summary,
+      actualVote
+    }
+  });
+
+  const hasDates = dateRes?.data?.rowlog?.some(
+    (r: any) => r.proposed_by === user?.user_id
+  );
+
+  if (hasDates) {
+    setStepCompleted(prev => ({ ...prev, 2: true }));
+  }
+
+  }
+    
+  // budget voting
+  if (budgetRes?.data) {
+
+  setBudgetInfo(budgetRes.data);
+
+  if (budgetRes.data.stats) {
+    setBudgetAnalysis(budgetRes.data.stats);
+  }
+
+  const hasBudget = budgetRes?.data?.rows?.some(
+    (r: any) => r.user_id === user?.user_id
+  );
+
+  if (hasBudget) {
+    setStepCompleted(prev => ({ ...prev, 3: true }));
+  }
+
+}
+
+    // location
+if (locRes?.data) {
+
+  if (locRes.data.analysis) {
+    setLocationAnalysis(locRes.data.analysis);
+  }
+
+  if (locRes.data.actualVote !== undefined) {
+    setLocationVotedCount(locRes.data.actualVote);
+  }
+
+  // ตรวจว่าผู้ใช้โหวตแล้วหรือยัง
+  const hasPlace = locRes?.data?.rowlog?.some(
+    (r: any) => r.proposed_by === user?.user_id
+  );
+
+  if (hasPlace) {
+    setStepCompleted(prev => ({ ...prev, 4: true }));
+  }
+
+  if (locRes?.data?.rowlog && user?.user_id) {
+
+    const myVotes = locRes.data.rowlog
+      .filter((log: any) => log.proposed_by === user.user_id)
+      .map((log: any) => ({
+        place: log.province_name,
+        score: log.score
+      }));
+
+    setUserLocations(myVotes);
+  }
+}
+
+  } catch (err) {
+    console.error("reload trip failed", err);
+  }
+
+};
+
   // ============== HANDLERS ==============
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
@@ -220,6 +400,7 @@ const VotePage: React.FC = () => {
       const res = await tripAPI.approveRequest(trip.tripid, userId);
       if (res.success) {
         setPendingRequests(prev => prev.filter(r => r.user_id !== userId));
+        await reloadTripData();
       } else {
         alert(res.message || 'อนุมัติไม่สำเร็จ');
       }
@@ -236,6 +417,7 @@ const VotePage: React.FC = () => {
       const res = await tripAPI.rejectRequest(trip.tripid, userId);
       if (res.success) {
         setPendingRequests(prev => prev.filter(r => r.user_id !== userId));
+        await reloadTripData();
       } else {
         alert(res.message || 'ปฏิเสธไม่สำเร็จ');
       }
@@ -256,6 +438,7 @@ const VotePage: React.FC = () => {
     for (const req of toApprove) {
       try {
         await tripAPI.approveRequest(trip.tripid, req.user_id);
+        await reloadTripData();
       } catch (e) {
         console.error('Approve failed:', e);
       }
@@ -273,6 +456,7 @@ const VotePage: React.FC = () => {
     for (const req of toReject) {
       try {
         await tripAPI.rejectRequest(trip.tripid, req.user_id);
+        await reloadTripData();
       } catch (e) {
         console.error('Reject failed:', e);
       }
@@ -285,6 +469,7 @@ const VotePage: React.FC = () => {
       const res = await tripAPI.removeMember(trip.tripid, memberId);
       if (res.success) {
         setMembers(prev => prev.filter(m => m.member_id !== memberId));
+        await reloadTripData();
       } else {
         alert(res.message || 'ลบสมาชิกไม่สำเร็จ');
       }
@@ -372,6 +557,11 @@ const VotePage: React.FC = () => {
         }));
         setUserLocations(updatedLocations);
         const locRes = await voteAPI.getLocationVote(trip.tripid);
+        console.log("location response:",locRes)
+       //
+      if (locRes?.data?.actualVote !== undefined) {
+        setLocationVotedCount(locRes.data.actualVote);
+      }
         if (locRes?.data?.analysis) setLocationAnalysis(locRes.data.analysis);
         setStepCompleted(prev => ({ ...prev, 4: true }));
       } else {

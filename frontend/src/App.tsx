@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './guards/ProtectedRoute';
-import socket from "./socket";
+
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -13,13 +13,6 @@ import VotePage from './pages/VotePage';
 import JoinPage from './pages/JoinPage';
 
 function App() {
-   useEffect(() => {
-
-    socket.on("connect", () => {
-      console.log("connected:", socket.id);
-    });
-
-  }, []);
   return (
     <BrowserRouter>
       <AuthProvider>

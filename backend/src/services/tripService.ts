@@ -219,7 +219,8 @@ export const requestJoinTripByCode = async (invite_code: string,user_id: string)
         success: true,
         message: "ส่งคำขอเข้าร่วมสำเร็จ กรุณารอ Owner อนุมัติ",
         trip_id: trip.trip_id,
-        trip_name: trip.trip_name
+        trip_name: trip.trip_name,
+        owner_id: trip.owner_id
       };
     }
 
@@ -249,7 +250,8 @@ export const requestJoinTripByCode = async (invite_code: string,user_id: string)
         success: true,
         message: "ส่งคำขอใหม่สำเร็จ กรุณารอ Owner อนุมัติ",
         trip_id: trip.trip_id,
-        trip_name: trip.trip_name
+        trip_name: trip.trip_name,
+        owner_id: trip.owner_id
       };
     }
 
@@ -513,11 +515,12 @@ export const removeMemberService = async ( trip_id: string, member_id: string, o
   }
 
   // ทำ Soft Delete + ลบ availability ภายใน transaction
-  await tripModel.removeMemberById(trip_id, member_id);
+  const res = await tripModel.removeMemberById(trip_id, member_id);
 
   return {
     success: true,
-    message: "ลบสมาชิกสำเร็จ"
+    message: "ลบสมาชิกสำเร็จ",
+    member_id: res.user_id
   };
 };
 
@@ -784,7 +787,6 @@ export default {
   getUserTrips,
   deleteTripService,
   removeMemberService,
-
   getTripDetail,
   getTripSummaryService,
   closeTripService,

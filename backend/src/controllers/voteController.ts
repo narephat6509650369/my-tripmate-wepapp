@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import * as voteService from '../services/voteService.js';
 import type { JwtPayload } from '../express.d.js';
 import { closeTripService } from '../services/tripService.js';
+import { getIO } from '../socket/socket.js';
 
 // ================= DATE VOTING =================
 // post user ส่งวันว่างที่ตัวเองว่างมา
@@ -48,6 +49,13 @@ export const submitAvailabilityController = async (req: Request, res: Response) 
         message: "Failed to submit availability",
       });
     }
+
+    const io = getIO();
+    io.to(`trip_${trip_id}`).emit("vote_updated", {
+      tripId: trip_id,
+      type: "date"
+    });
+    
     return res.status(200).json({
       success: true,
       code: "AVAILABILITY_SUBMITTED",
@@ -141,6 +149,12 @@ export const submitBudgetVoteController = async (req: Request, res: Response) =>
 
     const result = await voteService.updateBudget(tripId, user_id, category, amount);
     await closeTripService(tripId, "auto");
+
+    const io = getIO();
+    io.to(`trip_${tripId}`).emit("vote_updated", {
+      tripId,
+      type: "budget"
+    });
 
     return res.status(200).json({
       success: true,
@@ -263,6 +277,12 @@ export const submitLocationVoteController = async (req: Request, res: Response) 
       data[s.province_name] = Number(s.total_score);
     });
 
+    const io = getIO();
+    io.to(`trip_${tripid}`).emit("vote_updated", {
+      tripId: tripid,
+      type: "location"
+    });
+
     return res.status(200).json({
       success: true,
       code: "LOCATION_VOTED",
@@ -313,7 +333,7 @@ export const getLocationVoteController = async (req: Request, res: Response) => 
     }
 
     const locationVotes = await voteService.getvoteLocation(tripId, user_id);
-    //console.log("location:",locationVotes);
+    console.log("location:",locationVotes);
 
     return res.status(200).json({
       success: true,
