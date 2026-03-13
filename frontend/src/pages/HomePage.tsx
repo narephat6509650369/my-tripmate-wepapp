@@ -36,7 +36,6 @@ const HomePage: React.FC = () => {
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [tripToDelete, setTripToDelete] = useState<TripCard | null>(null);
   const [joiningTrip, setJoiningTrip] = useState(false);
-  const onlineUsers: Record<string, string> = {};
   
   // ✅ Helper: แปลง TripSummary → TripCard
   const formatTripSummary = (trip: TripSummary): TripCard => {

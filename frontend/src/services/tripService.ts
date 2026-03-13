@@ -45,6 +45,8 @@ import {
   getMockNotifications
 } from '../data/mockData';
 
+import { apiFetch } from "./apiClient";
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -55,7 +57,7 @@ const API_TIMEOUT = 10000;
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
+/*
 const fetchWithTimeout = async (
   url: string,
   options: RequestInit = {},
@@ -79,7 +81,8 @@ const fetchWithTimeout = async (
     throw error;
   }
 };
-
+*/
+/*
 const getAuthHeaders = (): HeadersInit => {
   const token = localStorage.getItem('jwtToken');
   return {
@@ -87,7 +90,8 @@ const getAuthHeaders = (): HeadersInit => {
     ...(token && { Authorization: `Bearer ${token}` })
   };
 };
-
+*/
+/*
 const checkAuth = (): boolean => {
   const token = localStorage.getItem('jwtToken');
   if (!token) {
@@ -96,7 +100,7 @@ const checkAuth = (): boolean => {
   }
   return true;
 };
-
+*/
 const handleApiError = (error: any): ApiResponse => {
   return {
     success: false,
@@ -123,11 +127,10 @@ export const tripAPI = {
     }
 
     try {
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/all-my-trips`,
+      const response = await apiFetch(
+        `/trips/all-my-trips`,
         {
-          method: "GET",
-          credentials: "include"
+          method: "GET"
         }
       );
 
@@ -149,12 +152,7 @@ export const tripAPI = {
 
     try {
 
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripId}`,
-      {
-        credentials: "include"
-      }
-      );
+      const response = await apiFetch(`/trips/${tripId}`);
 
       return await response.json();
 
@@ -174,11 +172,10 @@ export const tripAPI = {
   }
 
   try {
-    const response = await fetchWithTimeout(
-      `${API_URL}/trips/${tripId}/summary?template=${template}`,
+    const response = await apiFetch(
+      `/trips/${tripId}/summary?template=${template}`,
       {
         method: "GET",
-        credentials: "include"
       }
     );
 
@@ -199,9 +196,8 @@ export const tripAPI = {
 
     try {
 
-      const response = await fetchWithTimeout(`${API_URL}/trips/AddTrip`, {
+      const response = await apiFetch(`/trips/add-trip`, {
         method: 'POST',
-        credentials: 'include',  
         headers: {
           'Content-Type': 'application/json'
         },
@@ -224,9 +220,8 @@ export const tripAPI = {
   }
 
   try {
-    const response = await fetchWithTimeout(`${API_URL}/trips/request-join`, {
+    const response = await apiFetch(`/trips/request-join`, {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -261,9 +256,8 @@ export const tripAPI = {
     }
 
     try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}`, { // ← tripId ใน URL
+      const response = await apiFetch(`/trips/${tripId}`, { // ← tripId ใน URL
         method: 'DELETE',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         }
@@ -287,11 +281,10 @@ export const tripAPI = {
 
     try {
 
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripId}/members/${memberId}`,
+      const response = await apiFetch(
+        `/trips/${tripId}/members/${memberId}`,
         {
           method: 'DELETE',
-          credentials: 'include'
         }
       );
 
@@ -307,9 +300,8 @@ export const tripAPI = {
    */
   requestToJoin: async (inviteCode: string): Promise<ApiResponse> => {
     try {
-      const response = await fetchWithTimeout(`${API_URL}/trips/request-join`, {
+      const response = await apiFetch(`/trips/request-join`, {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invite_code: inviteCode })
       });
@@ -341,10 +333,7 @@ export const tripAPI = {
    */
   getPendingRequests: async (tripId: string): Promise<ApiResponse> => {
     try {
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripId}/pending-requests`,
-        { credentials: 'include' }
-      );
+      const response = await apiFetch(`/trips/${tripId}/pending-requests`);
       return await response.json();
     } catch (error) {
       return handleApiError(error);
@@ -356,9 +345,11 @@ export const tripAPI = {
    */
   approveRequest: async (tripId: string, userId: string): Promise<ApiResponse> => {
     try {
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripId}/approve/${userId}`,
-        { method: 'PATCH', credentials: 'include' }
+      const response = await apiFetch(
+        `/trips/${tripId}/approve/${userId}`,
+        { 
+          method: 'PATCH' 
+        }
       );
       return await response.json();
     } catch (error) {
@@ -371,9 +362,11 @@ export const tripAPI = {
    */
   rejectRequest: async (tripId: string, userId: string): Promise<ApiResponse> => {
     try {
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripId}/reject/${userId}`,
-        { method: 'PATCH', credentials: 'include' }
+      const response = await apiFetch(
+        `/trips/${tripId}/reject/${userId}`,
+        { 
+          method: 'PATCH'
+        }
       );
       return await response.json();
     } catch (error) {
@@ -383,13 +376,7 @@ export const tripAPI = {
 
   getMembers: async (tripId: string): Promise<ApiResponse> => {
     try {
-      const response = await fetchWithTimeout(
-        `${API_URL}/trips/${tripId}/get-members`,
-        { 
-          credentials: 'include',
-          headers: getAuthHeaders()  // ✅ เพิ่ม auth header
-        }
-      );
+      const response = await apiFetch(`/trips/${tripId}/get-members`);
       if (!response.ok) {
         return {
           success: false,
@@ -429,11 +416,10 @@ export const voteAPI = {
   }
 
   try {
-    const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripId}/date-matching-result`,
+    const response = await apiFetch(
+      `/votes/${tripId}/date-matching-result`,
       {
-        method: "GET",
-        credentials: "include", 
+        method: "GET", 
         headers: {
           "Content-Type": "application/json"
         }
@@ -461,11 +447,10 @@ export const voteAPI = {
   }
 
   try {
-    const response = await fetchWithTimeout(
-      `${API_URL}/votes/availability`,
+    const response = await apiFetch(
+      `/votes/availability`,
       {
         method: "POST",
-        credentials: "include", 
         headers: {
           "Content-Type": "application/json"
         },
@@ -491,17 +476,9 @@ export const voteAPI = {
     }
 
     try {
-      if (!checkAuth()) {
-        return {
-          success: false,
-          code: 'AUTH_UNAUTHORIZED',
-          message: 'กรุณาเข้าสู่ระบบใหม่'
-        };
-      }
 
-      const response = await fetchWithTimeout(`${API_URL}/votes/start-voting`, {
+      const response = await apiFetch(`/votes/start-voting`, {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trip_id: tripId })
       });
@@ -527,12 +504,7 @@ export const voteAPI = {
   }
 
   try {
-    const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripId}/get-budget`,
-      {
-        credentials: "include" 
-      }
-    );
+    const response = await apiFetch(`/votes/${tripId}/get-budget`);
 
     return await response.json();
 
@@ -554,11 +526,10 @@ export const voteAPI = {
 
   try {
 
-    const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripId}/budget`,
+    const response = await apiFetch(
+      `/votes/${tripId}/budget`,
       {
         method: "POST",
-        credentials: "include", 
         headers: {
           "Content-Type": "application/json"
         },
@@ -600,11 +571,10 @@ export const voteAPI = {
   }
 
   try {
-    const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripId}/get-vote-place`,
+    const response = await apiFetch(
+      `/votes/${tripId}/get-vote-place`,
       {
         method: "GET",
-        credentials: "include" 
       }
     );
 
@@ -637,11 +607,10 @@ export const voteAPI = {
   }
 
   try {
-    const response = await fetchWithTimeout(
-      `${API_URL}/votes/${tripid}/vote-place`,
+    const response = await apiFetch(
+      `/votes/${tripid}/vote-place`,
       {
         method: "POST",
-        credentials: "include", 
         headers: {
           "Content-Type": "application/json"
         },
@@ -669,9 +638,8 @@ export const voteAPI = {
 
     try {
 
-      const response = await fetchWithTimeout(`${API_URL}/trips/${tripId}/manual-close`, {
+      const response = await apiFetch(`/trips/${tripId}/manual-close`, {
         method: 'PATCH',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         } 
@@ -696,9 +664,8 @@ export const notiApi = {
       return getMockNotifications("mock-user-id");
     }
     try {
-      const response = await fetchWithTimeout(`${API_URL}/noti/get-noti`, {
+      const response = await apiFetch(`/noti/get-noti`, {
         method: 'GET',
-        credentials: 'include',
       });
       return await response.json();
     } catch (error) {
@@ -708,9 +675,8 @@ export const notiApi = {
 
   markAsRead: async (notificationId: string) => {
     try {
-      const response = await fetchWithTimeout(`${API_URL}/noti/${notificationId}/read`, {
+      const response = await apiFetch(`/noti/${notificationId}/read`, {
         method: 'PATCH',
-        credentials: 'include',
       });
       return await response.json();
     } catch (error) {
@@ -720,9 +686,8 @@ export const notiApi = {
 
   markAllAsRead: async () => {
     try {
-      const response = await fetchWithTimeout(`${API_URL}/noti/read-all`, {
+      const response = await apiFetch(`/noti/read-all`, {
         method: 'PATCH',
-        credentials: 'include',
       });
       return await response.json();
     } catch (error) {
@@ -732,9 +697,8 @@ export const notiApi = {
 
   deleteNoti: async (notificationId: string) => {
     try {
-      const response = await fetchWithTimeout(`${API_URL}/noti/notifications/${notificationId}`, {
+      const response = await apiFetch(`/noti/notifications/${notificationId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       return await response.json();
     } catch (error) {

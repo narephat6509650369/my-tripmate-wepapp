@@ -12,22 +12,45 @@ export const validateGoogleLogin = (req: Request, res: Response, next: NextFunct
   next();
 };
 
-export const verifyToken = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  const token = req.cookies.accessToken;
+export const verifyToken = (req: AuthRequest,res: Response,next: NextFunction) => {
+
+  const token = req.cookies?.accessToken;
 
   if (!token) {
-    return res.status(401).json({ success: false });
+    return res.status(401).json({
+      success: false,
+      code: "NO_TOKEN"
+    });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.ACCESS_SECRET!);
+
+    const decoded = jwt.verify(
+      token,
+      process.env.ACCESS_SECRET!
+    ) as {
+      user_id: string;
+      email?: string;
+      jti: string;
+    };
+
     req.user = decoded;
+
     next();
-  } catch {
-    return res.status(401).json({ success: false });
+
+  } catch (err: any) {
+
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        code: "TOKEN_EXPIRED"
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      code: "INVALID_TOKEN"
+    });
+
   }
 };

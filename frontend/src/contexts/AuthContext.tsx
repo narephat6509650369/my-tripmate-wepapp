@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import type { ApiResponse } from '../types/index';
 import { CONFIG } from '../config/app.config';
 import { initSocket, disconnectSocket } from "../socket";
+import { apiFetch } from "../services/apiClient";
 
 // ============== TYPES ==============
 export interface User {
@@ -92,10 +93,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    useEffect(() => {
      const initializeAuth = async () => {
        try {
-         const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-         const res = await fetch(`${API_URL}/auth/me`, {
+         const res = await apiFetch(`/auth/me`, {
            method: "GET",
-           credentials: "include"
          });
 
          if (!res.ok) {
@@ -116,48 +115,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
    // ============== Socket ==============
 
-   useEffect(() => {
-  if (authState.user?.user_id) {
-    console.log("🔌 Init socket for user:", authState.user.user_id);
-    initSocket(authState.user.user_id);
-    }
-  }, [authState.user]);
-
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-        const res = await fetch(`${API_URL}/auth/me`, {
-          method: "GET",
-          credentials: "include"
-        });
+  if (!authState.user?.user_id) return;
 
-        if (!res.ok) {
-          setAuthState({ user: null, isAuthenticated: false, isLoading: false });
-          return;
-        }
+  console.log("🔌 Init socket for user:", authState.user.user_id);
 
-        const result = await res.json();
-        setAuthState({ user: result.data, isAuthenticated: true, isLoading: false });
+  initSocket(authState.user.user_id);
 
-      } catch {
-        setAuthState({ user: null, isAuthenticated: false, isLoading: false });
-      }
-    };
+  return () => {
+    disconnectSocket();
+  };
 
-    initializeAuth();
-  }, []);
-
+}, [authState.user?.user_id]);
 
   // ✅ Login with Google
   const login = async (accessToken: string,redirectPath?: string): Promise<void> => {
-    const API_URL = import.meta.env.VITE_API_BASE_URL ||"http://localhost:5000/api";
-    const response = await fetch(`${API_URL}/auth/google`, {
+    const response = await apiFetch(`/auth/google`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      credentials: "include",
       body: JSON.stringify({
         access_token: accessToken
       })
@@ -186,13 +163,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 const logout = async (): Promise<void> => {
   try {
-    const API_URL =
-      import.meta.env.VITE_API_BASE_URL ||
-      "http://localhost:5000/api";
 
-    await fetch(`${API_URL}/auth/logout`, {
-      method: "POST",
-      credentials: "include"
+    await apiFetch(`/auth/logout`, {
+      method: "POST"
     });
 
   } catch (error) {
@@ -304,7 +277,7 @@ const isTokenExpired = (): boolean => {
     return true;
   }
 };
-
+/*
 export const getAuthHeader = (): string => {
   const token = localStorage.getItem('jwtToken');
   return token ? `Bearer ${token}` : '';
@@ -316,7 +289,7 @@ export const getAuthHeaders = (): Record<string, string> => {
   if (token) headers['Authorization'] = `Bearer ${token}`;
   return headers;
 };
-
+*/
 export const validateEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };

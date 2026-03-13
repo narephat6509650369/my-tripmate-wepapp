@@ -117,10 +117,17 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
   };
 
+  socket.on("connect", () => {
+    console.log("🔌 socket connected:", socket.id);
+
+    socket.emit("join_user", user.user_id);
+  });
+
   socket.on("new_notification", handleNewNotification);
 
   return () => {
     socket.off("new_notification", handleNewNotification);
+    socket.off("connect");
   };
 
 }, [user?.user_id]);

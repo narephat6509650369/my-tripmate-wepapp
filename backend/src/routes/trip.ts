@@ -29,7 +29,7 @@ router.get("/all-my-trips", auth, getMyTripsController);
 
 //เพิ่มทริปใหม่*
 
-router.post('/AddTrip', auth, addTripController);
+router.post('/add-trip', auth, addTripController);
 
 // ลบทริป (เจ้าของทริปเท่านั้น)*
 /* returns: { success: true, message: "ลบทริปสำเร็จ" } */

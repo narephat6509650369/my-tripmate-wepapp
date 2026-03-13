@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { googleLoginService } from "../services/authService.js";
-import type { AuthRequest } from "../middleware/validate.js";
+import type { AuthRequest   } from "../middleware/validate.js";
+import { randomUUID } from "crypto";
+import jwt from "jsonwebtoken";
 
 export const googleLogin = async (req: Request, res: Response) => {
   try {
@@ -84,4 +86,52 @@ export const getMe = async (req: AuthRequest, res: Response) => {
     success: true,
     data: req.user
   });
+};
+
+export const refreshToken = (req: Request, res: Response) => {
+
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(401).json({
+      success: false,
+      code: "NO_REFRESH_TOKEN"
+    });
+  }
+
+  try {
+
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.REFRESH_SECRET!
+    ) as any;
+
+    const newAccessToken = jwt.sign(
+      {
+        user_id: decoded.sub,
+        jti: randomUUID()
+      },
+      process.env.ACCESS_SECRET!,
+      { expiresIn: "15m" }
+    );
+
+    res.cookie("accessToken", newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000
+    });
+
+    return res.json({
+      success: true
+    });
+
+  } catch (err) {
+
+    return res.status(401).json({
+      success: false,
+      code: "INVALID_REFRESH_TOKEN"
+    });
+
+  }
 };
