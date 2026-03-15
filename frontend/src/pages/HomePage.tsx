@@ -243,9 +243,9 @@ const HomePage: React.FC = () => {
 
       const inviteCode = response.data.invite_code;
       
-      alert(
-        `สร้างทริปสำเร็จ!\n\nรหัสเชิญ: ${inviteCode}\n\nกรุณาบันทึกรหัสนี้ไว้`
-      );
+      // alert(
+      //   `สร้างทริปสำเร็จ!\n\nรหัสเชิญ: ${inviteCode}\n\nกรุณาบันทึกรหัสนี้ไว้`
+      // );
 
       navigate(`/votepage/${response.data.trip_id}`);
       setShowCreateModal(false);
@@ -426,6 +426,7 @@ const HomePage: React.FC = () => {
                 className="w-full border border-blue-300 rounded-lg px-3 py-2"
                 value={newTrip.name}
                 onChange={(e) => setNewTrip({ ...newTrip, name: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateTrip()}
                 placeholder="เช่น ทริปเที่ยวทะเล"
               />
             </div>
@@ -439,6 +440,7 @@ const HomePage: React.FC = () => {
                 className="w-full border border-blue-300 rounded-lg px-3 py-2"
                 value={newTrip.days}
                 onChange={(e) => setNewTrip({ ...newTrip, days: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateTrip()}
                 placeholder="3"
               />
             </div>
@@ -449,6 +451,7 @@ const HomePage: React.FC = () => {
                 className="w-full border border-blue-300 rounded-lg px-3 py-2 h-24"
                 value={newTrip.detail}
                 onChange={(e) => setNewTrip({ ...newTrip, detail: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateTrip()}
                 placeholder="เช่น เที่ยวทะเลภาคใต้ 3 วัน 2 คืน"
               />
             </div>
