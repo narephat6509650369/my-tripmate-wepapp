@@ -488,21 +488,32 @@ export const updateBudget = async (trip_id: string, user_id: string, category: s
 };
 
 
-export const clearBudgetCategory = async (tripid: string,user_id: string,category: string) => {
+export const clearBudgetCategory = async (tripid: string, user_id: string, category: string) => {
   const connection = await pool.getConnection();
   try {
+    await connection.beginTransaction();
+
+    // ลบ budget_votes ก่อน (child)
     await connection.query(
-      `
-      DELETE bv
-      FROM budget_votes bv
+      `DELETE bv FROM budget_votes bv
         JOIN budget_options bo ON bv.budget_option_id = bo.budget_option_id
         JOIN budget_votings bvt ON bo.budget_voting_id = bvt.budget_voting_id
-      WHERE bvt.trip_id = ?
-        AND bv.user_id = ?
-        AND bv.category_name = ?
-      `,
+      WHERE bvt.trip_id = ? AND bv.user_id = ? AND bv.category_name = ?`,
       [tripid, user_id, category]
     );
+
+    // ✅ ลบ budget_options ด้วย (parent)
+    await connection.query(
+      `DELETE bo FROM budget_options bo
+        JOIN budget_votings bvt ON bo.budget_voting_id = bvt.budget_voting_id
+      WHERE bvt.trip_id = ? AND bo.proposed_by = ? AND bo.category_name = ?`,
+      [tripid, user_id, category]
+    );
+
+    await connection.commit();
+  } catch (err) {
+    await connection.rollback();
+    throw err;
   } finally {
     connection.release();
   }
@@ -669,19 +680,21 @@ export const getVoteLocation = async (tripId: string, user_id: string) => {
     `;
 
     const logSql = `
-      SELECT
-        lo.proposed_by,
-        lo.province_name,
-        lo.score,
-        lo.proposed_at,
-        u.full_name AS proposed_by_name
-      FROM location_options lo
-      JOIN location_votings lvt 
-        ON lo.location_voting_id = lvt.location_voting_id
-      JOIN users u 
-        ON lo.proposed_by = u.user_id
-      WHERE lvt.trip_id = ?
-    `;
+    SELECT
+      lv.user_id AS proposed_by,
+      lo.province_name,
+      lv.score,
+      lv.voted_at AS proposed_at,
+      u.full_name AS proposed_by_name
+    FROM location_votes lv
+    JOIN location_options lo 
+      ON lv.location_option_id = lo.location_option_id
+    JOIN location_votings lvt 
+      ON lo.location_voting_id = lvt.location_voting_id
+    JOIN users u 
+      ON lv.user_id = u.user_id
+    WHERE lvt.trip_id = ?
+  `;
 
     const [
       userVoteResult,
