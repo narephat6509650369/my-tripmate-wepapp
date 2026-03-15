@@ -77,6 +77,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
   const [hasSaved, setHasSaved] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const budgetRef = useRef(budget);
+  useEffect(() => { budgetRef.current = budget; }, [budget]);
 
   // ✅ useRef สำหรับจัดการ timeout
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -140,7 +142,16 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
 
     // 2. set budget จาก loadedBudget ที่ build แล้ว
     if (budgetInfo.rows?.length > 0) {
-      setBudget(loadedBudget);
+      setBudget(prev => {
+        const merged = { ...prev };
+        Object.keys(loadedBudget).forEach((k) => {
+          const key = k as keyof BudgetState;
+          if (loadedBudget[key] > 0) {
+            merged[key] = loadedBudget[key];
+          }
+        });
+        return merged;
+      });
       setHasSaved(true);
       setIsAnalysisOpen(true);
     }
@@ -152,28 +163,28 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
           avg: Math.round(budgetInfo.stats.accommodation?.q2 || 0),
           min: Math.round(budgetInfo.stats.accommodation?.q1 || 0),
           max: Math.round(budgetInfo.stats.accommodation?.q3 || 0),
-          myValue: loadedBudget.accommodation,  // ✅ ใช้ loadedBudget แทน 0
+          myValue: loadedBudget.accommodation > 0 ? loadedBudget.accommodation : budgetRef.current.accommodation,
           median: Math.round(budgetInfo.stats.accommodation?.q2 || 0)
         },
         transport: {
           avg: Math.round(budgetInfo.stats.transport?.q2 || 0),
           min: Math.round(budgetInfo.stats.transport?.q1 || 0),
           max: Math.round(budgetInfo.stats.transport?.q3 || 0),
-          myValue: loadedBudget.transport,
+          myValue: loadedBudget.transport > 0 ? loadedBudget.transport : budgetRef.current.transport,
           median: Math.round(budgetInfo.stats.transport?.q2 || 0)
         },
         food: {
           avg: Math.round(budgetInfo.stats.food?.q2 || 0),
           min: Math.round(budgetInfo.stats.food?.q1 || 0),
           max: Math.round(budgetInfo.stats.food?.q3 || 0),
-          myValue: loadedBudget.food,
+          myValue: loadedBudget.food > 0 ? loadedBudget.food : budgetRef.current.food,
           median: Math.round(budgetInfo.stats.food?.q2 || 0)
         },
         other: {
           avg: Math.round(budgetInfo.stats.other?.q2 || 0),
           min: Math.round(budgetInfo.stats.other?.q1 || 0),
           max: Math.round(budgetInfo.stats.other?.q3 || 0),
-          myValue: loadedBudget.other,
+          myValue: loadedBudget.other > 0 ? loadedBudget.other : budgetRef.current.other,
           median: Math.round(budgetInfo.stats.other?.q2 || 0)
         }
       };
@@ -600,6 +611,16 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                         placeholder="0"
                         className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                         onChange={e => handleBudgetChange(key, Number(e.target.value) || 0)}
+                        id={`budget-input-${key}`}
+                        onKeyDown={async (e) => {
+                          if (e.key !== 'Enter') return;
+                          await handleSaveCategory(key);
+                          const keys = BUDGET_CATEGORIES.map(c => c.key);
+                          const nextKey = keys[keys.indexOf(key) + 1];
+                          if (nextKey) {
+                            document.getElementById(`budget-input-${nextKey}`)?.focus();
+                          }
+                        }}
                       />
                     </td>
                     <td className="px-4 py-3 text-center">
