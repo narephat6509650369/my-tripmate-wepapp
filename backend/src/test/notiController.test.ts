@@ -3,6 +3,9 @@ import { Request, Response } from "express";
 import {
   getUserNotiController,
   markAllNotificationAsReadController,
+  markNotificationAsReadController,
+  getUnreadCountController,
+  deleteNotificationController,
 } from "../controllers/notiController.js";
 import notiservice from "../services/notiService.js";
 
@@ -24,7 +27,7 @@ const noAuthReq = (overrides = {}) =>
 
 beforeEach(() => vi.clearAllMocks());
 
-// getUserNotiController, markAllNotificationAsReadController
+// getUserNotiController, markAllNotificationAsReadController, markNotificationAsReadController, getUnreadCountController, deleteNotificationController
 
 // ==================== getUserNotiController ====================
 
@@ -48,20 +51,89 @@ describe("getUserNotiController", () => {
   });
 });
 
-// ==================== markAllNotificationAsReadController ====================
+// ==================== markNotificationAsReadController ====================
 
-describe("markAllNotificationAsReadController", () => {
+describe("markNotificationAsReadController", () => {
   it("returns 401 if not authenticated", async () => {
     const res = mockRes();
-    await markAllNotificationAsReadController(noAuthReq(), res);
+    await markNotificationAsReadController(noAuthReq(), res);
     expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "AUTH_UNAUTHORIZED" }));
+  });
+
+  it("returns 400 if notification id is missing", async () => {
+    const res = mockRes();
+    await markNotificationAsReadController(authReq({ params: {} }), res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "NOTI_ID_REQUIRED" }));
   });
 
   it("returns 200 on success", async () => {
     const res = mockRes();
     mockNotiService.markNotificationAsRead.mockResolvedValueOnce({ success: true } as any);
-    await markAllNotificationAsReadController(authReq(), res);
+    await markNotificationAsReadController(authReq({ params: { id: "n1" } }), res);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "NOTI_MARK_ALL_SUCCESS" }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "NOTI_MARK_SUCCESS" }));
+  });
+});
+
+// ==================== getUnreadCountController ====================
+
+describe("getUnreadCountController", () => {
+  it("returns 401 if not authenticated", async () => {
+    const res = mockRes();
+    await getUnreadCountController(noAuthReq(), res);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "AUTH_UNAUTHORIZED" }));
+  });
+
+  it("returns 200 with unread count on success", async () => {
+    const res = mockRes();
+    mockNotiService.getUnreadCount.mockResolvedValueOnce({ success: true, count: 3 } as any);
+    await getUnreadCountController(authReq(), res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "NOTI_COUNT_SUCCESS",
+        data: { unreadCount: 3 }
+      })
+    );
+  });
+});
+
+// ==================== deleteNotificationController ====================
+
+describe("deleteNotificationController", () => {
+  it("returns 401 if not authenticated", async () => {
+    const res = mockRes();
+    await deleteNotificationController(noAuthReq(), res);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "AUTH_UNAUTHORIZED" }));
+  });
+
+  it("returns 400 if notification id is missing", async () => {
+    const res = mockRes();
+    await deleteNotificationController(authReq({ params: {} }), res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "NOTI_ID_REQUIRED" }));
+  });
+
+  it("returns 400 if service fails", async () => {
+    const res = mockRes();
+    mockNotiService.deleteNotification.mockResolvedValueOnce({
+      success: false,
+      message: "Not found"
+    } as any);
+    await deleteNotificationController(authReq({ params: { id: "n1" } }), res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "NOTI_DELETE_FAILED" }));
+  });
+
+  it("returns 200 on success", async () => {
+    const res = mockRes();
+    mockNotiService.deleteNotification.mockResolvedValueOnce({ success: true } as any);
+    await deleteNotificationController(authReq({ params: { id: "n1" } }), res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "NOTI_DELETE_SUCCESS" }));
   });
 });
