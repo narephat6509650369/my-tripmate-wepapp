@@ -206,7 +206,8 @@ export const requestJoinTripByCode = async (invite_code: string,user_id: string)
       };
     }
 
-    const member = await tripModel.getMemberByTripAndUser(trip.trip_id, user_id);
+    const members = await tripModel.getMemberByTripAndUser(trip.trip_id, user_id);
+    const member = members?.[0] ?? null
 
     // ไม่เคยเป็นสมาชิกมาก่อน
     if (!member) {
