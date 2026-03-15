@@ -55,6 +55,7 @@ const VotePage: React.FC = () => {
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const isReloading = React.useRef(false);
 
   const [panelTab, setPanelTab] = useState<'pending' | 'members'>('pending');
   const [members, setMembers] = useState<{user_id: string, member_id: string, full_name?: string, name?: string, email?: string}[]>([]);
@@ -135,7 +136,9 @@ const VotePage: React.FC = () => {
               summary: dateRes.data.summary || { totalMembers: 0, totalAvailableDays: 0 }
             });
           }
-          if (dateRes?.data?.rows) setUserDates(dateRes.data.rows);
+          if (dateRes?.data?.rows) {
+            setUserDates(dateRes.data.rows.map((d: string) => d.split('T')[0]));
+          }
           const hasDates = dateRes?.data?.rowlog?.some(
             (r: any) => r.proposed_by === user?.user_id
           );
@@ -187,8 +190,9 @@ const VotePage: React.FC = () => {
           try {
             const joinRes = await tripAPI.joinTrip(tripCode);
             if (joinRes.success) {
+              window.location.reload();
               console.log("Auto join success → reload trip");
-              await loadTripData();
+              // await loadTripData();
               return;
             }
           } catch (e) {
@@ -257,7 +261,12 @@ const reloadTripData = async () => {
 
   if (!trip?.tripid) return;
 
+  if (isReloading.current) return;  // ← กัน concurrent
+  isReloading.current = true;
+
   try {
+
+    const isCurrentUserOwner = trip.ownerid === user?.user_id;
 
     const [
       tripRes,
@@ -268,8 +277,8 @@ const reloadTripData = async () => {
       locRes
     ] = await Promise.all([
       tripAPI.getTripDetail(trip.tripid),
-      tripAPI.getMembers(trip.tripid),
-      tripAPI.getPendingRequests(trip.tripid),
+      isCurrentUserOwner ? tripAPI.getMembers(trip.tripid) : Promise.resolve(null),
+      isCurrentUserOwner ? tripAPI.getPendingRequests(trip.tripid) : Promise.resolve(null),
       voteAPI.getDateMatchingResult(trip.tripid),
       voteAPI.getBudgetVoting(trip.tripid),
       voteAPI.getLocationVote(trip.tripid)
@@ -372,12 +381,16 @@ if (locRes?.data) {
         score: log.score
       }));
 
-    setUserLocations(myVotes);
+    if (myVotes.length > 0) {
+      setUserLocations(myVotes);
+    }
   }
 }
 
   } catch (err) {
     console.error("reload trip failed", err);
+  } finally {
+    isReloading.current = false;  // ← ปลดล็อคเมื่อเสร็จ
   }
 
 };
