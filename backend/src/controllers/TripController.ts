@@ -199,7 +199,7 @@ export const requestJoinTripController = async (req: Request,res: Response) => {
     }
 
     const result =await requestJoinTripByCode(invite_code,user_id);
-    //console.log("requestJoinTripController",result)
+    console.log("requestJoinTripController",result)
     const io = getIO();
 
     if (!result.success) {

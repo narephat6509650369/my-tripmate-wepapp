@@ -2,26 +2,29 @@ const API_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"
 
 export const apiFetch = async (url: string, options: RequestInit = {}) => {
 
-  let response = await fetch(`${API_URL}${url}`, {
+  const endpoint = url.startsWith("/") ? url : `/${url}`;
+
+  let response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     credentials: "include"
   });
 
-  // access token หมด
-  if (response.status === 401) {
+  if (response.status === 401 && !endpoint.includes("/auth/refresh")) {
 
-    console.log("🔄 Access token expired, refreshing...");
+    console.log("🔄 Access token expired");
 
-    const refresh = await fetch(`${API_URL}/auth/refresh`, {
+    const refreshEndpoint = "/auth/refresh";
+
+    const refresh = await fetch(`${API_URL}${refreshEndpoint}`, {
       method: "POST",
       credentials: "include"
     });
 
     if (refresh.ok) {
+
       console.log("✅ Token refreshed");
 
-      // retry request
-      response = await fetch(`${API_URL}${url}`, {
+      response = await fetch(`${API_URL}${endpoint}`, {
         ...options,
         credentials: "include"
       });
@@ -30,8 +33,10 @@ export const apiFetch = async (url: string, options: RequestInit = {}) => {
 
       console.warn("❌ Refresh failed");
 
-      window.location.href = "/";
-      return response;
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+
     }
   }
 

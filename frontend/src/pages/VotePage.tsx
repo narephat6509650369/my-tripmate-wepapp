@@ -50,12 +50,12 @@ const VotePage: React.FC = () => {
   const [userLocations, setUserLocations] = useState<{ place: string; score: number }[]>([]);
   const [locationAnalysis, setLocationAnalysis] = useState<any>(null);
   const [locationVotedCount, setLocationVotedCount] = useState(0);
+  const [dialogMessage, setDialogMessage] = useState<string | null>(null);
 
   // ✅ Pending Requests state
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const isReloading = React.useRef(false);
 
   const [panelTab, setPanelTab] = useState<'pending' | 'members'>('pending');
   const [members, setMembers] = useState<{user_id: string, member_id: string, full_name?: string, name?: string, email?: string}[]>([]);
@@ -136,9 +136,7 @@ const VotePage: React.FC = () => {
               summary: dateRes.data.summary || { totalMembers: 0, totalAvailableDays: 0 }
             });
           }
-          if (dateRes?.data?.rows) {
-            setUserDates(dateRes.data.rows.map((d: string) => d.split('T')[0]));
-          }
+          if (dateRes?.data?.rows) setUserDates(dateRes.data.rows);
           const hasDates = dateRes?.data?.rowlog?.some(
             (r: any) => r.proposed_by === user?.user_id
           );
@@ -190,9 +188,8 @@ const VotePage: React.FC = () => {
           try {
             const joinRes = await tripAPI.joinTrip(tripCode);
             if (joinRes.success) {
-              window.location.reload();
               console.log("Auto join success → reload trip");
-              // await loadTripData();
+              await loadTripData();
               return;
             }
           } catch (e) {
@@ -246,11 +243,20 @@ useEffect(() => {
     await reloadTripData();
 
   };
+  socket.on("you_were_removed", (data) => {
+
+  console.log("Removed from trip:", data.trip_id);
+
+  setDialogMessage("คุณถูกนำออกจากทริป");
+
+  });
 
   socket.on("vote_updated", handleVoteUpdate);
   socket.on("member_updated", handleMemberUpdate);
+  
 
   return () => {
+    socket.off("you_were_removed");
     socket.off("vote_updated", handleVoteUpdate);
     socket.off("member_updated", handleMemberUpdate);
   };
@@ -261,12 +267,7 @@ const reloadTripData = async () => {
 
   if (!trip?.tripid) return;
 
-  if (isReloading.current) return;  // ← กัน concurrent
-  isReloading.current = true;
-
   try {
-
-    const isCurrentUserOwner = trip.ownerid === user?.user_id;
 
     const [
       tripRes,
@@ -277,8 +278,8 @@ const reloadTripData = async () => {
       locRes
     ] = await Promise.all([
       tripAPI.getTripDetail(trip.tripid),
-      isCurrentUserOwner ? tripAPI.getMembers(trip.tripid) : Promise.resolve(null),
-      isCurrentUserOwner ? tripAPI.getPendingRequests(trip.tripid) : Promise.resolve(null),
+      tripAPI.getMembers(trip.tripid),
+      tripAPI.getPendingRequests(trip.tripid),
       voteAPI.getDateMatchingResult(trip.tripid),
       voteAPI.getBudgetVoting(trip.tripid),
       voteAPI.getLocationVote(trip.tripid)
@@ -381,16 +382,12 @@ if (locRes?.data) {
         score: log.score
       }));
 
-    if (myVotes.length > 0) {
-      setUserLocations(myVotes);
-    }
+    setUserLocations(myVotes);
   }
 }
 
   } catch (err) {
     console.error("reload trip failed", err);
-  } finally {
-    isReloading.current = false;  // ← ปลดล็อคเมื่อเสร็จ
   }
 
 };
@@ -942,7 +939,7 @@ if (locRes?.data) {
                   <div key={req.user_id} className="flex items-center justify-between px-4 py-3 border-b hover:bg-gray-50 transition">
                     <div className="flex-1 min-w-0 mr-2">
                       <p className="text-sm font-semibold text-gray-800 truncate">{req.full_name || req.name || 'ไม่ระบุชื่อ'}</p>
-                      <p className="text-xs text-gray-500 truncate">{req.email || ''}</p>
+                      <p className="text-xs text-gray-500 truncate">{req.email || req.user_id}</p>
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0">
                       <button onClick={() => handleApprove(req.user_id)} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition">✓ รับ</button>
@@ -1006,6 +1003,26 @@ if (locRes?.data) {
           </span>
         </button>
       )}
+      {/* ✅ Join Result Dialog */}
+      {dialogMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-11/12 max-w-sm text-center">
+            <p className="mb-4 text-blue-900 font-medium">
+              {dialogMessage}
+            </p>
+
+            <button
+              onClick={() => {
+                setDialogMessage(null);
+                navigate("/homepage");
+              }}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirm Modal */}
       {showDeleteConfirm && !isClosed && (
@@ -1046,6 +1063,7 @@ if (locRes?.data) {
           </div>
         </div>
       )}
+      
     </div>
   );
 };

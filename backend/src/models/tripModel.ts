@@ -247,27 +247,33 @@ export async function deleteTrip(tripId: string,ownerId: string): Promise<void> 
 }  
 
 export async function generateInviteCode(): Promise<string> {
-    let code = '';
-    let isUnique = false;
 
-    while (!isUnique) {
-        const raw = crypto.randomBytes(8).toString('hex').toUpperCase(); // 16 hex chars
+    for (let i = 0; i < 5; i++) {
 
-        // แปลงเป็น XXXX-XXXX-XXXX-XXXX
+        const raw = crypto.randomBytes(8).toString('hex').toUpperCase();
+
         const dashed = raw.match(/.{4}/g)!.join('-');
 
-        const [rows] = await pool.query<RowDataPacket[]>(
-            'SELECT trip_id FROM trips WHERE invite_code = ?', 
-            [dashed]
-        );
+        try {
 
-        if (rows.length === 0) {
-            code = dashed;
-            isUnique = true;
+            const [rows] = await pool.query<RowDataPacket[]>(
+                'SELECT trip_id FROM trips WHERE invite_code = ?',
+                [dashed]
+            );
+
+            if (rows.length === 0) {
+                return dashed;
+            }
+
+        } catch (err) {
+
+            console.error("generateInviteCode DB error:", err);
+
         }
+
     }
 
-    return code;
+    throw new Error("Failed to generate unique invite code");
 }
 
 export async function generateInviteLink(inviteCode: string): Promise<string> {
