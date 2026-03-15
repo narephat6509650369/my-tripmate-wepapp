@@ -942,7 +942,7 @@ if (locRes?.data) {
                   <div key={req.user_id} className="flex items-center justify-between px-4 py-3 border-b hover:bg-gray-50 transition">
                     <div className="flex-1 min-w-0 mr-2">
                       <p className="text-sm font-semibold text-gray-800 truncate">{req.full_name || req.name || 'ไม่ระบุชื่อ'}</p>
-                      <p className="text-xs text-gray-500 truncate">{req.email || req.user_id}</p>
+                      <p className="text-xs text-gray-500 truncate">{req.email || ''}</p>
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0">
                       <button onClick={() => handleApprove(req.user_id)} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition">✓ รับ</button>
