@@ -59,6 +59,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const [, forceUpdate] = useState(0);
+  const [toast, setToast] = useState<{ text: string; type: string } | null>(null);
 
   useEffect(() => {
     const fetchNoti = async () => {
@@ -106,6 +107,12 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
           tripId: n.trip_id,
         }));
         setNotifications(mapped);
+
+        const latest = mapped.find((n: any) => !n.read);
+        if (latest) {
+          setToast({ text: latest.text, type: latest.type });
+          setTimeout(() => setToast(null), 4000);
+        }
 
         // ✅ ถ้ามี noti trip_confirmed/archived/completed และอยู่ใน votepage ของทริปนั้น
         const closedNoti = mapped.find((n: any) =>
@@ -497,6 +504,19 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
           >
             <LogOut className="w-4 h-4" />
             ออกจากระบบ
+          </button>
+        </div>
+      )}
+
+      {/* ✅ Toast Notification */}
+      {toast && (
+        <div className="fixed top-20 right-4 z-[9999] max-w-sm bg-white border border-gray-200 rounded-xl shadow-2xl px-4 py-3 flex items-start gap-3 animate-in slide-in-from-right duration-300">
+          <span className="text-xl flex-shrink-0">🔔</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-800">{toast.text}</p>
+          </div>
+          <button onClick={() => setToast(null)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
