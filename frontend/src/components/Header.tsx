@@ -21,6 +21,7 @@ type NotificationType =
   | 'new_voting_session'
   | 'voting_closed'
   | 'trip_confirmed'
+  | 'trip_archived'
   | 'member_joined'
   | 'member_removed'
   | 'trip_deleted';  
@@ -91,30 +92,35 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   if (!socket) return;
 
   const handleNewNotification = async () => {
-
     console.log("🔔 socket notification received");
-
     try {
       const res = await notiApi.getNoti();
-
       if (res?.success && Array.isArray(res.data?.notifications)) {
-        setNotifications(
-          res.data.notifications.map((n: any) => ({
-            id: n.notification_id,
-            type: n.notification_type,
-            text: n.message || n.title,
-            subText: n.email,
-            read: Boolean(n.is_read),
-            timestamp: new Date(new Date(n.created_at).getTime() + 7 * 60 * 60 * 1000),
-            tripId: n.trip_id,
-          }))
-        );
-      }
+        const mapped = res.data.notifications.map((n: any) => ({
+          id: n.notification_id,
+          type: n.notification_type,
+          text: n.message || n.title,
+          subText: n.email,
+          read: Boolean(n.is_read),
+          timestamp: new Date(new Date(n.created_at).getTime() + 7 * 60 * 60 * 1000),
+          tripId: n.trip_id,
+        }));
+        setNotifications(mapped);
 
+        // ✅ ถ้ามี noti trip_confirmed/archived/completed และอยู่ใน votepage ของทริปนั้น
+        const closedNoti = mapped.find((n: any) =>
+          ["trip_confirmed", "voting_closed", "trip_archived"].includes(n.type) &&
+          n.tripId &&
+          window.location.pathname.includes(n.tripId)
+        );
+        if (closedNoti) {
+          navigate(`/votepage/${closedNoti.tripId}`);
+          window.location.reload();
+        }
+      }
     } catch (err) {
       console.error("Failed to reload notifications:", err);
     }
-
   };
 
   socket.on("connect", () => {
@@ -149,6 +155,8 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case "trip_confirmed":
         return <CheckCircle className="w-4 h-4 text-emerald-500" />;
+      case "trip_archived":
+        return <X className="w-4 h-4 text-gray-500" />;
       case "member_joined":
         return <Users className="w-4 h-4 text-blue-400" />;
       case "member_removed":
