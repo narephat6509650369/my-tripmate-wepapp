@@ -100,8 +100,6 @@ export const getDateMatchingResultController = async (req: Request, res: Respons
 
     const result = await voteService.getvoteDate(tripId, user_id);
 
-    //console.log("Date matching:",result);
-
     //console.log("get tripmatching results:",result);
 
     return res.status(200).json({
@@ -205,7 +203,7 @@ export const getBudgetVoteController = async (req: Request, res: Response) => {
     }
 
     const data = await voteService.getvoteBudget(tripId, user_id);
-    //console.log("budget vote:",data)
+    console.log("budget vote:",data)
 
     return res.status(200).json({
       success: true,
@@ -333,7 +331,7 @@ export const getLocationVoteController = async (req: Request, res: Response) => 
     }
 
     const locationVotes = await voteService.getvoteLocation(tripId, user_id);
-    console.log("location:",locationVotes);
+    //console.log("location:",locationVotes);
 
     return res.status(200).json({
       success: true,

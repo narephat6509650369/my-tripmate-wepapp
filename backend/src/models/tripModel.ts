@@ -719,18 +719,6 @@ export const getTripByInviteCode = async (invite_code: string) => {
     return rows[0]; // คืนค่า undefined ถ้าหาไม่เจอ
 };
 
-
-
-// ดึงสมาชิกเก่ากลับเข้าทริป (กรณีเคยออกไปแล้ว is_active = 0)
-/*
-export const reactivateTripMember = async (trip_id: string, user_id: string) => {
-    await pool.query(
-        `UPDATE trip_members SET is_active = 1, role = 'member' 
-         WHERE trip_id = ? AND user_id = ?`,
-        [trip_id, user_id]
-    );
-};
-*/
 // ดึงข้อมูลสรุปทริป
 export async function getTripSummaryById(tripId: string): Promise<TripSummaryResult | null> {
   try {
@@ -1276,6 +1264,16 @@ export const findOwnerByTrip = async (trip_id: string): Promise<string | null> =
   return rows[0]?.owner_id ?? null;
 };
 
+
+export const updateDescription = async (tripId: string,description: string) => {
+  await pool.query(
+    `UPDATE trips 
+     SET description = ? 
+     WHERE trip_id = ?`,
+    [description, tripId]
+  );
+};
+
 export default {
     generateInviteCode,
     generateInviteLink,
@@ -1302,18 +1300,6 @@ export default {
     getTripOwner,
     getMemberWithEmail,
     getMemberWithEmailPending,
-    findOwnerByTrip
+    findOwnerByTrip,
+    updateDescription
 };
-/*
-    getTripById,
-    updateTrip,
-    deactivateTrip,
-    activateTrip,
-    addMemberToTrip,
-    removeMemberFromTrip,
-    getTripMembers,
-    getTripsByUserId,
-    confirmTrip,
-    completeTrip,
-    archiveTrip,
-*/

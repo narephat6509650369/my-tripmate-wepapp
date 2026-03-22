@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { getUserTrips, requestJoinTripByCode, removeMemberService, approveMember, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate, getMemberService, getPendingRequests, rejectMember} from "../services/tripService.js";
+import { getUserTrips, requestJoinTripByCode, removeMemberService, approveMember, deleteTripService, addTrip, getTripDetail, getTripSummaryService, closeTripService, PromptTemplate, getMemberService, getPendingRequests, rejectMember,editTripService} from "../services/tripService.js";
 import voteService from "../services/voteService.js";
 import { findOwnerByTrip } from "../models/tripModel.js";
 import { getIO, getUserSocket} from "../socket/socket.js";
@@ -980,6 +980,62 @@ export const getMemberController = async (req: Request, res: Response) => {
   }
 };
 
+export const editController = async (req: Request, res: Response) => {
+  try {
+    const { tripId } = req.params;
+    const ownerId = req.user?.user_id;
+    const { description } = req.body;
 
-export default {addTripController, deleteTripController, getMyTripsController, requestJoinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,getMemberController};
+    if (!ownerId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    if (!tripId) {
+      return res.status(400).json({
+        success: false,
+        message: "Trip ID is required"
+      });
+    }
+
+    if (!description) {
+      return res.status(400).json({
+        success: false,
+        message: "Description is required"
+      });
+    }
+
+    const result = await editTripService(tripId, ownerId, description);
+
+    // check success ก่อน
+    if (!result.success) {
+      return res.status(403).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Edit description success",
+      data: result.data
+    });
+
+  } catch (error) {
+    console.error("editController error:", error);
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to edit description"
+    });
+  }
+};
+
+
+export default {addTripController, deleteTripController, getMyTripsController, requestJoinTripController, removeMemberController, getTripDetailController,getTripSummaryController, manualCloseController,getMemberController, editController};
 //deleteMemberController

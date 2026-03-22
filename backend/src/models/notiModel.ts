@@ -1,16 +1,5 @@
 import { pool } from "../config/db.js";
 import crypto from "crypto";
-/*
-notification_id	varchar(36)	NO	PRI		
-user_id	varchar(36)	NO	MUL		
-trip_id	varchar(36)	YES	MUL		
-notification_type	enum('trip_invitation','new_voting_session','voting_closed','trip_confirmed','member_joined','member_removed')	NO			
-title	varchar(255)	NO			
-message	text	YES			
-is_read	tinyint(1)	YES	MUL	0	
-created_at	timestamp	YES	MUL	CURRENT_TIMESTAMP	DEFAULT_GENERATED
-read_at	timestamp	YES		
-*/	
 
 export const createNotification = async (trip_id: string,user_id: string,type: string,title: string,message: string) => {
 

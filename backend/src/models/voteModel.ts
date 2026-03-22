@@ -13,8 +13,6 @@ type LocationVotePayload = {
 };
 
 // ================= DATE VOTING SECTION =================
-
-
 export const addAvailability = async (trip_id: string,user_id: string,available_date: Date) => {
   const connection: PoolConnection = await pool.getConnection();
   try {
@@ -173,138 +171,6 @@ export const getAvailabilitiesByTrip = async (tripId: string) => {
   return rows;
 };
 
-/*
-export const saveUserAvailability = async (date_voting_id: string, trip_id: string) => {
-  const [result] = await pool.query(
-    `INSERT INTO date_votings (date_voting_id, trip_id, status)
-     VALUES (?, ?, 'active')`,
-    [date_voting_id, trip_id]
-  );
-  return result;
-};
-
-export const getActiveDateVotingByTrip = async (trip_id: string) => {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `
-      SELECT * FROM date_votings
-      WHERE trip_id = ? AND status = 'active'
-      LIMIT 1
-    `,
-    [trip_id]
-  );
-  return rows[0] ?? null;
-};
-
-
-//กรณีที่ algorithm ต้องเก็บ top-N
-export const insertRankingResults = async (trip_id: string, results: { rank: number; date: string; matching_score: number; num_available: number; total_members: number; }[]) => {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    await conn.query(
-      `DELETE FROM date_ranking_results 
-       WHERE trip_id = ?`,
-      [trip_id]
-    );
-
-    for (const r of results) {
-      await conn.query(
-        `INSERT INTO date_ranking_results 
-         (ranking_id, trip_id, rank, date, matching_score, num_available, total_members)
-         VALUES (UUID(), ?, ?, ?, ?, ?, ?)`,
-        [
-          trip_id,
-          r.rank,
-          r.date,
-          r.matching_score,
-          r.num_available,
-          r.total_members
-        ]
-      );
-    }
-
-    await conn.commit();
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
-};
-
-export const getRankingResults = async (trip_id: string) => {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT rank, date, matching_score, num_available, total_members
-     FROM date_ranking_results
-     WHERE trip_id = ?
-     ORDER BY rank ASC`,
-    [trip_id]
-  );
-  return rows;
-};
-
-export const insertDateVoting  = async (connection: unknown, trip_id: string, date_voting_id: string) => {
-  await pool.query(
-    `INSERT INTO date_votings (date_voting_id, trip_id, status) 
-       VALUES (?, ?, 'active')`,
-      [date_voting_id, trip_id]
-  );
-};
-
-export const clearActiveVotingByTrip = async (conn: any, trip_id: string) => {
-  await conn.query(
-    `
-      UPDATE date_votings
-      SET status = 'closed'
-      WHERE trip_id = ? AND status = 'active'
-    `,
-    [trip_id]
-  );
-};
-*/
-// ================= BUDGET SECTION =================
-/*
-export const getTripBudgets = async (trip_id: string, user_id: string) => {
-  const connection = await pool.getConnection();
-  try{
-    const [row] = await connection.query( 
-    `
-    SELECT 
-      bv.user_id,
-      bv.category_name,
-      bv.estimated_amount,
-      bv.voted_at
-    FROM budget_votes bv
-    JOIN budget_votings ON 
-    WHERE bv.user_id = ? AND bvt.trip_id = ?
-  
-  `);
-
-  const [rowlog] =await connection.query(
-     `SELECT
-        bo.proposed_by,
-        bo.proposed_at,
-        bo.category_name,
-        bo.estimated_amount,
-        u.full_name AS proposed_by_name
-      FROM budget_options bo
-      JOIN budget_votings bvt ON bo.budget_voting_id = bvt.budget_voting_id
-      JOIN users u ON bo.proposed_by = u.user_id
-      WHERE bvt.trip_id = ?
-      ORDER BY bo.proposed_at ASC`,
-      [trip_id]
-    );
-
-  return {
-    row,
-    rowlog
-  };
-  } finally {
-    connection.release();
-  }
-};
-*/
 export const getBudgetVoting = async (trip_id: string, user_id: string) => {
   try {
 
@@ -817,12 +683,3 @@ export default {
   getActualMembetVoteLocation,
 };
 
-/*
-saveUserAvailability,
-  getActiveDateVotingByTrip,
-  insertDateVoting,
-  clearActiveVotingByTrip,
-  insertRankingResults,
-  getRankingResults,
-  clearUserAvailability,
-*/

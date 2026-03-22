@@ -59,77 +59,6 @@ export const submitAvailability = async ( trip_id: string, user_id: string, date
   };
 };
 
-/**
- * 2. ดึงข้อมูล Heatmap (วันไหนคนว่างเยอะสุด)
- */
-/*
-export const getTripHeatmap = async (trip_id: string, user_id: string): Promise<HeatmapData> => {
-  const rawData = await voteModel.getTripAvailabilities(trip_id, user_id);
-  
-  const heatmap: HeatmapData = {};
-
-  rawData.forEach((entry: any) => {
-    const dateStr = entry.available_date.toISOString().slice(0, 10);
-    if (!heatmap[dateStr]) {
-      heatmap[dateStr] = [];
-    }
-    heatmap[dateStr].push(entry.user_id);
-  });
-
-  return heatmap;
-};
-*/
-
-/**
- * 3. เปิดห้องโหวต + เปลี่ยนสถานะทริปเป็น 'voting'
- */
-/*
-export const startVotingSession = async (trip_id: string, user_id: string) => {
-  if (!trip_id) {
-    throw new Error("trip_id is required");
-  }
-  if (!user_id) {
-    throw new Error("user_id is required");
-  }
-  // 1. เช็คว่ามีห้องโหวต active อยู่แล้วไหม
-  const existingSession = await voteModel.getActiveDateVotingByTrip(trip_id);
-  if (existingSession) {
-    throw new Error("A voting session is already active for this trip.");
-  }
-
-  // 2. เช็คว่า user เป็น owner หรือไม่
-  const trip = await tripModel.getTripDetail(trip_id);
-  if (!trip) throw new Error("Trip not found");
-  if (trip.owner_id !== user_id) {
-    throw new Error("Only trip owner can start voting session");
-  }
-
-  const date_voting_id = uuidv4();
-
-  // 3. Transaction: สร้างห้องโหวต + อัปเดตสถานะทริป
-  const connection = await voteModel.getConnection();
-  try {
-    await connection.beginTransaction();
-
-    await voteModel.insertDateVoting(connection, date_voting_id, trip_id);
-    await tripModel.updateTripStatus(connection, trip_id, 'voting');
-
-    await connection.commit();
-    
-    return { 
-      voting_id: date_voting_id, 
-      status: 'active',
-      message: "Voting session started and trip status updated to 'voting'"
-    };
-
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-};
-*/
 export const getvoteDate = async (tripId: string,userId: string) => {
 
   const trip = await tripModel.findTripById(tripId);
@@ -671,79 +600,14 @@ export const getvoteLocation = async (tripId: string, user_id: string) => {
 };
 
 
-/*ปิดทริป
-export const closeTrip = async (tripCode: string, user_id: string) => {
-  // 1. หาทริป
-  const trip = await tripModel.getTripByInviteCode(tripCode);
-  if (!trip) throw new Error("Trip not found");
-
-  // 2. เช็คว่าเป็น owner
-  if (trip.owner_id !== user_id) {
-    throw new Error("Only trip owner can close voting");
-  }
-
-  // 3. เปลี่ยนสถานะทริปเป็น 'confirmed'
-  const connection = await voteModel.getConnection();
-  try {
-    await connection.beginTransaction();
-
-    // อัปเดตสถานะทริป
-    await connection.query(
-      `UPDATE trips 
-       SET status = 'confirmed', confirmed_at = NOW(), updated_at = NOW() 
-       WHERE trip_id = ?`,
-      [trip.trip_id]
-    );
-
-    // ปิดห้องโหวตทั้งหมด
-    await connection.query(
-      `UPDATE date_votings 
-       SET status = 'closed', closed_at = NOW() 
-       WHERE trip_id = ? AND status = 'active'`,
-      [trip.trip_id]
-    );
-
-    await connection.query(
-      `UPDATE budget_votings 
-       SET status = 'closed', closed_at = NOW() 
-       WHERE trip_id = ? AND status = 'active'`,
-      [trip.trip_id]
-    );
-
-    await connection.query(
-      `UPDATE location_votings 
-       SET status = 'closed', closed_at = NOW() 
-       WHERE trip_id = ? AND status = 'active'`,
-      [trip.trip_id]
-    );
-
-    await connection.commit();
-    
-    return {
-      success: true,
-      message: "Trip voting closed successfully"
-    };
-
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-};
-*/
 export default {
   submitAvailability,
-  //getTripHeatmap,
-  //startVotingSession,
-  //getFullTripData,
   updateBudget,
   voteLocation,
   getvoteDate,
   getvoteBudget,
   getvoteLocation,
   checkTripStatus
-  //closeTrip
 };
 
 

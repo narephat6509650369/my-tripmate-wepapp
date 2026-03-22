@@ -396,86 +396,6 @@ export const rejectMember = async (trip_id: string,user_id: string,owner_id: str
   }
 
 };
-/*
-export const joinTripByCode = async (invite_code: string, user_id: string) => {
-  try {
-    const trip = await tripModel.getTripByInviteCode(invite_code);
-
-    if (!trip) {
-      return {
-        success: false,
-        message: "Invalid invite code"
-      };
-    }
-
-    // check trip status
-    if (
-      trip.status === "archived" ||
-      trip.status === "completed" ||
-      trip.status === "confirmed"
-    ) {
-      return {
-        success: false,
-        message: `ไม่สามารถเข้าร่วมทริปได้เนื่องจากทริปถูกปิดไปแล้ว (สถานะ: ${trip.status})`
-      };
-    }
-
-    const members = await tripModel.getTripMembers(trip.trip_id);
-    const existingMember = members.find(m => m.user_id === user_id);
-
-    // already active member
-    if (existingMember && existingMember.is_active) {
-      return {
-        success: false,
-        message: "คุณเป็นสมาชิกของทริปนี้อยู่แล้ว"
-      };
-    }
-
-    // rejoin case
-    if (existingMember && !existingMember.is_active) {
-      await tripModel.reactivateTripMember(trip.trip_id, user_id);
-
-      await notiService.notifyMemberJoined(trip.trip_id, user_id);
-
-      return {
-        success: true,
-        message: {
-          trip_id: trip.trip_id,
-          trip_name: trip.trip_name,
-          rejoined: true,
-          text: "เข้าร่วมทริปสำเร็จ (rejoined)"
-        }
-      };
-    }
-
-    // new member case
-    await tripModel.addMemberIfNotExists(trip.trip_id, user_id);
-
-    await notiService.notifyMemberJoined(trip.trip_id, user_id);
-
-    return {
-      success: true,
-      message: {
-        trip_id: trip.trip_id,
-        trip_name: trip.trip_name,
-        rejoined: false,
-        text: "เข้าร่วมทริปสำเร็จ"
-      }
-    };
-
-  } catch (error) {
-    console.error("joinTripByCode service error:", error);
-
-    return {
-      success: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : "An error occurred while joining the trip"
-    };
-  }
-};
-*/
 
 /**
  * ลบสมาชิกออกจากทริป (เฉพาะ Owner)
@@ -525,17 +445,6 @@ export const removeMemberService = async ( trip_id: string, member_id: string, o
   };
 };
 
-/*
-export const TripDetail = async (tripCode: string) => {
-  const trip = await tripModel.getTripDetail(tripCode);
-  return trip;
-}
-
-export const findById = async (tripId: string) => {
-  const trip = await tripModel.findTripById(tripId);
-  return trip;
-}
-*/
 export type PromptTemplate =| "comprehensive"| "itinerary"| "budget"| "activities"| "accommodation";
 
 export async function getTripSummaryService(tripId: string, user_id: string, template: PromptTemplate = "comprehensive") {
@@ -783,6 +692,34 @@ export const getMemberService = async (tripId: string,ownerId: string): Promise<
   }
 };
 
+export const editTripService = async (tripId: string,ownerId: string,description: string) => {
+
+   const trip = await tripModel.findTripById(tripId);
+
+  if (!trip) {
+    return { success: false, message: "ไม่พบทริป" };
+  }
+
+  const owner = await tripModel.getTripOwner(tripId);
+
+    if (owner.user_id !== ownerId && owner.ownerid !== ownerId) {
+      return {
+        success: false,
+        message: "You're not owner of this trip"
+      };
+    }
+
+  await tripModel.updateDescription(tripId, description);
+
+  return {
+    success: true,
+    data: {
+      tripId,
+      description
+    }
+  };
+};
+
 export default {
   addTrip,
   getUserTrips,
@@ -796,6 +733,6 @@ export default {
   rejectMember,
   approveMember,
   getPendingRequests,
-  
+  editTripService
 };
 
