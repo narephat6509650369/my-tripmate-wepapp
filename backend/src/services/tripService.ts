@@ -150,13 +150,6 @@ export const deleteTripService = async (trip_id: string,owner_id: string) => {
       };
     }
 
-    if (status !== "planning") {
-      return {
-        success: false,
-        message: `ไม่สามารถลบทริปที่มีสถานะ '${status}' ได้`
-      };
-    }
-
     // 2. ลบทริป
     await tripModel.deleteTrip(trip_id,owner_id);
 
