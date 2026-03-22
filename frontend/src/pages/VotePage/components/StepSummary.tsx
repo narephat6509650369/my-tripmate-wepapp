@@ -112,6 +112,12 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   const [isClosing, setIsClosing] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
   const [aiMeta, setAiMeta] = useState<any>(null);
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string>(''); 
+  const [showResponseInput, setShowResponseInput] = useState(false);
+  const [isSavingResponse, setIsSavingResponse] = useState(false);
+  const [editedPrompt, setEditedPrompt] = useState<string>('');
   const voteTimerRef = useRef<any>(null);
 
   const fetchVoteData = useCallback(async () => {
@@ -281,6 +287,8 @@ useEffect(() => {
         if (summaryRes?.data?.aiSummary) {
           setAiSummary(summaryRes.data.aiSummary);
           setAiMeta(summaryRes.data.aiMeta);
+          setEditedPrompt(summaryRes.data.aiSummary); // sync ให้ editedPrompt ตามค่าจาก API
+          console.log("✅ aiSummary from API:", summaryRes.data.aiSummary);
         }
       } catch (err) {
         console.error('Failed to load AI summary', err);
@@ -302,6 +310,21 @@ useEffect(() => {
     navigator.clipboard.writeText(text);
     setCopied(prev => ({ ...prev, [key]: true }));
     setTimeout(() => setCopied(prev => ({ ...prev, [key]: false })), 2000);
+  };
+
+  const handleSavePrompt = async () => {
+    try {
+      setIsSaving(true);
+      await tripAPI.updateTripSummary(trip.tripid, { aiSummary: editedPrompt });
+      setAiSummary(editedPrompt); // sync local state ด้วย
+      setIsEditingPrompt(false);
+      alert('✅ บันทึกสำเร็จ');
+    } catch (err) {
+      console.error(err);
+      alert('❌ บันทึกไม่สำเร็จ');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCloseVoting = async () => {
@@ -398,9 +421,10 @@ useEffect(() => {
           </div>
         )}
 
-        <div className="bg-blue-100 rounded-xl shadow-xl p-6">
+        <div className="bg-blue-100 rounded-xl shadow-xl p-6 space-y-4">
+
           {/* Trip title */}
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-blue-600" />
             <h3 className="font-bold text-lg text-blue-700">สรุปผลทริปนี้</h3>
             <span className="ml-auto text-blue-600 text-sm">{memberCount} คน · {trip.numdays} วัน</span>
@@ -408,8 +432,6 @@ useEffect(() => {
 
           {/* 3 ข้อมูลหลัก */}
           <div className="grid grid-cols-3 gap-3">
-
-            {/* วันที่ */}
             <div className="bg-blue-200 hover:bg-blue-300 rounded-xl p-4 text-center transition">
               <p className="text-2xl mb-1">📅</p>
               <p className="text-xs text-blue-600 mb-1">วันที่แนะนำ</p>
@@ -430,7 +452,6 @@ useEffect(() => {
               )}
             </div>
 
-            {/* งบ */}
             <div className="bg-blue-200 hover:bg-blue-300 rounded-xl p-4 text-center transition">
               <p className="text-2xl mb-1">💰</p>
               <p className="text-xs text-blue-600 mb-1">งบเฉลี่ยต่อคน</p>
@@ -441,7 +462,6 @@ useEffect(() => {
               )}
             </div>
 
-            {/* จังหวัด */}
             <div className="bg-blue-200 hover:bg-blue-300 rounded-xl p-4 text-center transition">
               <p className="text-2xl mb-1">📍</p>
               <p className="text-xs text-blue-600 mb-1">จังหวัดชนะเลิศ</p>
@@ -455,38 +475,19 @@ useEffect(() => {
               )}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* ── ผลสรุปของทริป (MAIN FEATURE) ── */}
-      <details className="group">
-        <summary className="cursor-pointer list-none bg-white border-2 border-indigo-100 rounded-xl px-5 py-4 flex items-center justify-between hover:bg-indigo-50 transition select-none shadow-sm">
-          <span className="font-semibold text-gray-700 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-500" />
-            ดูรายละเอียดผลสรุป
-          </span>
-          <span className="text-gray-400 text-sm group-open:hidden">▼ ขยาย</span>
-          <span className="text-gray-400 text-sm hidden group-open:inline">▲ ซ่อน</span>
-        </summary>
+          {/* ── ผลสรุปของทริป (MAIN FEATURE) ── */}
+          <details className="group">
+            <summary className="cursor-pointer list-none bg-white border-2 border-indigo-100 rounded-xl px-5 py-4 flex items-center justify-between hover:bg-indigo-50 transition select-none shadow-sm">
+              <span className="font-semibold text-gray-700 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-500" />
+                ดูรายละเอียดผลสรุป
+              </span>
+              <span className="text-gray-400 text-sm group-open:hidden">▼ ขยาย</span>
+              <span className="text-gray-400 text-sm hidden group-open:inline">▲ ซ่อน</span>
+            </summary>
 
-        <div className="mt-3">
-          <div className="relative">
-            {!canViewSummary && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl">
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-xl" />
-                <div className="relative z-10 text-center px-6">
-                  <div className="text-5xl mb-3">🔒</div>
-                  <p className="font-bold text-gray-800 text-lg mb-1">
-                    {isOwner ? 'ปิดการโหวตเพื่อดูผลสรุป' : 'รอเจ้าของทริปปิดการโหวต'}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {isOwner ? 'กดปุ่มด้านล่างเมื่อทุกคนกรอกครบ' : 'หรือรอครบ 7 วันหลังสร้างทริป'}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 p-6 rounded-xl shadow-lg space-y-6">
+            <div className="mt-3 bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 p-6 rounded-xl shadow-lg space-y-6">
               <h3 className="font-bold text-gray-900 text-xl flex items-center gap-2">
                 <Sparkles className="w-6 h-6 text-purple-600" />
                 ผลสรุปของทริป
@@ -565,11 +566,13 @@ useEffect(() => {
                     <p className="text-gray-400 text-sm text-center py-4">ยังไม่มีข้อมูลเพียงพอ</p>
                   )}
                 </div>
+
               </div>
             </div>
-          </div>
+          </details>
+
         </div>
-      </details>
+      </div>
 
       {/* ── AI Prompt Studio (collapsed by default) ── */}
       <details className="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -749,12 +752,48 @@ useEffect(() => {
           {showPreview && canViewSummary && (
             <div className="bg-gray-900 text-green-400 rounded-lg p-4 font-mono text-xs overflow-x-auto">
               <div className="flex justify-between items-center mb-2 text-gray-400">
-                <span className="flex items-center gap-2"><Code className="w-4 h-4" /> Prompt Preview</span>
-                <button onClick={() => handleCopy('preview', prompt)}>
-                  {copied.preview ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </button>
+                <span className="flex items-center gap-2">
+                  <Code className="w-4 h-4" /> Prompt Preview
+                </span>
+                <div className="flex items-center gap-2">
+                  {/* ปุ่ม Edit เฉพาะ owner */}
+                  {isOwner && (
+                    <button
+                      onClick={() => setIsEditingPrompt(prev => !prev)}
+                      className="text-xs px-2 py-1 rounded bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-300 transition"
+                    >
+                      {isEditingPrompt ? '✅ ดู' : '✏️ แก้ไข'}
+                    </button>
+                  )}
+                  <button onClick={() => handleCopy('preview', isEditingPrompt ? editedPrompt : prompt)}>
+                    {copied.preview ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-              <pre className="whitespace-pre-wrap break-words max-h-64 overflow-y-auto">{prompt}</pre>
+
+              {/* ถ้า owner กด edit → textarea, ไม่ใช่ → pre */}
+              {isOwner && isEditingPrompt ? (
+              <>
+                <textarea
+                  value={editedPrompt}
+                  onChange={e => setEditedPrompt(e.target.value)}
+                  className="w-full bg-gray-800 text-green-300 rounded p-3 text-xs font-mono resize-y min-h-48 outline-none border border-gray-600 focus:border-green-500"
+                  spellCheck={false}
+                />
+                {/* เพิ่มตรงนี้ */}
+                <button
+                  onClick={handleSavePrompt}
+                  disabled={isSaving}
+                  className="mt-2 w-full py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-bold rounded transition"
+                >
+                  {isSaving ? '⏳ กำลังบันทึก...' : '💾 บันทึก Prompt'}
+                </button>
+              </>
+            ) : (
+              <pre className="whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
+                {prompt}
+              </pre>
+            )}
             </div>
           )}
 
@@ -777,6 +816,68 @@ useEffect(() => {
             </div>
           )}
         </div>
+
+        {/* {canViewSummary && (
+        <div className="border-t border-gray-100 pt-4">
+          <button
+            onClick={() => setShowResponseInput(prev => !prev)}
+            className="w-full flex items-center justify-between p-3 bg-indigo-50 hover:bg-indigo-100 rounded-lg text-sm font-medium text-indigo-700 transition"
+          >
+            <span className="flex items-center gap-2">
+              📥 วางผลลัพธ์จาก AI ที่นี่
+            </span>
+            {showResponseInput ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showResponseInput && (
+            <div className="mt-3 space-y-3">
+              <textarea
+                value={aiResponse}
+                onChange={e => setAiResponse(e.target.value)}
+                placeholder="วางผลลัพธ์จาก ChatGPT / Claude / Gemini ที่นี่..."
+                className="w-full h-64 p-3 text-sm border-2 border-indigo-200 rounded-xl resize-y outline-none focus:border-indigo-500 bg-indigo-50 text-gray-800 placeholder-gray-400"
+                spellCheck={false}
+              />
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleCopy('response', aiResponse)}
+                  disabled={!aiResponse}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 text-gray-700 text-sm font-medium rounded-xl transition"
+                >
+                  {copied.response ? <><Check className="w-4 h-4" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy</>}
+                </button>
+
+                
+                {isOwner && (
+                  <button
+                    onClick={async () => {
+                      if (!aiResponse.trim()) return;
+                      try {
+                        setIsSavingResponse(true);
+                        await tripAPI.updateTripSummary(trip.tripid, { aiSummary: aiResponse });
+                        alert('✅ บันทึกผลลัพธ์สำเร็จ');
+                      } catch (err) {
+                        alert('❌ บันทึกไม่สำเร็จ');
+                      } finally {
+                        setIsSavingResponse(false);
+                      }
+                    }}
+                    disabled={!aiResponse.trim() || isSavingResponse}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition"
+                  >
+                    {isSavingResponse ? '⏳ กำลังบันทึก...' : '💾 บันทึกผลลัพธ์'}
+                  </button>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-400 text-right">
+                {aiResponse.length.toLocaleString()} ตัวอักษร
+              </p>
+            </div>
+          )}
+        </div>
+      )} */}
       </details>
 
       {/* ── Quick Edit ── */}

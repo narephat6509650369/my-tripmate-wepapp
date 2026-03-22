@@ -166,24 +166,41 @@ export const tripAPI = {
    */
   getTripSummary: async (tripId: string,template: string = "comprehensive"): Promise<ApiResponse<TripSummaryResult>> => {
 
-  if (CONFIG.USE_MOCK_DATA) {
-    await mockDelay();
-    return getMockTripSummary(tripId);
-  }
+    if (CONFIG.USE_MOCK_DATA) {
+      await mockDelay();
+      return getMockTripSummary(tripId);
+    }
 
-  try {
-    const response = await apiFetch(
-      `/trips/${tripId}/summary?template=${template}`,
-      {
-        method: "GET",
-      }
-    );
+    try {
+      const response = await apiFetch(
+        `/trips/${tripId}/summary?template=${template}`,
+        {
+          method: "GET",
+        }
+      );
 
-    return await response.json();
-  } catch (error) {
-    return handleApiError(error);
-  }
-},
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+
+  /**
+   * PATCH /api/trips/:tripId/summary
+   */
+  updateTripSummary: async (tripId: string, data: { aiSummary: string }): Promise<ApiResponse> => {
+    try {
+      const response = await apiFetch(`/trips/${tripId}/summary`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiSummary: data.aiSummary })
+      });
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 
   /**
    * POST /api/trips/AddTrip
