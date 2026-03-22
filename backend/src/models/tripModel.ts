@@ -369,6 +369,7 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
         t.invite_code,
         t.invite_link,
         t.status,
+        t.summary_link,
         t.created_at,
         COUNT(tm.user_id) AS member_count
       FROM trips t
@@ -730,6 +731,7 @@ export async function getTripSummaryById(tripId: string): Promise<TripSummaryRes
         description,
         num_days,
         status,
+        summary_link,
         confirmed_at,
         created_at
       FROM trips
@@ -1274,6 +1276,17 @@ export const updateDescription = async (tripId: string,description: string) => {
   );
 };
 
+export const updateSummaryLink = async (tripId: string,link: string) => {
+  await pool.query(
+    `
+    UPDATE trips
+    SET summary_link = ?
+    WHERE trip_id = ?
+    `,
+    [link, tripId]
+  );
+};
+
 export default {
     generateInviteCode,
     generateInviteLink,
@@ -1301,5 +1314,6 @@ export default {
     getMemberWithEmail,
     getMemberWithEmailPending,
     findOwnerByTrip,
-    updateDescription
+    updateDescription,
+    updateSummaryLink
 };

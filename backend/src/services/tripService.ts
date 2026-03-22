@@ -694,7 +694,7 @@ export const getMemberService = async (tripId: string,ownerId: string): Promise<
 
 export const editTripService = async (tripId: string,ownerId: string,description: string) => {
 
-   const trip = await tripModel.findTripById(tripId);
+  const trip = await tripModel.findTripById(tripId);
 
   if (!trip) {
     return { success: false, message: "ไม่พบทริป" };
@@ -720,6 +720,29 @@ export const editTripService = async (tripId: string,ownerId: string,description
   };
 };
 
+export const addLinkService = async (tripId: string,user_id: string,link: string) => {
+  const trip = await tripModel.findTripById(tripId);
+
+  if (!trip) {
+    return { success: false, message: "ไม่พบทริป" };
+  }
+
+  // ให้เฉพาะ owner แก้
+  if (trip.owner_id !== user_id) {
+    throw new Error("FORBIDDEN");
+  }
+
+  await tripModel.updateSummaryLink(tripId, link);
+
+  return {
+    success: true,
+    data: {
+      tripId,
+      summary_link: link
+    }
+  };
+};
+
 export default {
   addTrip,
   getUserTrips,
@@ -733,6 +756,7 @@ export default {
   rejectMember,
   approveMember,
   getPendingRequests,
-  editTripService
+  editTripService,
+  addLinkService
 };
 
