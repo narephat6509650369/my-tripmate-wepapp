@@ -207,7 +207,7 @@ export const tripAPI = {
    */
   createTrip: async (payload: CreateTripPayload): Promise<ApiResponse<CreateTripResponse>> => {
     if (CONFIG.USE_MOCK_DATA) {
-      await mockDelay();
+      await mockDelay();  
       return getMockCreateTrip(payload);
     }
 
@@ -305,6 +305,32 @@ export const tripAPI = {
         }
       );
 
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  editDescription: async (tripId: string, description: string): Promise<ApiResponse> => {
+    try {
+      const response = await apiFetch(`/trips/${tripId}/edit-describe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description })
+      });
+      return await response.json();
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  addLink: async (tripId: string, link: string): Promise<ApiResponse> => {
+    try {
+      const response = await apiFetch(`/trips/${tripId}/addLink`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link })
+      });
       return await response.json();
     } catch (error) {
       return handleApiError(error);

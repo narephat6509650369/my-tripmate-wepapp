@@ -117,6 +117,7 @@ export interface TripDetail {
   provinceVotes: ProvinceVote[];
   budgetOptions: BudgetOption[];
   memberAvailabilitys: MemberAvailability[];
+  summary_link?: string | null; 
 }
 
 export interface Member {
