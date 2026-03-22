@@ -110,15 +110,21 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   const [activeTab, setActiveTab] = useState<'templates' | 'models'>('templates');
   const [copied, setCopied] = useState<Record<string, boolean>>({});
   const [isClosing, setIsClosing] = useState(false);
+  const [isEditingDesc, setIsEditingDesc] = useState(false);
+  const [editedDesc, setEditedDesc] = useState(trip.description || '');
+  const [isSavingDesc, setIsSavingDesc] = useState(false);
+  const [summaryLink, setSummaryLink] = useState(trip.summary_link || '');
+  const [isEditingLink, setIsEditingLink] = useState(false);
+  const [isSavingLink, setIsSavingLink] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
   const [aiMeta, setAiMeta] = useState<any>(null);
-  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [aiResponse, setAiResponse] = useState<string>(''); 
-  const [showResponseInput, setShowResponseInput] = useState(false);
-  const [isSavingResponse, setIsSavingResponse] = useState(false);
-  const [editedPrompt, setEditedPrompt] = useState<string>('');
   const voteTimerRef = useRef<any>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 2500);
+  };
 
   const fetchVoteData = useCallback(async () => {
 
@@ -193,50 +199,6 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   socket.emit("join_trip", trip.tripid);
 
 }, [trip?.tripid]);
-  /*
-  useEffect(() => {
-    if (!trip?.tripid) return;
-
-    const fetchVoteData = async () => {
-      try {
-        setIsLoading(true);
-        const [dateRes, budgetRes, locRes] = await Promise.all([
-          voteAPI.getDateMatchingResult(trip.tripid),
-          voteAPI.getBudgetVoting(trip.tripid),
-          voteAPI.getLocationVote(trip.tripid),
-        ]);
-        const dateData = dateRes?.data;
-        const budgetData = budgetRes?.data;
-        const locData = locRes?.data;
-
-        setSummaryData({
-          bestDates: dateData?.recommendation?.dates || [],
-          avgBudget: {
-            accommodation: Math.round(budgetData?.stats?.accommodation?.q2 || 0),
-            transport: Math.round(budgetData?.stats?.transport?.q2 || 0),
-            food: Math.round(budgetData?.stats?.food?.q2 || 0),
-            other: Math.round(budgetData?.stats?.other?.q2 || 0),
-          },
-          topLocations: (locData?.locationVotesTotal || [])
-            .sort((a: any, b: any) => b.total_score - a.total_score)
-            .slice(0, 3)
-            .map((l: any) => ({ place: l.place, total_score: l.total_score })),
-
-          progress: {
-            dates: dateData?.summary?.actualVote || 0,
-            budget: budgetData?.filledMembers || 0,
-            location: locData?.actualVote || 0
-          }
-        });
-      } catch (err) {
-        console.error('Failed to load vote data', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchVoteData();
-  }, [trip?.tripid, trip?.membercount]);*/
 
 //======== SOCKET ========
 
@@ -287,8 +249,6 @@ useEffect(() => {
         if (summaryRes?.data?.aiSummary) {
           setAiSummary(summaryRes.data.aiSummary);
           setAiMeta(summaryRes.data.aiMeta);
-          setEditedPrompt(summaryRes.data.aiSummary); // sync ให้ editedPrompt ตามค่าจาก API
-          console.log("✅ aiSummary from API:", summaryRes.data.aiSummary);
         }
       } catch (err) {
         console.error('Failed to load AI summary', err);
@@ -312,21 +272,6 @@ useEffect(() => {
     setTimeout(() => setCopied(prev => ({ ...prev, [key]: false })), 2000);
   };
 
-  const handleSavePrompt = async () => {
-    try {
-      setIsSaving(true);
-      await tripAPI.updateTripSummary(trip.tripid, { aiSummary: editedPrompt });
-      setAiSummary(editedPrompt); // sync local state ด้วย
-      setIsEditingPrompt(false);
-      alert('✅ บันทึกสำเร็จ');
-    } catch (err) {
-      console.error(err);
-      alert('❌ บันทึกไม่สำเร็จ');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleCloseVoting = async () => {
     if (!confirm('ยืนยันปิดการโหวต? สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก')) return;
     try {
@@ -335,7 +280,7 @@ useEffect(() => {
       onClosed?.();
     } catch (err) {
       console.error(err);
-      alert('ปิดการโหวตไม่สำเร็จ');
+      showToast('❌ ปิดการโหวตไม่สำเร็จ', 'error');
     } finally {
       setIsClosing(false);
     }
@@ -348,6 +293,55 @@ useEffect(() => {
     model: selectedModel,
     version: '1.0.0',
     timestamp: ''
+  };
+
+  const handleSaveDescription = async () => {
+    try {
+      setIsSavingDesc(true);
+      await tripAPI.editDescription(trip.tripid, editedDesc);
+      setIsEditingDesc(false);
+      showToast('บันทึกเรียบร้อย', 'success');
+
+      // re-fetch prompt ถ้า unlock แล้ว
+      if (canViewSummary) {
+        const summaryRes = await tripAPI.getTripSummary(trip.tripid, selectedTemplate);
+        if (summaryRes?.data?.aiSummary) {
+          setAiSummary(summaryRes.data.aiSummary);
+          setAiMeta(summaryRes.data.aiMeta);
+        }
+      }
+    } catch (err) {
+      showToast('บันทึกไม่สำเร็จ', 'error');
+    } finally {
+      setIsSavingDesc(false);
+    }
+  };
+  const handleSaveLink = async () => {
+    if (!summaryLink.trim()) return;
+
+    // auto-prepend https:// ถ้าไม่มี
+    const normalizedLink = summaryLink.startsWith('http') 
+      ? summaryLink 
+      : `https://${summaryLink}`;
+
+    try {
+      new URL(normalizedLink);
+    } catch {
+      showToast('ลิ้งก์ไม่ถูกต้อง เช่น https://docs.google.com/...', 'error');
+      return;
+    }
+
+    try {
+      setIsSavingLink(true);
+      await tripAPI.addLink(trip.tripid, normalizedLink);
+      setSummaryLink(normalizedLink); // sync state ด้วย
+      setIsEditingLink(false);
+      showToast('บันทึกลิ้งก์สำเร็จ', 'success');
+    } catch (err) {
+      showToast('บันทึกลิ้งก์ไม่สำเร็จ', 'error');
+    } finally {
+      setIsSavingLink(false);
+    }
   };
 
   // ============== LOADING ==============
@@ -423,12 +417,110 @@ useEffect(() => {
 
         <div className="bg-blue-100 rounded-xl shadow-xl p-6 space-y-4">
 
-          {/* Trip title */}
+          {/* Header */}
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-blue-600" />
             <h3 className="font-bold text-lg text-blue-700">สรุปผลทริปนี้</h3>
-            <span className="ml-auto text-blue-600 text-sm">{memberCount} คน · {trip.numdays} วัน</span>
           </div>
+
+          {/* Trip Identity */}
+          <div className="text-center py-1">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">✈️ {trip.tripname}</h2>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {trip.numdays && (
+                <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">{trip.numdays} วัน</span>
+              )}
+              <span className="text-xs bg-blue-200 text-blue-700 px-3 py-1 rounded-full">{memberCount} คน</span>
+              <span className={`text-xs px-3 py-1 rounded-full ${
+                ['completed','archived','confirmed'].includes(trip.status)
+                  ? 'bg-gray-100 text-gray-600'
+                  : 'bg-yellow-100 text-yellow-700'
+              }`}>
+                {['completed','archived','confirmed'].includes(trip.status) ? '✅ เสร็จสิ้น' : '🗳️ กำลังโหวต'}
+              </span>
+            </div>
+          </div>
+
+          {/* Description — เฉพาะ owner แก้ได้, member ดูได้ */}
+          <div className="bg-white rounded-xl border border-blue-200 px-4 py-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-semibold text-blue-600">📝 รายละเอียดทริป</p>
+              {isOwner && (
+                !isEditingDesc ? (
+                  <button onClick={() => setIsEditingDesc(true)} className="text-xs text-blue-500 hover:text-blue-700 transition">
+                    ✏️ แก้ไข
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button onClick={() => setIsEditingDesc(false)} className="text-xs text-gray-400 hover:text-gray-600">
+                      ยกเลิก
+                    </button>
+                    <button onClick={handleSaveDescription} disabled={isSavingDesc}
+                      className="text-xs text-green-600 font-bold hover:text-green-800 disabled:opacity-50">
+                      {isSavingDesc ? '⏳...' : '💾 บันทึก'}
+                    </button>
+                  </div>
+                )
+              )}
+            </div>
+            {isOwner && isEditingDesc ? (
+              <textarea
+                value={editedDesc}
+                onChange={e => setEditedDesc(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveDescription(); } }}
+                className="w-full text-sm border border-blue-200 rounded-lg p-2 resize-none outline-none focus:border-blue-400"
+                rows={3}
+                placeholder="เพิ่มรายละเอียดทริป... (Enter บันทึก, Shift+Enter ขึ้นบรรทัด)"
+              />
+            ) : (
+              <p className="text-sm text-gray-600">
+                {editedDesc || <span className="text-gray-400 italic text-xs">ยังไม่มีรายละเอียด</span>}
+              </p>
+            )}
+          </div>
+
+          {/* Summary Link — แสดงหลัง canViewSummary */}
+          {canViewSummary && (
+            <div className="bg-white rounded-xl border border-indigo-200 px-4 py-3">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-semibold text-indigo-600">🔗 ลิ้งก์ผลลัพธ์จาก AI</p>
+                {isOwner && (
+                  !isEditingLink ? (
+                    <button onClick={() => setIsEditingLink(true)} className="text-xs text-indigo-500 hover:text-indigo-700 transition">
+                      ✏️ แก้ไข
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={() => setIsEditingLink(false)} className="text-xs text-gray-400 hover:text-gray-600">
+                        ยกเลิก
+                      </button>
+                      <button onClick={handleSaveLink} disabled={isSavingLink}
+                        className="text-xs text-green-600 font-bold hover:text-green-800 disabled:opacity-50">
+                        {isSavingLink ? '⏳...' : '💾 บันทึก'}
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+              {isOwner && isEditingLink ? (
+                <input
+                  type="url"
+                  value={summaryLink}
+                  onChange={e => setSummaryLink(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveLink()}
+                  className="w-full text-sm border border-indigo-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400"
+                  placeholder="https://..."
+                />
+              ) : summaryLink ? (
+                <a href={summaryLink} target="_blank" rel="noopener noreferrer"
+                  className="text-sm text-indigo-600 hover:text-indigo-800 underline break-all">
+                  {summaryLink}
+                </a>
+              ) : (
+                <p className="text-xs text-gray-400 italic">ยังไม่มีลิ้งก์</p>
+              )}
+            </div>
+          )}
 
           {/* 3 ข้อมูลหลัก */}
           <div className="grid grid-cols-3 gap-3">
@@ -575,10 +667,10 @@ useEffect(() => {
       </div>
 
       {/* ── AI Prompt Studio (collapsed by default) ── */}
-      <details className="bg-white rounded-xl shadow-lg overflow-hidden">
+      <details className="bg-blue-100 rounded-xl shadow-lg overflow-hidden">
         <summary className="px-5 py-4 cursor-pointer flex items-center gap-2 text-gray-500 hover:bg-gray-50 transition select-none list-none">
           <Brain className="w-4 h-4" />
-          <span className="text-sm font-medium">🤖 AI Prompt Studio</span>
+          <span className="text-sm font-medium text-gray-800">🤖 AI Prompt Studio</span>
           <span className="ml-auto text-xs text-gray-400">คลิกเพื่อขยาย</span>
         </summary>
 
@@ -755,45 +847,11 @@ useEffect(() => {
                 <span className="flex items-center gap-2">
                   <Code className="w-4 h-4" /> Prompt Preview
                 </span>
-                <div className="flex items-center gap-2">
-                  {/* ปุ่ม Edit เฉพาะ owner */}
-                  {isOwner && (
-                    <button
-                      onClick={() => setIsEditingPrompt(prev => !prev)}
-                      className="text-xs px-2 py-1 rounded bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-300 transition"
-                    >
-                      {isEditingPrompt ? '✅ ดู' : '✏️ แก้ไข'}
-                    </button>
-                  )}
-                  <button onClick={() => handleCopy('preview', isEditingPrompt ? editedPrompt : prompt)}>
-                    {copied.preview ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* ถ้า owner กด edit → textarea, ไม่ใช่ → pre */}
-              {isOwner && isEditingPrompt ? (
-              <>
-                <textarea
-                  value={editedPrompt}
-                  onChange={e => setEditedPrompt(e.target.value)}
-                  className="w-full bg-gray-800 text-green-300 rounded p-3 text-xs font-mono resize-y min-h-48 outline-none border border-gray-600 focus:border-green-500"
-                  spellCheck={false}
-                />
-                {/* เพิ่มตรงนี้ */}
-                <button
-                  onClick={handleSavePrompt}
-                  disabled={isSaving}
-                  className="mt-2 w-full py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-bold rounded transition"
-                >
-                  {isSaving ? '⏳ กำลังบันทึก...' : '💾 บันทึก Prompt'}
+                <button onClick={() => handleCopy('preview', prompt)}>
+                  {copied.preview ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 </button>
-              </>
-            ) : (
-              <pre className="whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
-                {prompt}
-              </pre>
-            )}
+              </div>
+              <pre className="whitespace-pre-wrap break-words max-h-64 overflow-y-auto">{prompt}</pre>
             </div>
           )}
 
@@ -816,68 +874,6 @@ useEffect(() => {
             </div>
           )}
         </div>
-
-        {/* {canViewSummary && (
-        <div className="border-t border-gray-100 pt-4">
-          <button
-            onClick={() => setShowResponseInput(prev => !prev)}
-            className="w-full flex items-center justify-between p-3 bg-indigo-50 hover:bg-indigo-100 rounded-lg text-sm font-medium text-indigo-700 transition"
-          >
-            <span className="flex items-center gap-2">
-              📥 วางผลลัพธ์จาก AI ที่นี่
-            </span>
-            {showResponseInput ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-
-          {showResponseInput && (
-            <div className="mt-3 space-y-3">
-              <textarea
-                value={aiResponse}
-                onChange={e => setAiResponse(e.target.value)}
-                placeholder="วางผลลัพธ์จาก ChatGPT / Claude / Gemini ที่นี่..."
-                className="w-full h-64 p-3 text-sm border-2 border-indigo-200 rounded-xl resize-y outline-none focus:border-indigo-500 bg-indigo-50 text-gray-800 placeholder-gray-400"
-                spellCheck={false}
-              />
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleCopy('response', aiResponse)}
-                  disabled={!aiResponse}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 text-gray-700 text-sm font-medium rounded-xl transition"
-                >
-                  {copied.response ? <><Check className="w-4 h-4" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy</>}
-                </button>
-
-                
-                {isOwner && (
-                  <button
-                    onClick={async () => {
-                      if (!aiResponse.trim()) return;
-                      try {
-                        setIsSavingResponse(true);
-                        await tripAPI.updateTripSummary(trip.tripid, { aiSummary: aiResponse });
-                        alert('✅ บันทึกผลลัพธ์สำเร็จ');
-                      } catch (err) {
-                        alert('❌ บันทึกไม่สำเร็จ');
-                      } finally {
-                        setIsSavingResponse(false);
-                      }
-                    }}
-                    disabled={!aiResponse.trim() || isSavingResponse}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition"
-                  >
-                    {isSavingResponse ? '⏳ กำลังบันทึก...' : '💾 บันทึกผลลัพธ์'}
-                  </button>
-                )}
-              </div>
-
-              <p className="text-xs text-gray-400 text-right">
-                {aiResponse.length.toLocaleString()} ตัวอักษร
-              </p>
-            </div>
-          )}
-        </div>
-      )} */}
       </details>
 
       {/* ── Quick Edit ── */}
@@ -922,6 +918,14 @@ useEffect(() => {
         </div>
       )}
 
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
+          toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        }`}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 };
