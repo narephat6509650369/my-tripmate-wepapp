@@ -649,16 +649,7 @@ export const getMemberService = async (tripId: string,ownerId: string): Promise<
         message: "Trip not found"
       };
     }
-
-    const owner = await tripModel.getTripOwner(tripId);
-
-    if (owner.user_id !== ownerId && owner.ownerid !== ownerId) {
-      return {
-        success: false,
-        message: "You're not owner of this trip"
-      };
-    }
-
+    
     const members = await tripModel.getTripMembers(tripId);
 
     if (!members || !Array.isArray(members)) {

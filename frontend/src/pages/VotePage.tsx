@@ -251,151 +251,122 @@ useEffect(() => {
 
   });
 
-  const handleAddInfo =async ()=>{
-    await reloadTripData();
-  }
+  const handleReload = () => {
+    console.log("🔥 socket reload");
+    reloadTripData(trip.tripid);
+  };
 
   socket.on("vote_updated", handleVoteUpdate);
   socket.on("member_updated", handleMemberUpdate);
-  socket.on("add_Info", handleAddInfo);
+  socket.on("add_Info", handleReload);
   
 
   return () => {
     socket.off("you_were_removed");
     socket.off("vote_updated", handleVoteUpdate);
     socket.off("member_updated", handleMemberUpdate);
-    socket.off("add_Info",handleAddInfo)
+    socket.off("add_Info",handleReload)
   };
 
 }, [trip?.tripid]);
 
-const reloadTripData = async () => {
-
-  if (!trip?.tripid) return;
+const reloadTripData = async (tripId?: string) => {
+  const id = tripId || trip?.tripid;
+  if (!id) return;
 
   try {
+    const tripRes = await tripAPI.getTripDetail(id);
 
-    const [
-      tripRes,
-      membersRes,
-      pendingRes,
-      dateRes,
-      budgetRes,
-      locRes
-    ] = await Promise.all([
-      tripAPI.getTripDetail(trip.tripid),
-      tripAPI.getMembers(trip.tripid),
-      tripAPI.getPendingRequests(trip.tripid),
-      voteAPI.getDateMatchingResult(trip.tripid),
-      voteAPI.getBudgetVoting(trip.tripid),
-      voteAPI.getLocationVote(trip.tripid)
-    ]) as any[];
-    // trip
-    if (tripRes?.data) {
-      setTrip(tripRes.data);
+    if (!tripRes?.data) return;
+
+    const freshTrip = tripRes.data;
+    setTrip(freshTrip);
+
+    const isOwner = freshTrip.ownerid === user?.user_id;
+
+    const promises: Promise<any>[] = [
+      voteAPI.getDateMatchingResult(id),
+      voteAPI.getBudgetVoting(id),
+      voteAPI.getLocationVote(id)
+    ];
+
+    if (isOwner) {
+      promises.push(tripAPI.getMembers(id));
+      promises.push(tripAPI.getPendingRequests(id));
     }
 
-    // members
-    if (membersRes?.success) {
-      setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
+    const results = await Promise.allSettled(promises);
+
+    let index = 0;
+
+    // ===== DATE =====
+    const dateRes = results[index++];
+    if (dateRes.status === "fulfilled" && dateRes.value?.data) {
+      const data = dateRes.value.data;
+
+      setMatchingData({
+        availability: data.availability || [],
+        recommendation: data.recommendation || null,
+        summary: {
+          ...data.summary,
+          actualVote:
+            data.summary?.actualVote ??
+            data.rowlog?.length ??
+            0
+        }
+      });
     }
 
-    // pending
-    if (pendingRes?.success) {
-      const list =
-        pendingRes.data?.data?.data ??
-        pendingRes.data?.data ??
-        pendingRes.data ??
-        [];
-
-      setPendingRequests(Array.isArray(list) ? list : []);
+    // ===== BUDGET =====
+    const budgetRes = results[index++];
+    if (budgetRes.status === "fulfilled" && budgetRes.value?.data) {
+      const data = budgetRes.value.data;
+      setBudgetInfo(data);
+      if (data.stats) setBudgetAnalysis(data.stats);
     }
 
-  // date voting
-  if (dateRes?.data) {
+    // ===== LOCATION =====
+    const locRes = results[index++];
+    if (locRes.status === "fulfilled" && locRes.value?.data) {
+      const data = locRes.value.data;
 
-  const summary = dateRes.data.summary || {};
+      if (data.analysis) setLocationAnalysis(data.analysis);
+      if (data.actualVote !== undefined) setLocationVotedCount(data.actualVote);
 
-  const actualVote =
-    summary.actualVote ??
-    dateRes.data.rowlog?.length ??
-    0;
+      if (data?.rowlog && user?.user_id) {
+        const myVotes = data.rowlog
+          .filter((log: any) => log.proposed_by === user.user_id)
+          .map((log: any) => ({
+            place: log.province_name,
+            score: log.score
+          }));
 
-  setMatchingData({
-    availability: dateRes.data.availability || [],
-    recommendation: dateRes.data.recommendation || null,
-    summary: {
-      ...summary,
-      actualVote
+        setUserLocations(myVotes);
+      }
     }
-  });
 
-  const hasDates = dateRes?.data?.rowlog?.some(
-    (r: any) => r.proposed_by === user?.user_id
-  );
+    // ===== OWNER =====
+    if (isOwner) {
+      const membersRes = results[index++];
+      if (membersRes?.status === "fulfilled") {
+        setMembers(Array.isArray(membersRes.value?.data) ? membersRes.value.data : []);
+      }
 
-  if (hasDates) {
-    setStepCompleted(prev => ({ ...prev, 2: true }));
-  }
+      const pendingRes = results[index++];
+      if (pendingRes?.status === "fulfilled") {
+        const list =
+          pendingRes.value?.data?.data?.data ??
+          pendingRes.value?.data?.data ??
+          pendingRes.value?.data ??
+          [];
 
-  }
-    
-  // budget voting
-  if (budgetRes?.data) {
-
-  setBudgetInfo(budgetRes.data);
-
-  if (budgetRes.data.stats) {
-    setBudgetAnalysis(budgetRes.data.stats);
-  }
-
-  const hasBudget = budgetRes?.data?.rows?.some(
-    (r: any) => r.user_id === user?.user_id
-  );
-
-  if (hasBudget) {
-    setStepCompleted(prev => ({ ...prev, 3: true }));
-  }
-
-}
-
-    // location
-if (locRes?.data) {
-
-  if (locRes.data.analysis) {
-    setLocationAnalysis(locRes.data.analysis);
-  }
-
-  if (locRes.data.actualVote !== undefined) {
-    setLocationVotedCount(locRes.data.actualVote);
-  }
-
-  // ตรวจว่าผู้ใช้โหวตแล้วหรือยัง
-  const hasPlace = locRes?.data?.rowlog?.some(
-    (r: any) => r.proposed_by === user?.user_id
-  );
-
-  if (hasPlace) {
-    setStepCompleted(prev => ({ ...prev, 4: true }));
-  }
-
-  if (locRes?.data?.rowlog && user?.user_id) {
-
-    const myVotes = locRes.data.rowlog
-      .filter((log: any) => log.proposed_by === user.user_id)
-      .map((log: any) => ({
-        place: log.province_name,
-        score: log.score
-      }));
-
-    setUserLocations(myVotes);
-  }
-}
+        setPendingRequests(Array.isArray(list) ? list : []);
+      }
+    }
 
   } catch (err) {
-    console.error("reload trip failed", err);
+    console.error("reloadTripData error:", err);
   }
-
 };
 
   // ============== HANDLERS ==============

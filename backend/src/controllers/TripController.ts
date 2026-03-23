@@ -561,7 +561,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
 
     const response = await getTripDetail(tripId);
     //console.log("response:",response)
-    console.log("getTripDetail:",response.data)
+    //console.log("getTripDetail:",response.data)
 
     if (!response.success) {
       return res.status(404).json({
@@ -595,7 +595,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
       success: false,
       code: "INTERNAL_ERROR",
       message: "Failed to get trip detail",
-      error: { detail: error }
+      error: { detail: (error as Error).message }
     });
   }
 };
@@ -869,11 +869,7 @@ export const editController = async (req: Request, res: Response) => {
     }
 
     const io = getIO();
-    const memberSocketId = getUserSocket(user_id);
-    if (memberSocketId) {
-      io.to(memberSocketId).emit("add_Info", {trip_id: tripId});
-    }
-   
+    io.to(`trip_${tripId}`).emit("add_Info", {trip_id: tripId});
 
     return res.status(200).json({
       success: true,
@@ -954,11 +950,8 @@ export const addLinkController = async (req: Request, res: Response) => {
     const result = await addLinkService(tripId, user_id, link);
 
     const io = getIO();
-    const memberSocketId = getUserSocket(user_id);
-    if (memberSocketId) {
-      io.to(memberSocketId).emit("add_Info", {trip_id: tripId});
-    }
-
+    io.to(`trip_${tripId}`).emit("add_Info", {trip_id: tripId});
+    
     return res.status(200).json({
       success: true,
       code: "SUMMARY_LINK_ADDED",

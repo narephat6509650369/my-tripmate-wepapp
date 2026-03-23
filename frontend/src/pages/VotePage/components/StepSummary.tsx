@@ -200,6 +200,14 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
 
 }, [trip?.tripid]);
 
+useEffect(() => {
+  setEditedDesc(trip.description || '');
+}, [trip.description]);
+
+useEffect(() => {
+  setSummaryLink(trip.summarylink || '');
+}, [trip.summarylink]);
+
 //======== SOCKET ========
 
 useEffect(() => {
@@ -305,6 +313,7 @@ useEffect(() => {
     try {
       setIsSavingDesc(true);
       await tripAPI.editDescription(trip.tripid, editedDesc);
+      setEditedDesc(editedDesc);
       setIsEditingDesc(false);
       fetchAiSummary();
       showToast('บันทึกเรียบร้อย', 'success');
