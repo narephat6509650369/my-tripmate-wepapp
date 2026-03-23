@@ -113,7 +113,7 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [editedDesc, setEditedDesc] = useState(trip.description || '');
   const [isSavingDesc, setIsSavingDesc] = useState(false);
-  const [summaryLink, setSummaryLink] = useState(trip.summary_link || '');
+  const [summaryLink, setSummaryLink] = useState(trip.summarylink || '');
   const [isEditingLink, setIsEditingLink] = useState(false);
   const [isSavingLink, setIsSavingLink] = useState(false);
   const [aiSummary, setAiSummary] = useState<string>('');
@@ -226,10 +226,17 @@ useEffect(() => {
 
   };
 
+  const handleAddInfo = () =>{
+    fetchVoteData();
+    fetchAiSummary();
+  }
+
   socket.on("vote_updated", handleVoteUpdate);
+  socket.on("add_Info", handleAddInfo );
 
   return () => {
     socket.off("vote_updated", handleVoteUpdate);
+    socket.off("add_Info", handleAddInfo);
 
     if (voteTimerRef.current) {
       clearTimeout(voteTimerRef.current);
@@ -242,8 +249,10 @@ useEffect(() => {
   useEffect(() => {
     if (!trip?.tripid) return;
     if (!canViewSummary) return; // ← guard 
+    fetchAiSummary();
+  }, [trip?.tripid, selectedTemplate, canViewSummary]);
 
-    const fetchAiSummary = async () => {
+  const fetchAiSummary = async () => {
       try {
         const summaryRes = await tripAPI.getTripSummary(trip.tripid, selectedTemplate);
         if (summaryRes?.data?.aiSummary) {
@@ -254,9 +263,6 @@ useEffect(() => {
         console.error('Failed to load AI summary', err);
       }
     };
-
-    fetchAiSummary();
-  }, [trip?.tripid, selectedTemplate, canViewSummary]);
 
   // ── Helpers ──
   const memberCount = trip.membercount || trip.members?.length || 0;
@@ -300,6 +306,7 @@ useEffect(() => {
       setIsSavingDesc(true);
       await tripAPI.editDescription(trip.tripid, editedDesc);
       setIsEditingDesc(false);
+      fetchAiSummary();
       showToast('บันทึกเรียบร้อย', 'success');
 
       // re-fetch prompt ถ้า unlock แล้ว

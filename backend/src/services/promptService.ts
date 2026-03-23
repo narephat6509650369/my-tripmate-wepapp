@@ -115,7 +115,7 @@ export const estimateCost = (text: string, model: string): number => {
 // ============== HELPER ==============
 
 function getRegionFromProvince(province: string): string {
-if (!province) return "ไม่ระบุ"; 
+  if (!province) return "ไม่ระบุ";
   const regions: Record<string, string[]> = {
     ภาคเหนือ: ["เชียงใหม่", "เชียงราย", "ลำปาง", "ลำพูน", "แม่ฮ่องสอน"],
     ภาคกลาง: ["กรุงเทพ", "นนทบุรี", "ปทุมธานี", "สมุทรปราการ"],
@@ -132,17 +132,20 @@ if (!province) return "ไม่ระบุ";
 
 // ============== SYSTEM PROMPTS ==============
 
+// ✅ แก้ไข: เพิ่มคำสั่งให้ตอบกลับเป็นภาษาไทยทุก system prompt
 const SYSTEM_PROMPTS: Record<string, string> = {
-  "gpt-4": `You are an expert travel planning assistant with deep knowledge of Thailand tourism, budget optimization, and group dynamics. Provide detailed, actionable recommendations.`,
-  "claude-3-opus": `You are a thoughtful travel planning expert specializing in Thai destinations. You excel at understanding group dynamics, budget constraints, and creating memorable experiences. Be thorough and considerate in your recommendations.`,
-  "gemini-pro": `Act as a knowledgeable Thai travel consultant. Focus on practical, budget-conscious suggestions that maximize group satisfaction.`,
+  "gpt-4": `คุณคือผู้เชี่ยวชาญด้านการวางแผนท่องเที่ยวในประเทศไทย มีความรู้เชิงลึกด้านการท่องเที่ยว การจัดสรรงบประมาณ และการจัดการกลุ่ม กรุณาตอบกลับเป็นภาษาไทยทุกครั้ง พร้อมให้คำแนะนำที่ละเอียดและนำไปปฏิบัติได้จริง`,
+  "claude-3-opus": `คุณคือผู้เชี่ยวชาญด้านการวางแผนท่องเที่ยวในประเทศไทย เชี่ยวชาญด้านจิตวิทยากลุ่ม งบประมาณ และการสร้างประสบการณ์ที่น่าจดจำ กรุณาตอบกลับเป็นภาษาไทยทุกครั้ง ด้วยความละเอียดรอบคอบและคำนึงถึงความต้องการของกลุ่ม`,
+  "gemini-pro": `คุณคือที่ปรึกษาท่องเที่ยวไทยผู้เชี่ยวชาญ เน้นคำแนะนำที่ประหยัดและคุ้มค่าสูงสุดสำหรับกลุ่ม กรุณาตอบกลับเป็นภาษาไทยทุกครั้ง`,
 };
 
+// ✅ แก้ไข: default system prompt เป็นภาษาไทย
 const DEFAULT_SYSTEM_PROMPT =
-  "You are an expert travel planning assistant specializing in Thailand. Provide detailed, actionable recommendations.";
+  "คุณคือผู้เชี่ยวชาญด้านการวางแผนท่องเที่ยวในประเทศไทย กรุณาตอบกลับเป็นภาษาไทยทุกครั้ง พร้อมให้คำแนะนำที่ละเอียดและนำไปปฏิบัติได้จริง";
 
 // ============== PROMPT BUILDERS ==============
-//สร้าง prompt ใหญ่แบบครบทุกอย่าง
+
+// ✅ แก้ไข: สร้าง prompt ใหญ่แบบครบทุกอย่าง พร้อมสั่งให้ตอบเป็นภาษาไทย
 function buildComprehensivePrompt(data: any, config: PromptConfig): string {
   const { trip, members = [], locationResult, dateResult, budgetResult } = data;
 
@@ -150,18 +153,18 @@ function buildComprehensivePrompt(data: any, config: PromptConfig): string {
     trip: {
       name: trip.trip_name,
       description: trip.description,
-      duration: `${trip.num_days} days`,
+      duration: `${trip.num_days} วัน`,
       code: trip.trip_code,
     },
     group: {
       size: members.length,
       estimated_ages: "20-35",
-      gender_ratio: "Mixed group",
+      gender_ratio: "กลุ่มผสม",
     },
     dates: dateResult
       ? {
           preferred: dateResult.final_dates,
-          availability: `${dateResult.voter_count}/${members.length} members available`,
+          availability: `${dateResult.voter_count}/${members.length} คนว่าง`,
         }
       : null,
     budget: budgetResult
@@ -179,7 +182,7 @@ function buildComprehensivePrompt(data: any, config: PromptConfig): string {
             members.length,
         }
       : null,
-    destination: locationResult?.province_name 
+    destination: locationResult?.province_name
       ? {
           province: locationResult.province_name,
           score: locationResult.vote_count,
@@ -188,41 +191,46 @@ function buildComprehensivePrompt(data: any, config: PromptConfig): string {
       : null,
   };
 
-  let prompt = `# 🎯 Travel Planning Request\n\n`;
-  prompt += `I'm planning a trip with friends and need your expert recommendations.\n\n`;
+  // ✅ แก้ไข: header เป็นภาษาไทย + คำสั่งให้ตอบไทย
+  let prompt = `# 🎯 คำขอวางแผนการเดินทาง\n\n`;
+  prompt += `⚠️ **กรุณาตอบกลับทั้งหมดเป็นภาษาไทยเท่านั้น**\n\n`;
+  prompt += `ฉันกำลังวางแผนทริปกับเพื่อน ต้องการคำแนะนำจากผู้เชี่ยวชาญ\n\n`;
 
-  prompt += `## 📋 Trip Details\n\n`;
+  prompt += `## 📋 รายละเอียดทริป\n\n`;
   prompt += `\`\`\`json\n${JSON.stringify(structuredData, null, 2)}\n\`\`\`\n\n`;
 
   if (config.includeCOT) {
-    prompt += `## 🤔 Analysis Framework\n\n`;
-    prompt += `Please analyze this trip systematically:\n`;
-    prompt += `1. **Group Dynamics**: Consider the group size and likely preferences\n`;
-    prompt += `2. **Budget Feasibility**: Evaluate if the budget aligns with destination and duration\n`;
-    prompt += `3. **Seasonal Factors**: Check if dates are optimal for the destination\n`;
-    prompt += `4. **Logistical Flow**: Plan efficient routing and timing\n\n`;
+    // ✅ แก้ไข: Analysis framework เป็นภาษาไทย
+    prompt += `## 🤔 กรอบการวิเคราะห์\n\n`;
+    prompt += `กรุณาวิเคราะห์ทริปนี้อย่างเป็นระบบ:\n`;
+    prompt += `1. **พลวัตกลุ่ม**: พิจารณาขนาดกลุ่มและความชอบที่น่าจะเป็น\n`;
+    prompt += `2. **ความเป็นไปได้ของงบประมาณ**: ประเมินว่างบสอดคล้องกับจุดหมายและระยะเวลาหรือไม่\n`;
+    prompt += `3. **ปัจจัยตามฤดูกาล**: ตรวจสอบว่าช่วงเวลาที่เลือกเหมาะสมกับจุดหมายหรือไม่\n`;
+    prompt += `4. **การจัดการด้านโลจิสติกส์**: วางแผนเส้นทางและตารางเวลาที่มีประสิทธิภาพ\n\n`;
   }
 
-  prompt += `## ❓ Key Questions\n\n`;
+  // ✅ แก้ไข: คำถามหลักเป็นภาษาไทย
+  prompt += `## ❓ คำถามหลัก\n\n`;
 
   if (locationResult) {
-    prompt += `1. **Destination Validation**: Is ${locationResult.province_name} optimal for ${members.length} people with ฿${structuredData.budget?.total_per_person?.toLocaleString()} per person?\n`;
-    prompt += `2. **Must-Visit Attractions**: Top 5-7 places in ${locationResult.province_name} for a ${trip.num_days}-day trip\n`;
+    prompt += `1. **การตรวจสอบจุดหมาย**: ${locationResult.province_name} เหมาะสมสำหรับ ${members.length} คน งบ ฿${structuredData.budget?.total_per_person?.toLocaleString()} ต่อคนหรือไม่?\n`;
+    prompt += `2. **สถานที่ห้ามพลาด**: สถานที่ยอดนิยม 5-7 แห่งใน${locationResult.province_name} สำหรับทริป ${trip.num_days} วัน\n`;
   }
 
   if (budgetResult) {
-    prompt += `3. **Accommodation**: Recommend specific hotels/hostels within ฿${budgetResult.accommodation.toLocaleString()}/person budget\n`;
-    prompt += `4. **Transportation**: Optimal travel method with cost breakdown (budget: ฿${budgetResult.transport.toLocaleString()}/person)\n`;
-    prompt += `5. **Food Planning**: Restaurant suggestions for ฿${budgetResult.food.toLocaleString()}/person/day\n`;
+    prompt += `3. **ที่พัก**: แนะนำโรงแรม/โฮสเทลที่เหมาะสมในงบ ฿${budgetResult.accommodation.toLocaleString()} ต่อคน\n`;
+    prompt += `4. **การเดินทาง**: วิธีการเดินทางที่เหมาะสมพร้อมรายละเอียดค่าใช้จ่าย (งบ ฿${budgetResult.transport.toLocaleString()} ต่อคน)\n`;
+    prompt += `5. **แผนอาหาร**: แนะนำร้านอาหารในงบ ฿${budgetResult.food.toLocaleString()} ต่อคน ต่อวัน\n`;
   }
 
-  prompt += `6. **Daily Itinerary**: Hour-by-hour schedule for maximum enjoyment\n`;
-  prompt += `7. **Budget Optimization**: Any ways to enhance the trip within current budget?\n`;
-  prompt += `8. **Risk Mitigation**: Weather concerns, seasonal issues, or booking tips\n\n`;
+  prompt += `6. **ตารางกิจกรรมรายวัน**: กำหนดการแบบชั่วโมงต่อชั่วโมงเพื่อความสนุกสูงสุด\n`;
+  prompt += `7. **การเพิ่มประสิทธิภาพงบประมาณ**: มีวิธีเพิ่มความคุ้มค่าในงบที่มีหรือไม่?\n`;
+  prompt += `8. **การลดความเสี่ยง**: ข้อควรระวังด้านสภาพอากาศ ฤดูกาล หรือเคล็ดลับการจอง\n\n`;
 
   if (config.structured) {
-    prompt += `## 📤 Required Output Format\n\n`;
-    prompt += `Please respond in well-structured JSON format:\n`;
+    // ✅ แก้ไข: คำสั่ง JSON output เป็นภาษาไทย (โดย key ยังเป็น English เพื่อ parse ง่าย)
+    prompt += `## 📤 รูปแบบผลลัพธ์ที่ต้องการ\n\n`;
+    prompt += `กรุณาตอบกลับในรูปแบบ JSON ที่มีโครงสร้างชัดเจน โดยค่าทั้งหมดให้เป็นภาษาไทย:\n`;
     prompt += `\`\`\`json\n`;
     prompt += `{\n`;
     prompt += `  "validation": { "suitable": boolean, "concerns": [], "suggestions": [] },\n`;
@@ -237,44 +245,46 @@ function buildComprehensivePrompt(data: any, config: PromptConfig): string {
   }
 
   if (config.includeExamples) {
-    prompt += `## 💡 Example Analysis Style\n\n`;
-    prompt += `*Example for Chiang Mai, 3 days, 4 people, ฿5000/person:*\n\n`;
-    prompt += `**Day 1: Old City Exploration**\n`;
-    prompt += `- 09:00: Doi Suthep Temple (฿50 entrance)\n`;
-    prompt += `- 12:00: Lunch at Huen Phen (฿150/person)\n`;
-    prompt += `- 14:00: Old City temples walk (Free)\n`;
-    prompt += `- 19:00: Saturday Night Market (฿300/person)\n\n`;
-    prompt += `Please provide similar detailed breakdowns for ${locationResult?.province_name}.\n\n`;
+    // ✅ แก้ไข: ตัวอย่างเป็นภาษาไทย
+    prompt += `## 💡 ตัวอย่างรูปแบบการวิเคราะห์\n\n`;
+    prompt += `*ตัวอย่างสำหรับเชียงใหม่ 3 วัน 4 คน งบ ฿5,000 ต่อคน:*\n\n`;
+    prompt += `**วันที่ 1: สำรวจเมืองเก่า**\n`;
+    prompt += `- 09:00 น.: วัดพระธาตุดอยสุเทพ (ค่าเข้า ฿50)\n`;
+    prompt += `- 12:00 น.: ทานข้าวที่ร้านเฮือนเพ็ญ (฿150 ต่อคน)\n`;
+    prompt += `- 14:00 น.: เดินชมวัดในเมืองเก่า (ฟรี)\n`;
+    prompt += `- 19:00 น.: ถนนคนเดินวันเสาร์ (฿300 ต่อคน)\n\n`;
+    prompt += `กรุณาให้รายละเอียดในระดับเดียวกันสำหรับ${locationResult?.province_name}\n\n`;
   }
 
   prompt += `---\n\n`;
-  prompt += `Please provide comprehensive, actionable recommendations. Be specific with names, prices, and booking tips. 🙏`;
+  prompt += `กรุณาให้คำแนะนำที่ครอบคลุมและนำไปปฏิบัติได้จริง ระบุชื่อสถานที่ ราคา และเคล็ดลับการจองให้ชัดเจน **ตอบกลับเป็นภาษาไทยทั้งหมด** 🙏`;
 
   return prompt;
 }
 
-//สร้าง prompt เน้นตารางทริป
+// ✅ แก้ไข: สร้าง prompt เน้นตารางทริป เป็นภาษาไทย
 function buildItineraryPrompt(data: any, config: PromptConfig): string {
   const { trip, members = [], locationResult, dateResult } = data;
 
-  let prompt = `# 🗺️ Itinerary Planning Request\n\n`;
-  prompt += `Create a detailed ${trip.num_days}-day itinerary for ${locationResult?.province_name || "Thailand"}.\n\n`;
-  prompt += `**Group**: ${members.length} people\n`;
+  let prompt = `# 🗺️ คำขอวางแผนตารางการเดินทาง\n\n`;
+  prompt += `⚠️ **กรุณาตอบกลับทั้งหมดเป็นภาษาไทยเท่านั้น**\n\n`;
+  prompt += `กรุณาวางแผนตารางการเดินทาง ${trip.num_days} วัน สำหรับ${locationResult?.province_name || "ประเทศไทย"}\n\n`;
+  prompt += `**กลุ่ม**: ${members.length} คน\n`;
 
   if (dateResult) {
-    prompt += `**Dates**: ${dateResult.final_dates.join(", ")}\n`;
+    prompt += `**วันที่**: ${dateResult.final_dates.join(", ")}\n`;
   }
 
-  prompt += `**Focus**: Maximize experiences while maintaining efficient routing\n\n`;
-  prompt += `## Requirements\n\n`;
-  prompt += `- Hour-by-hour breakdown for each day\n`;
-  prompt += `- Include travel time between locations\n`;
-  prompt += `- Mix of activities (culture, nature, food, relaxation)\n`;
-  prompt += `- Account for meal times\n`;
-  prompt += `- Realistic pacing for ${members.length} people\n\n`;
+  prompt += `**เป้าหมาย**: เพิ่มประสบการณ์สูงสุดพร้อมการเดินทางที่มีประสิทธิภาพ\n\n`;
+  prompt += `## สิ่งที่ต้องการ\n\n`;
+  prompt += `- รายละเอียดแบบชั่วโมงต่อชั่วโมงสำหรับแต่ละวัน\n`;
+  prompt += `- รวมเวลาเดินทางระหว่างสถานที่\n`;
+  prompt += `- ผสมกิจกรรมหลากหลาย (วัฒนธรรม ธรรมชาติ อาหาร พักผ่อน)\n`;
+  prompt += `- คำนึงถึงเวลามื้ออาหาร\n`;
+  prompt += `- ความเร็วที่เหมาะสมสำหรับกลุ่ม ${members.length} คน\n\n`;
 
   if (config.structured) {
-    prompt += `Return as JSON with structure:\n`;
+    prompt += `ตอบกลับในรูปแบบ JSON โดยค่าทั้งหมดเป็นภาษาไทย:\n`;
     prompt += `\`\`\`json\n`;
     prompt += `{\n`;
     prompt += `  "days": [\n`;
@@ -282,7 +292,7 @@ function buildItineraryPrompt(data: any, config: PromptConfig): string {
     prompt += `      "day": 1,\n`;
     prompt += `      "theme": "string",\n`;
     prompt += `      "schedule": [\n`;
-    prompt += `        { "time": "09:00", "activity": "...", "location": "...", "duration": "2h", "cost": 0 }\n`;
+    prompt += `        { "time": "09:00", "activity": "...", "location": "...", "duration": "2 ชั่วโมง", "cost": 0 }\n`;
     prompt += `      ]\n`;
     prompt += `    }\n`;
     prompt += `  ]\n`;
@@ -293,11 +303,12 @@ function buildItineraryPrompt(data: any, config: PromptConfig): string {
   return prompt;
 }
 
-//วิเคราะห์งบ
+// ✅ แก้ไข: วิเคราะห์งบ เป็นภาษาไทย
 function buildBudgetPrompt(data: any, config: PromptConfig): string {
   const { trip, members = [], budgetResult, locationResult } = data;
 
-  let prompt = `# 💰 Budget Analysis & Optimization\n\n`;
+  let prompt = `# 💰 การวิเคราะห์และเพิ่มประสิทธิภาพงบประมาณ\n\n`;
+  prompt += `⚠️ **กรุณาตอบกลับทั้งหมดเป็นภาษาไทยเท่านั้น**\n\n`;
 
   if (budgetResult) {
     const total = Object.values(budgetResult as Record<string, number>).reduce(
@@ -305,28 +316,28 @@ function buildBudgetPrompt(data: any, config: PromptConfig): string {
       0
     );
 
-    prompt += `Analyze this travel budget:\n\n`;
-    prompt += `**Destination**: ${locationResult?.province_name || "TBD"}\n`;
-    prompt += `**Duration**: ${trip.num_days} days\n`;
-    prompt += `**Group Size**: ${members.length} people\n\n`;
-    prompt += `**Budget Breakdown (per person)**:\n`;
-    prompt += `- 🏠 Accommodation: ฿${budgetResult.accommodation.toLocaleString()}\n`;
-    prompt += `- 🚗 Transport: ฿${budgetResult.transport.toLocaleString()}\n`;
-    prompt += `- 🍜 Food: ฿${budgetResult.food.toLocaleString()}\n`;
-    prompt += `- 💼 Other/Reserve: ฿${budgetResult.other.toLocaleString()}\n`;
-    prompt += `- **Total**: ฿${total.toLocaleString()}\n\n`;
-    prompt += `**Group Total**: ฿${(total * members.length).toLocaleString()}\n\n`;
+    prompt += `วิเคราะห์งบประมาณการเดินทางดังนี้:\n\n`;
+    prompt += `**จุดหมาย**: ${locationResult?.province_name || "ยังไม่กำหนด"}\n`;
+    prompt += `**ระยะเวลา**: ${trip.num_days} วัน\n`;
+    prompt += `**จำนวนคน**: ${members.length} คน\n\n`;
+    prompt += `**รายละเอียดงบประมาณ (ต่อคน)**:\n`;
+    prompt += `- 🏠 ที่พัก: ฿${budgetResult.accommodation.toLocaleString()}\n`;
+    prompt += `- 🚗 การเดินทาง: ฿${budgetResult.transport.toLocaleString()}\n`;
+    prompt += `- 🍜 อาหาร: ฿${budgetResult.food.toLocaleString()}\n`;
+    prompt += `- 💼 อื่นๆ/สำรอง: ฿${budgetResult.other.toLocaleString()}\n`;
+    prompt += `- **รวม**: ฿${total.toLocaleString()}\n\n`;
+    prompt += `**งบรวมทั้งกลุ่ม**: ฿${(total * members.length).toLocaleString()}\n\n`;
   }
 
-  prompt += `## Analysis Required\n\n`;
-  prompt += `1. **Feasibility**: Is this budget realistic for the destination and duration?\n`;
-  prompt += `2. **Distribution**: Is the budget allocation optimal?\n`;
-  prompt += `3. **Optimization**: Specific ways to stretch the budget\n`;
-  prompt += `4. **Risk Areas**: Where might costs exceed estimates?\n`;
-  prompt += `5. **Value Adds**: Free/cheap activities to enhance the trip\n\n`;
+  prompt += `## สิ่งที่ต้องวิเคราะห์\n\n`;
+  prompt += `1. **ความเป็นไปได้**: งบประมาณนี้สมจริงสำหรับจุดหมายและระยะเวลาหรือไม่?\n`;
+  prompt += `2. **การกระจายงบ**: การจัดสรรงบเหมาะสมหรือไม่?\n`;
+  prompt += `3. **การเพิ่มคุณค่า**: วิธีเฉพาะในการยืดงบประมาณให้คุ้มค่า\n`;
+  prompt += `4. **จุดเสี่ยง**: ส่วนที่ค่าใช้จ่ายอาจเกินประมาณ\n`;
+  prompt += `5. **กิจกรรมเพิ่มมูลค่า**: กิจกรรมฟรีหรือราคาถูกที่ช่วยเพิ่มความสนุก\n\n`;
 
   if (config.structured) {
-    prompt += `Respond in JSON:\n`;
+    prompt += `ตอบกลับในรูปแบบ JSON โดยค่าทั้งหมดเป็นภาษาไทย:\n`;
     prompt += `\`\`\`json\n`;
     prompt += `{\n`;
     prompt += `  "feasibility_score": 0-10,\n`;
@@ -341,86 +352,89 @@ function buildBudgetPrompt(data: any, config: PromptConfig): string {
   return prompt;
 }
 
-//แนะนำกิจกรรม
+// ✅ แก้ไข: แนะนำกิจกรรม เป็นภาษาไทย
 function buildActivitiesPrompt(data: any, config: PromptConfig): string {
   const { trip, members = [], locationResult, budgetResult } = data;
 
-  let prompt = `# 🎯 Activity Recommendations\n\n`;
-  prompt += `Suggest activities for ${members.length} people visiting ${locationResult?.province_name || "Thailand"}.\n\n`;
+  let prompt = `# 🎯 คำแนะนำกิจกรรม\n\n`;
+  prompt += `⚠️ **กรุณาตอบกลับทั้งหมดเป็นภาษาไทยเท่านั้น**\n\n`;
+  prompt += `แนะนำกิจกรรมสำหรับ ${members.length} คน ที่เดินทางไป${locationResult?.province_name || "ประเทศไทย"}\n\n`;
 
-  prompt += `**Constraints**:\n`;
-  prompt += `- Duration: ${trip.num_days} days\n`;
+  prompt += `**ข้อกำหนด**:\n`;
+  prompt += `- ระยะเวลา: ${trip.num_days} วัน\n`;
 
   if (budgetResult) {
     const activityBudget = budgetResult.other + budgetResult.food * 0.3;
-    prompt += `- Activity Budget: ~฿${Math.round(activityBudget).toLocaleString()}/person\n`;
+    prompt += `- งบกิจกรรม: ~฿${Math.round(activityBudget).toLocaleString()} ต่อคน\n`;
   }
 
-  prompt += `- Group Size: ${members.length} (affects group activities)\n\n`;
+  prompt += `- จำนวนกลุ่ม: ${members.length} คน (ส่งผลต่อกิจกรรมกลุ่ม)\n\n`;
 
-  prompt += `## Categories to Cover\n\n`;
-  prompt += `1. 🏛️ **Cultural/Historical** (temples, museums, heritage sites)\n`;
-  prompt += `2. 🌳 **Nature/Outdoor** (parks, viewpoints, trekking)\n`;
-  prompt += `3. 🍜 **Food Experiences** (markets, cooking classes, food tours)\n`;
-  prompt += `4. 🎨 **Unique/Local** (crafts, workshops, local interactions)\n`;
-  prompt += `5. 📸 **Photo Spots** (Instagram-worthy locations)\n`;
-  prompt += `6. 💆 **Relaxation** (spas, cafes, chill spots)\n\n`;
+  prompt += `## หมวดหมู่ที่ต้องครอบคลุม\n\n`;
+  prompt += `1. 🏛️ **วัฒนธรรม/ประวัติศาสตร์** (วัด พิพิธภัณฑ์ แหล่งมรดก)\n`;
+  prompt += `2. 🌳 **ธรรมชาติ/กลางแจ้ง** (อุทยาน จุดชมวิว การเดินป่า)\n`;
+  prompt += `3. 🍜 **ประสบการณ์อาหาร** (ตลาด คลาสทำอาหาร ทัวร์ชิมอาหาร)\n`;
+  prompt += `4. 🎨 **เอกลักษณ์/ท้องถิ่น** (งานหัตถกรรม เวิร์กช็อป ปฏิสัมพันธ์ชุมชน)\n`;
+  prompt += `5. 📸 **จุดถ่ายรูป** (สถานที่สวยงามเหมาะถ่ายภาพ)\n`;
+  prompt += `6. 💆 **พักผ่อนหย่อนใจ** (สปา คาเฟ่ สถานที่ผ่อนคลาย)\n\n`;
 
-  prompt += `For each recommendation, provide:\n`;
-  prompt += `- Name and brief description\n`;
-  prompt += `- Estimated cost per person\n`;
-  prompt += `- Time required\n`;
-  prompt += `- Best time to visit\n`;
-  prompt += `- Booking requirements (if any)\n`;
-  prompt += `- Why it's great for groups of ${members.length}\n\n`;
+  prompt += `สำหรับแต่ละคำแนะนำ กรุณาระบุ:\n`;
+  prompt += `- ชื่อและคำอธิบายสั้น\n`;
+  prompt += `- ค่าใช้จ่ายโดยประมาณต่อคน\n`;
+  prompt += `- เวลาที่ใช้\n`;
+  prompt += `- ช่วงเวลาที่ดีที่สุด\n`;
+  prompt += `- ข้อกำหนดการจอง (ถ้ามี)\n`;
+  prompt += `- เหตุผลที่เหมาะสำหรับกลุ่ม ${members.length} คน\n\n`;
 
   return prompt;
 }
 
+// ✅ แก้ไข: แนะนำที่พัก เป็นภาษาไทย
 function buildAccommodationPrompt(data: any, config: PromptConfig): string {
   const { trip, members = [], locationResult, budgetResult, dateResult } = data;
 
-  let prompt = `# 🏨 Accommodation Recommendations\n\n`;
+  let prompt = `# 🏨 คำแนะนำที่พัก\n\n`;
+  prompt += `⚠️ **กรุณาตอบกลับทั้งหมดเป็นภาษาไทยเท่านั้น**\n\n`;
 
   if (budgetResult && locationResult) {
     const nightlyBudget = budgetResult.accommodation / (trip.num_days - 1);
 
-    prompt += `Find suitable accommodations in ${locationResult.province_name}:\n\n`;
-    prompt += `**Requirements**:\n`;
-    prompt += `- Group: ${members.length} people\n`;
-    prompt += `- Duration: ${trip.num_days - 1} nights\n`;
-    prompt += `- Budget: ฿${Math.round(nightlyBudget).toLocaleString()}/person/night\n`;
+    prompt += `ค้นหาที่พักที่เหมาะสมใน${locationResult.province_name}:\n\n`;
+    prompt += `**ความต้องการ**:\n`;
+    prompt += `- กลุ่ม: ${members.length} คน\n`;
+    prompt += `- ระยะเวลา: ${trip.num_days - 1} คืน\n`;
+    prompt += `- งบประมาณ: ฿${Math.round(nightlyBudget).toLocaleString()} ต่อคน ต่อคืน\n`;
 
     if (dateResult) {
-      prompt += `- Dates: ${dateResult.final_dates[0]} to ${
+      prompt += `- วันที่: ${dateResult.final_dates[0]} ถึง ${
         dateResult.final_dates[dateResult.final_dates.length - 1]
       }\n`;
     }
 
     prompt += `\n`;
-    prompt += `## Recommend 3-5 Options\n\n`;
-    prompt += `For each option, provide:\n`;
-    prompt += `1. **Name & Type** (hotel/hostel/guesthouse/Airbnb)\n`;
-    prompt += `2. **Location** (area/district + proximity to attractions)\n`;
-    prompt += `3. **Price Range** (per night, per person)\n`;
-    prompt += `4. **Room Configuration** (how to split ${members.length} people)\n`;
-    prompt += `5. **Amenities** (WiFi, breakfast, pool, etc.)\n`;
-    prompt += `6. **Pros & Cons** for groups\n`;
-    prompt += `7. **Booking Tips** (platform, advance time, cancellation)\n`;
-    prompt += `8. **Transportation** (access to public transport/attractions)\n\n`;
+    prompt += `## แนะนำ 3-5 ตัวเลือก\n\n`;
+    prompt += `สำหรับแต่ละตัวเลือก กรุณาระบุ:\n`;
+    prompt += `1. **ชื่อและประเภท** (โรงแรม/โฮสเทล/เกสต์เฮาส์/Airbnb)\n`;
+    prompt += `2. **ที่ตั้ง** (ย่าน/ทำเล + ระยะทางจากสถานที่ท่องเที่ยว)\n`;
+    prompt += `3. **ช่วงราคา** (ต่อคืน ต่อคน)\n`;
+    prompt += `4. **การจัดห้อง** (แบ่งห้องอย่างไรสำหรับ ${members.length} คน)\n`;
+    prompt += `5. **สิ่งอำนวยความสะดวก** (WiFi อาหารเช้า สระว่ายน้ำ ฯลฯ)\n`;
+    prompt += `6. **ข้อดีและข้อเสีย** สำหรับการเดินทางแบบกลุ่ม\n`;
+    prompt += `7. **เคล็ดลับการจอง** (แพลตฟอร์ม ควรจองล่วงหน้านานแค่ไหน นโยบายยกเลิก)\n`;
+    prompt += `8. **การเดินทาง** (การเข้าถึงขนส่งสาธารณะและสถานที่ท่องเที่ยว)\n\n`;
 
-    prompt += `## Prioritize\n`;
-    prompt += `- Value for money\n`;
-    prompt += `- Location convenience\n`;
-    prompt += `- Group-friendly facilities\n`;
-    prompt += `- Safety and cleanliness\n\n`;
+    prompt += `## ให้ความสำคัญกับ\n`;
+    prompt += `- ความคุ้มค่า\n`;
+    prompt += `- ความสะดวกด้านที่ตั้ง\n`;
+    prompt += `- สิ่งอำนวยความสะดวกที่เหมาะกับกลุ่ม\n`;
+    prompt += `- ความปลอดภัยและความสะอาด\n\n`;
   }
 
   return prompt;
 }
 
 // ============== PROMPT GENERATOR ==============
-//แนะนำที่พัก
+
 function buildPrompt(data: any, config: PromptConfig): string {
   switch (config.template) {
     case "itinerary":

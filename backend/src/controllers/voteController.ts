@@ -203,7 +203,7 @@ export const getBudgetVoteController = async (req: Request, res: Response) => {
     }
 
     const data = await voteService.getvoteBudget(tripId, user_id);
-    console.log("budget vote:",data)
+    //console.log("budget vote:",data)
 
     return res.status(200).json({
       success: true,

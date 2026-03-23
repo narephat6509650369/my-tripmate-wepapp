@@ -109,6 +109,7 @@ export interface TripDetail {
   status: string;
   createdat: string;
   updatedat?: string;
+  summarylink?: string | null;
   membercount: number,
   confirmedat?: string | null;
   isactive?: boolean;
@@ -116,8 +117,7 @@ export interface TripDetail {
   dateRanges: DateRange[];
   provinceVotes: ProvinceVote[];
   budgetOptions: BudgetOption[];
-  memberAvailabilitys: MemberAvailability[];
-  summary_link?: string | null; 
+  memberAvailabilitys: MemberAvailability[]; 
 }
 
 export interface Member {

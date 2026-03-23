@@ -458,72 +458,6 @@ export const rejectMemberController = async (req: Request,res: Response) => {
 
 };
 
-/*
-export const joinTripController = async (req: Request, res: Response) => {
-  try {
-    const { invite_code } = req.body;
-    const user_id = req.user?.user_id;
-
-    if (!user_id) {
-      return res.status(401).json({
-        success: false,
-        code: "AUTH_UNAUTHORIZED",
-        message: "Unauthorized"
-      });
-    }
-
-    if (!invite_code) {
-      return res.status(400).json({
-        success: false,
-        code: "MISSING_FIELD",
-        message: "Invite code is required",
-        error: { field: "invite_code" }
-      });
-    }
-
-    const result = await joinTripByCode(invite_code, user_id);
-
-    if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        code: "TRIP_JOIN_FAILED",
-        message: result.message
-      });
-    }
-
-    // extract จาก result.message
-    const tripData = result.message as {
-      trip_id: string;
-      trip_name: string;
-      rejoined: boolean;
-      text: string;
-    };
-
-    return res.status(200).json({
-      success: true,
-      code: "TRIP_JOINED",
-      message: tripData.text,
-      data: {
-        tripId: tripData.trip_id,
-        tripName: tripData.trip_name,
-        rejoined: tripData.rejoined
-      }
-    });
-
-  } catch (error: any) {
-    console.error("joinTripController error:", error);
-
-    return res.status(500).json({
-      success: false,
-      code: "INTERNAL_ERROR",
-      message:
-        error instanceof Error
-          ? error.message
-          : "Cannot join trip"
-    });
-  }
-};
-*/
 //ลบสมาชิกทริป
 export const removeMemberController = async (req: Request, res: Response) => {
   try {
@@ -627,7 +561,7 @@ export const getTripDetailController = async (req: Request, res: Response) => {
 
     const response = await getTripDetail(tripId);
     //console.log("response:",response)
-    //console.log("response:",response.data)
+    console.log("getTripDetail:",response.data)
 
     if (!response.success) {
       return res.status(404).json({
@@ -750,52 +684,6 @@ export const getTripSummaryController = async (req: Request, res: Response) => {
   }
 };
 
-/*
-export const autoCloseController = async (req: Request, res: Response) => {
-  try {
-    const { tripId } = req.params;
-
-    if (!tripId) {
-      return res.status(400).json({
-        success: false,
-        code: "MISSING_FIELD",
-        message: "tripId is required",
-        error: { field: "tripId" }
-      });
-    }
-
-    const result = await closeTripService(tripId, "auto");
-
-    if (!result || !result.success) {
-      return res.status(403).json({
-        success: false,
-        code: "AUTH_FORBIDDEN",
-        message: "Cannot close trip",
-        error: {
-          reason: result?.message || "Unknown error"
-        }
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      code: "TRIP_CLOSED",
-      message: "Trip closed successfully"
-    });
-  } catch (error) {
-    console.error("Close trip error:", error instanceof Error ? error.message : error);
-    return res.status(500).json({
-      success: false,
-      code: "INTERNAL_ERROR",
-      message: "Failed to close trip",
-      error: {
-        detail: error instanceof Error ? error.message : error
-      }
-    });
-}
-};
-*/
-
 export const manualCloseController = async (req: Request, res: Response) => {
   try {
     const { tripId } = req.params;
@@ -871,58 +759,6 @@ export const manualCloseController = async (req: Request, res: Response) => {
     });
 }
 };
-
-/*
-export const deleteMemberController = async (req: Request, res: Response) => {
-  try {
-    const { tripId, memberId } = req.params;
-    const ownerId = req.user?.user_id;
-
-    //  1. ตรวจสอบ login
-    if (!ownerId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized"
-      });
-    }
-
-    // 2. ตรวจสอบ parameter
-    if (!tripId || !memberId) {
-      return res.status(400).json({
-        success: false,
-        message: "Trip ID and Member ID are required"
-      });
-    }
-
-    const result = await removeMemberService(tripId,ownerId,memberId);
-
-    const io = getIO();
-    const memberSocketId = getUserSocket(memberId);
-    if (memberSocketId) {
-      io.to(memberSocketId).emit("join_rejected", {
-        trip_id: tripId,
-      });
-      io.to(memberSocketId).emit("new_notification", {
-          trip_id: tripId
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Member removed successfully",
-      data: result
-    });
-
-  } catch (error: any) {
-    console.error("deleteMemberController error:", error);
-
-    return res.status(400).json({
-      success: false,
-      message: error.message || "Failed to remove member"
-    });
-  }
-};
-*/
 
 export const getMemberController = async (req: Request, res: Response) => {
   try {
@@ -1032,6 +868,13 @@ export const editController = async (req: Request, res: Response) => {
       });
     }
 
+    const io = getIO();
+    const memberSocketId = getUserSocket(user_id);
+    if (memberSocketId) {
+      io.to(memberSocketId).emit("add_Info", {trip_id: tripId});
+    }
+   
+
     return res.status(200).json({
       success: true,
       code: "TRIP_UPDATED",
@@ -1109,6 +952,12 @@ export const addLinkController = async (req: Request, res: Response) => {
     }
 
     const result = await addLinkService(tripId, user_id, link);
+
+    const io = getIO();
+    const memberSocketId = getUserSocket(user_id);
+    if (memberSocketId) {
+      io.to(memberSocketId).emit("add_Info", {trip_id: tripId});
+    }
 
     return res.status(200).json({
       success: true,

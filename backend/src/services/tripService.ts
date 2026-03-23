@@ -501,6 +501,7 @@ export async function getTripSummaryService(tripId: string, user_id: string, tem
         trip_name: summary.trip.tripname ?? summary.trip.trip_name,
         num_days:  summary.trip.numdays  ?? summary.trip.num_days,
         trip_code: summary.trip.tripcode ?? summary.trip.trip_code,
+        trip_Link: summary.trip.summarylink ?? summary.trip.summary_link,
         description: summary.trip.description,
       };
 

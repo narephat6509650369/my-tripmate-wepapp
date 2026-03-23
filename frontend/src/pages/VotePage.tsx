@@ -251,14 +251,20 @@ useEffect(() => {
 
   });
 
+  const handleAddInfo =async ()=>{
+    await reloadTripData();
+  }
+
   socket.on("vote_updated", handleVoteUpdate);
   socket.on("member_updated", handleMemberUpdate);
+  socket.on("add_Info", handleAddInfo);
   
 
   return () => {
     socket.off("you_were_removed");
     socket.off("vote_updated", handleVoteUpdate);
     socket.off("member_updated", handleMemberUpdate);
+    socket.off("add_Info",handleAddInfo)
   };
 
 }, [trip?.tripid]);

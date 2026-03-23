@@ -494,6 +494,7 @@ export async function getTripDetail(tripId: string): Promise<TripDetail | null> 
       status: tripRows[0].status,
       createdat: tripRows[0].created_at,
       membercount: tripRows[0].member_count,
+      summarylink: tripRows[0].summary_link,
       members: memberRows,
       dateRanges: dateRows,
       provinceVotes: provinceRows,
