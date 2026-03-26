@@ -231,6 +231,11 @@ export const requestJoinTripController = async (req: Request,res: Response) => {
         tripId: result.trip_id
       });
     }
+ 
+    io.to(`trip_${result.trip_id}`).emit("new_notification", {
+      trip_id: result.trip_id
+    });
+    
 
 
     return res.status(200).json({
@@ -733,13 +738,7 @@ export const manualCloseController = async (req: Request, res: Response) => {
       io.to(`trip_${tripId}`).emit("trip_closed", {
         trip_id: tripId,
       });
-
-    const ownerSocketId = getUserSocket(user_id);
-      if (ownerSocketId) {
-        io.to(ownerSocketId).emit("new_notification", {
-          trip_id: tripId
-        });
-      }
+      
 
     return res.status(200).json({
       success: true,
