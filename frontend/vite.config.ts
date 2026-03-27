@@ -11,6 +11,10 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'unsafe-none'
     }
   },
+  preview: {
+    host: true,
+    allowedHosts: true
+  },
   build: {
     sourcemap: false,
   },
