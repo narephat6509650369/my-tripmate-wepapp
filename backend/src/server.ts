@@ -16,8 +16,11 @@ async function bootstrap() {
     initSocket(server);
 
     app.use(cors({
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
-      credentials: true
+    origin: [
+      "http://localhost:5173",
+      "https://my-tripmate-wepapp-1.onrender.com"
+    ],
+    credentials: true
     }));
 
 
