@@ -8,10 +8,10 @@ import {
   approveMemberController,
   removeMemberController,
   getTripDetailController,
-} from "../controllers/TripController.js";
+} from "../backend/src/controllers/TripController.js";
 
-import * as tripService from "../services/tripService.js";
-import * as tripModel from "../models/tripModel.js";
+import * as tripService from "../backend/src/services/tripService.js";
+import * as tripModel from "../backend/src/models/tripModel.js";
 
 vi.mock("../services/tripService.js");
 vi.mock("../models/tripModel.js");
