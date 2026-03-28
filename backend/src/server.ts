@@ -35,8 +35,7 @@ async function bootstrap() {
     // ใช้ CORS middleware สำหรับทุก route
     app.use(cors(corsOptions));
 
-    // ตอบ preflight request สำหรับทุก route (OPTIONS)
-    app.options("/*", cors(corsOptions));
+  
 
     // === Middleware อื่น ๆ ===
     app.use(cookieParser());
