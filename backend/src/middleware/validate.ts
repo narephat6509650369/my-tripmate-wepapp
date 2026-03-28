@@ -5,7 +5,8 @@ export interface AuthRequest extends Request {
 }
 
 export const validateGoogleLogin = (req: Request, res: Response, next: NextFunction) => {
-   if (req.method === "OPTIONS") {
+  console.log("🔥 validateGoogleLogin called:", req.method);
+  if (req.method === "OPTIONS") {
     return next();
   }
   const { access_token } = req.body;
