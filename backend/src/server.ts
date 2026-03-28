@@ -11,7 +11,6 @@ async function bootstrap() {
     const app = express();
     const server = http.createServer(app);
 
-    // === CORS — must be first, before everything ===
     const corsOptions = {
       origin: "https://my-tripmate-wepapp-1.onrender.com",
       credentials: true,
@@ -19,31 +18,25 @@ async function bootstrap() {
       allowedHeaders: ["Content-Type", "Authorization"],
     };
 
-    app.options("*", cors(corsOptions)); // ← preflight handler FIRST
-    app.use(cors(corsOptions));          // ← then general CORS middleware
+    app.options("*", cors(corsOptions));
+    app.use(cors(corsOptions));
 
-    // === Other middleware ===
     app.use(cookieParser());
     app.use(express.json());
     app.use(passport.initialize());
 
-    // === WebSocket — after CORS is set up ===
     const { initSocket } = await import("./socket/socket.js");
     initSocket(server);
 
-    // === Routes ===
     const authRoutes = (await import("./routes/user.js")).default;
     const tripRoutes = (await import("./routes/trip.js")).default;
     const voteRoutes = (await import("./routes/vote.js")).default;
     const notiRoutes = (await import("./routes/noti.js")).default;
-   
 
     app.use("/api/auth", authRoutes);
     app.use("/api/trips", tripRoutes);
     app.use("/api/votes", voteRoutes);
     app.use("/api/noti", notiRoutes);
-
-
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
@@ -55,6 +48,8 @@ async function bootstrap() {
     process.exit(1);
   }
 }
+
+bootstrap();
   /*
     app.use(cors({
     origin: [
