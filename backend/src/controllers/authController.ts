@@ -113,12 +113,14 @@ export const refreshToken = (req: Request, res: Response) => {
       { expiresIn: "15m" }
     );
 
-    res.cookie("accessToken", newAccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
-      maxAge: 15 * 60 * 1000
-    });
+    const isProduction = process.env.NODE_ENV === "production";
+
+  res.cookie("accessToken", newAccessToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 15 * 60 * 1000
+  });
 
     return res.json({
       success: true
