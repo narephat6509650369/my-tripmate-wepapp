@@ -5,6 +5,9 @@ export interface AuthRequest extends Request {
 }
 
 export const validateGoogleLogin = (req: Request, res: Response, next: NextFunction) => {
+   if (req.method === "OPTIONS") {
+    return next();
+  }
   const { access_token } = req.body;
   if (!access_token) {
     return res.status(400).json({ error: "access_token is required" });
