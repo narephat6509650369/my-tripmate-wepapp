@@ -24,7 +24,7 @@ export const googleLogin = async (req: Request, res: Response) => {
     res.cookie("accessToken", result.accessToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: "lax",
+      sameSite: "none",
       maxAge: 15 * 60 * 1000
     });
 
@@ -32,7 +32,7 @@ export const googleLogin = async (req: Request, res: Response) => {
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: "lax",
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
@@ -67,12 +67,12 @@ export const logout = (req: Request, res: Response) => {
   res.clearCookie("accessToken", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax"
+    sameSite: "none"
   });
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax"
+    sameSite: "none"
   });
   res.status(200).json({
     success: true,
