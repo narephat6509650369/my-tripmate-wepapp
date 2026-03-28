@@ -4,7 +4,6 @@ import cors from "cors";
 import passport from "passport";
 import cookieParser from "cookie-parser";
 import http from "http";
-
 async function bootstrap() {
   try {
     dotenv.config();
@@ -12,35 +11,25 @@ async function bootstrap() {
     const app = express();
     const server = http.createServer(app);
 
-    // Initialize WebSocket (ถ้ามี)
-    const { initSocket } = await import("./socket/socket.js");
-    initSocket(server);
-
-    // === CORS configuration ===
-    const allowedOrigins = [
-      "https://my-tripmate-wepapp-1.onrender.com", // production frontend
-      // "http://localhost:5173", // dev frontend (uncomment for local dev)
-    ];
+    // === CORS — must be first, before everything ===
     const corsOptions = {
-      origin: (origin: string | undefined, callback: any) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error("Not allowed by CORS"));
-        }
-      },
+      origin: "https://my-tripmate-wepapp-1.onrender.com",
       credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
     };
 
-    // ใช้ CORS middleware สำหรับทุก route
-    app.use(cors(corsOptions));
+    app.options("*", cors(corsOptions)); // ← preflight handler FIRST
+    app.use(cors(corsOptions));          // ← then general CORS middleware
 
-  
-
-    // === Middleware อื่น ๆ ===
+    // === Other middleware ===
     app.use(cookieParser());
     app.use(express.json());
     app.use(passport.initialize());
+
+    // === WebSocket — after CORS is set up ===
+    const { initSocket } = await import("./socket/socket.js");
+    initSocket(server);
 
     // === Routes ===
     const authRoutes = (await import("./routes/user.js")).default;
@@ -54,10 +43,8 @@ async function bootstrap() {
     app.use("/api/votes", voteRoutes);
     app.use("/api/noti", notiRoutes);
 
-    // Swagger
     setupSwagger(app);
 
-    // === Start server ===
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
@@ -68,8 +55,6 @@ async function bootstrap() {
     process.exit(1);
   }
 }
-
-bootstrap();
   /*
     app.use(cors({
     origin: [
