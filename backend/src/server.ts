@@ -16,13 +16,15 @@ async function bootstrap() {
     initSocket(server);
 
     app.use(cors({
-    origin: [
-      "http://localhost:5173",
-      "https://my-tripmate-wepapp-1.onrender.com"
-    ],
-    credentials: true
+      origin: "https://my-tripmate-wepapp-1.onrender.com", // frontend production URL
+      credentials: true
     }));
 
+    // ตอบ preflight request
+    app.options("*", cors({
+      origin: "https://my-tripmate-wepapp-1.onrender.com",
+      credentials: true
+    }));
 
     app.use(cookieParser());
     app.use(express.json());
@@ -42,9 +44,8 @@ async function bootstrap() {
     setupSwagger(app);
 
     const PORT = process.env.PORT || 5000;
-
     server.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`Server running on port ${PORT}`);
     });
 
   } catch (err) {
