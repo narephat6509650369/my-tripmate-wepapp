@@ -12,7 +12,7 @@ async function bootstrap() {
     const app = express();
     const server = http.createServer(app);
 
-    // ✅ CORS (รองรับ 2 domain ของคุณ)
+    // CORS (รองรับ 2 domain ของคุณ)
     app.use(cors({
       origin: [
         "https://my-tripmate-wepapp-1.onrender.com",
@@ -20,8 +20,6 @@ async function bootstrap() {
       ],
       credentials: true
     }));
-
-    // ❌ ลบ manual header middleware ทิ้ง (ไม่ต้องใช้แล้ว)
 
     app.use(cookieParser());
     app.use(express.json());

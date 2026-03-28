@@ -1,23 +1,29 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
+
 export interface AuthRequest extends Request {
   user?: any;
 }
 
-export const validateGoogleLogin = (req: Request, res: Response, next: NextFunction) => {
-  console.log("🔥 validateGoogleLogin called:", req.method);
-  if (req.method === "OPTIONS") {
-    return next();
-  }
+export const validateGoogleLogin = (req: Request,res: Response,next: NextFunction) => {
+  
   const { access_token } = req.body;
+
   if (!access_token) {
-    return res.status(400).json({ error: "access_token is required" });
+    return res.status(400).json({
+      success: false,
+      message: "access_token is required"
+    });
   }
+
   next();
 };
 
-export const verifyToken = (req: AuthRequest,res: Response,next: NextFunction) => {
-
+export const verifyToken = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   const token = req.cookies?.accessToken;
 
   if (!token) {
@@ -28,7 +34,6 @@ export const verifyToken = (req: AuthRequest,res: Response,next: NextFunction) =
   }
 
   try {
-
     const decoded = jwt.verify(
       token,
       process.env.ACCESS_SECRET!
@@ -39,7 +44,6 @@ export const verifyToken = (req: AuthRequest,res: Response,next: NextFunction) =
     };
 
     req.user = decoded;
-
     next();
 
   } catch (err: any) {
@@ -55,6 +59,5 @@ export const verifyToken = (req: AuthRequest,res: Response,next: NextFunction) =
       success: false,
       code: "INVALID_TOKEN"
     });
-
   }
 };
