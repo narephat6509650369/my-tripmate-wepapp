@@ -4,6 +4,7 @@ import cors from "cors";
 import passport from "passport";
 import cookieParser from "cookie-parser";
 import http from "http";
+
 async function bootstrap() {
   try {
     dotenv.config();
@@ -11,28 +12,16 @@ async function bootstrap() {
     const app = express();
     const server = http.createServer(app);
 
-    const corsOptions = {
-      origin: "https://my-tripmate-wepapp-1.onrender.com",
-      credentials: true,
-    };
-    //methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    //allowedHeaders: ["Content-Type", "Authorization"],
-    //app.options("/*", cors(corsOptions));
-    app.use(cors(corsOptions));
+    // ✅ CORS (รองรับ 2 domain ของคุณ)
+    app.use(cors({
+      origin: [
+        "https://my-tripmate-wepapp-1.onrender.com",
+        "https://my-tripmate-wepapp.onrender.com"
+      ],
+      credentials: true
+    }));
 
-    app.use((req, res, next) => {
-      res.header("Access-Control-Allow-Origin", "https://my-tripmate-wepapp-1.onrender.com");
-      res.header("Access-Control-Allow-Credentials", "true");
-      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-      res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-
-      if (req.method === "OPTIONS") {
-        return res.sendStatus(204);
-      }
-
-      next();
-    });
-
+    // ❌ ลบ manual header middleware ทิ้ง (ไม่ต้องใช้แล้ว)
 
     app.use(cookieParser());
     app.use(express.json());
@@ -52,8 +41,10 @@ async function bootstrap() {
     app.use("/api/noti", notiRoutes);
 
     const PORT = process.env.PORT || 5000;
+
     server.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`Server running on port ${PORT}`);
+      console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
     });
 
   } catch (err) {
