@@ -6,6 +6,7 @@ import { googleLogin, logout, getMe, refreshToken } from '../controllers/authCon
 
 const router = express.Router();
 
+router.options('/google', (req, res) => {res.sendStatus(204);});
 router.post('/google', validateGoogleLogin, googleLogin);
 router.get('/me', verifyToken, getMe);
 router.post('/refresh',refreshToken)
