@@ -24,7 +24,7 @@ export const googleLogin = async (req: Request, res: Response) => {
   // Login Handler
   res.cookie("accessToken", result.accessToken, {
     httpOnly: true,
-    secure: isProduction,        // ต้อง true บน production
+    secure: true,        // ต้อง true บน production
     sameSite: "none",
     maxAge: 15 * 60 * 1000,
     //domain: cookieDomain,
@@ -32,7 +32,7 @@ export const googleLogin = async (req: Request, res: Response) => {
 
 res.cookie("refreshToken", result.refreshToken, {
   httpOnly: true,
-  secure: isProduction,
+  secure: true,
   sameSite: "none",
   maxAge: 7 * 24 * 60 * 60 * 1000,
   //domain: cookieDomain,
@@ -70,14 +70,14 @@ export const logout = (req: Request, res: Response) => {
   //const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
   res.clearCookie("accessToken", {
   httpOnly: true,
-  secure: isProduction,
+  secure: true,
   sameSite: "none",
   //domain: cookieDomain,
 });
 
 res.clearCookie("refreshToken", {
   httpOnly: true,
-  secure: isProduction,
+  secure: true,
   sameSite: "none",
   //domain: cookieDomain,
 });
@@ -117,13 +117,13 @@ export const refreshToken = (req: Request, res: Response) => {
       { expiresIn: "15m" }
     );
 
-    const isProduction = process.env.NODE_ENV === "production";
+    //const isProduction = process.env.NODE_ENV === "production";
     //const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
 
     // ส่ง accessToken ใหม่พร้อม cookie ครอบ subdomain
     res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
-      secure: isProduction,               // HTTPS บน production
+      secure: true,               // HTTPS บน production
       sameSite: "none",
       maxAge: 15 * 60 * 1000,
     });
