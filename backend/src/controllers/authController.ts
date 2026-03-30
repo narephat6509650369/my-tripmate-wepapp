@@ -121,6 +121,7 @@ export const refreshToken = (req: Request, res: Response) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
+    domain: ".onrender.com",
     maxAge: 15 * 60 * 1000
   });
 
