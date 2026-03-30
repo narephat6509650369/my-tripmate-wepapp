@@ -25,7 +25,7 @@ export const googleLogin = async (req: Request, res: Response) => {
   res.cookie("accessToken", result.accessToken, {
     httpOnly: true,
     secure: isProduction,        // ต้อง true บน production
-    sameSite: isProduction ? "none" : "lax",
+    sameSite: "none",
     maxAge: 15 * 60 * 1000,
     //domain: cookieDomain,
   });
@@ -33,7 +33,7 @@ export const googleLogin = async (req: Request, res: Response) => {
 res.cookie("refreshToken", result.refreshToken, {
   httpOnly: true,
   secure: isProduction,
-  sameSite: isProduction ? "none" : "lax",
+  sameSite: "none",
   maxAge: 7 * 24 * 60 * 60 * 1000,
   //domain: cookieDomain,
   });

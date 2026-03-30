@@ -13,6 +13,7 @@ async function bootstrap() {
     const server = http.createServer(app);
 
     // CORS (รองรับ 2 domain ของคุณ)
+    /*
     const isProduction = process.env.NODE_ENV === "production";
 
     const allowedOrigin = isProduction
@@ -23,6 +24,12 @@ async function bootstrap() {
       origin: allowedOrigin,
       credentials: true, 
     }));
+    */
+   // CORS สำหรับ cross-site cookie
+  app.use(cors({
+    origin: "https://my-tripmate-wepapp-1.onrender.com", // frontend domain จริง
+    credentials: true, 
+  }));
 
     app.use(cookieParser());
     app.use(express.json());
