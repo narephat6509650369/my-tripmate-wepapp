@@ -15,8 +15,7 @@ async function bootstrap() {
     // CORS (รองรับ 2 domain ของคุณ)
     app.use(cors({
       origin: [
-        "https://my-tripmate-wepapp-1.onrender.com",
-        "https://my-tripmate-wepapp.onrender.com"
+        "https://my-tripmate-wepapp-1.onrender.com"
       ],
       credentials: true
     }));
@@ -43,6 +42,11 @@ async function bootstrap() {
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+    });
+
+    app.use((req, res, next) => {
+      console.log("cookies:", req.cookies);
+      next();
     });
 
   } catch (err) {
