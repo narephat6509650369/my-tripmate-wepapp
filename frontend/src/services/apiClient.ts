@@ -5,7 +5,6 @@ if (!API_URL) {
 }
 
 export const apiFetch = async (url: string, options: RequestInit = {}) => {
-
   const endpoint = url.startsWith("/") ? url : `/${url}`;
 
   let response = await fetch(`${API_URL}${endpoint}`, {
@@ -13,34 +12,30 @@ export const apiFetch = async (url: string, options: RequestInit = {}) => {
     credentials: "include"
   });
 
+  // re ถ้า 401 -> ลอง refresh token
   if (response.status === 401 && !endpoint.includes("/auth/refresh")) {
-
     console.log("🔄 Access token expired");
 
-    const refreshEndpoint = "/auth/refresh";
-
-    const refresh = await fetch(`${API_URL}${refreshEndpoint}`, {
+    const refresh = await fetch(`${API_URL}/auth/refresh`, {
       method: "POST",
       credentials: "include"
     });
 
     if (refresh.ok) {
-
-      console.log("✅ Token refreshed");
+      console.log("✅ Token refreshed, retry original request");
 
       response = await fetch(`${API_URL}${endpoint}`, {
         ...options,
         credentials: "include"
       });
 
+      return response;
     } else {
-
       console.warn("❌ Refresh failed");
-
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
-
+      // ❌ อย่า redirect ที่นี่ ให้ AuthContext handle
+      const error = new Error("Refresh token failed");
+      (error as any).status = 401;
+      throw error;
     }
   }
 

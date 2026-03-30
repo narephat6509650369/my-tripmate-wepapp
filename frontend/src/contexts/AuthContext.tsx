@@ -91,27 +91,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);*/
 
    useEffect(() => {
-     const initializeAuth = async () => {
-       try {
-         const res = await apiFetch(`/auth/me`, {
-           method: "GET",
-         });
+  const initializeAuth = async () => {
+    try {
+      const res = await apiFetch("/auth/me");
+      if (!res.ok) throw new Error("Failed to fetch user");
+      const data = await res.json();
+      setAuthState({ user: data.data, isAuthenticated: true, isLoading: false });
+    } catch (error: any) {
+      // ถ้า refresh token ล้มเหลว (401) → redirect /login
+      if (error.status === 401) {
+        setAuthState({ user: null, isAuthenticated: false, isLoading: false });
+        navigate("/login");
+      } else {
+        console.error("Auth initialization failed:", error);
+        setAuthState({ user: null, isAuthenticated: false, isLoading: false });
+      }
+    }
+  };
 
-         if (!res.ok) {
-           setAuthState({ user: null, isAuthenticated: false, isLoading: false });
-           return;
-         }
-
-         const result = await res.json();
-         setAuthState({ user: result.data, isAuthenticated: true, isLoading: false });
-
-       } catch {
-         setAuthState({ user: null, isAuthenticated: false, isLoading: false });
-       }
-     };
-
-     initializeAuth();
-   }, []);
+  initializeAuth();
+}, []);
 
    // ============== Socket ==============
 
