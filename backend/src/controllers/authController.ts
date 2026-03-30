@@ -24,15 +24,13 @@ res.cookie("accessToken", result.accessToken, {
   httpOnly: true,
   secure: isProduction, // true บน production, false บน localhost
   sameSite: isProduction ? "none" : "lax", // ลองใช้ lax ใน dev
-  domain: ".onrender.com", 
   maxAge: 15 * 60 * 1000
 });
 
 res.cookie("refreshToken", result.refreshToken, {
   httpOnly: true,
   secure: isProduction,
-  sameSite: isProduction ? "none" : "lax",
-  domain: ".onrender.com", 
+  sameSite: isProduction ? "none" : "lax", 
   maxAge: 7 * 24 * 60 * 60 * 1000
 });
 
@@ -121,7 +119,6 @@ export const refreshToken = (req: Request, res: Response) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
-    domain: ".onrender.com",
     maxAge: 15 * 60 * 1000
   });
 
