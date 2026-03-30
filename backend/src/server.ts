@@ -13,11 +13,15 @@ async function bootstrap() {
     const server = http.createServer(app);
 
     // CORS (รองรับ 2 domain ของคุณ)
+    const isProduction = process.env.NODE_ENV === "production";
+
+    const allowedOrigin = isProduction
+      ? "https://my-tripmate-wepapp-1.onrender.com"
+      : "http://localhost:5173";
+
     app.use(cors({
-      origin: [
-        "https://my-tripmate-wepapp-1.onrender.com"
-      ],
-      credentials: true
+      origin: allowedOrigin,
+      credentials: true, 
     }));
 
     app.use(cookieParser());

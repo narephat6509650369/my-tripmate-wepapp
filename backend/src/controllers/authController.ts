@@ -19,20 +19,24 @@ export const googleLogin = async (req: Request, res: Response) => {
     const result = await googleLoginService(access_token);
 
     const isProduction = process.env.NODE_ENV === "production";
+    const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
 
-res.cookie("accessToken", result.accessToken, {
-  httpOnly: true,
-  secure: isProduction, // true บน production, false บน localhost
-  sameSite: isProduction ? "none" : "lax", // ลองใช้ lax ใน dev
-  maxAge: 15 * 60 * 1000
-});
+  // Login Handler
+  res.cookie("accessToken", result.accessToken, {
+    httpOnly: true,
+    secure: isProduction,        // ต้อง true บน production
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 15 * 60 * 1000,
+    domain: cookieDomain,        // ครอบทุก subdomain
+  });
 
 res.cookie("refreshToken", result.refreshToken, {
   httpOnly: true,
   secure: isProduction,
-  sameSite: isProduction ? "none" : "lax", 
-  maxAge: 7 * 24 * 60 * 60 * 1000
-});
+  sameSite: isProduction ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    domain: cookieDomain,
+  });
 
     return res.status(200).json({
       success: true,
@@ -62,16 +66,21 @@ res.cookie("refreshToken", result.refreshToken, {
 };
 
 export const logout = (req: Request, res: Response) => {  
+  const isProduction = process.env.NODE_ENV === "production";
+  const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
   res.clearCookie("accessToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "none"
-  });
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "none"
-  });
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: "none",
+  domain: cookieDomain,
+});
+
+res.clearCookie("refreshToken", {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: "none",
+  domain: cookieDomain,
+});
   res.status(200).json({
     success: true,
     code: "AUTH_LOGOUT_SUCCESS",
@@ -87,51 +96,47 @@ export const getMe = async (req: AuthRequest, res: Response) => {
 };
 
 export const refreshToken = (req: Request, res: Response) => {
-
   const refreshToken = req.cookies.refreshToken;
 
   if (!refreshToken) {
     return res.status(401).json({
       success: false,
-      code: "NO_REFRESH_TOKEN"
+      code: "NO_REFRESH_TOKEN",
     });
   }
 
   try {
-
-    const decoded = jwt.verify(
-      refreshToken,
-      process.env.REFRESH_SECRET!
-    ) as any;
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET!) as any;
 
     const newAccessToken = jwt.sign(
       {
         user_id: decoded.sub,
-        jti: randomUUID()
+        jti: randomUUID(),
       },
       process.env.ACCESS_SECRET!,
       { expiresIn: "15m" }
     );
 
     const isProduction = process.env.NODE_ENV === "production";
+    const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
 
-  res.cookie("accessToken", newAccessToken, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    maxAge: 15 * 60 * 1000
-  });
+    // ส่ง accessToken ใหม่พร้อม cookie ครอบ subdomain
+    res.cookie("accessToken", newAccessToken, {
+      httpOnly: true,
+      secure: isProduction,               // HTTPS บน production
+      sameSite: isProduction ? "none" : "lax",
+      domain: cookieDomain,               // ครอบทุก subdomain
+      maxAge: 15 * 60 * 1000,
+    });
 
     return res.json({
-      success: true
+      success: true,
     });
-
   } catch (err) {
-
+    console.error("Refresh token invalid:", err);
     return res.status(401).json({
       success: false,
-      code: "INVALID_REFRESH_TOKEN"
+      code: "INVALID_REFRESH_TOKEN",
     });
-
   }
 };
