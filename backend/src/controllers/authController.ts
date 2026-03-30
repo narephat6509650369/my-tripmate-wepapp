@@ -19,23 +19,23 @@ export const googleLogin = async (req: Request, res: Response) => {
     const result = await googleLoginService(access_token);
 
     const isProduction = process.env.NODE_ENV === "production";
-    const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
-
+    //const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
+   
   // Login Handler
   res.cookie("accessToken", result.accessToken, {
     httpOnly: true,
     secure: isProduction,        // ต้อง true บน production
     sameSite: isProduction ? "none" : "lax",
     maxAge: 15 * 60 * 1000,
-    domain: cookieDomain,        // ครอบทุก subdomain
+    //domain: cookieDomain,
   });
 
 res.cookie("refreshToken", result.refreshToken, {
   httpOnly: true,
   secure: isProduction,
   sameSite: isProduction ? "none" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    domain: cookieDomain,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  //domain: cookieDomain,
   });
 
     return res.status(200).json({
@@ -67,19 +67,19 @@ res.cookie("refreshToken", result.refreshToken, {
 
 export const logout = (req: Request, res: Response) => {  
   const isProduction = process.env.NODE_ENV === "production";
-  const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
+  //const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
   res.clearCookie("accessToken", {
   httpOnly: true,
   secure: isProduction,
   sameSite: "none",
-  domain: cookieDomain,
+  //domain: cookieDomain,
 });
 
 res.clearCookie("refreshToken", {
   httpOnly: true,
   secure: isProduction,
   sameSite: "none",
-  domain: cookieDomain,
+  //domain: cookieDomain,
 });
   res.status(200).json({
     success: true,
@@ -118,14 +118,13 @@ export const refreshToken = (req: Request, res: Response) => {
     );
 
     const isProduction = process.env.NODE_ENV === "production";
-    const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
+    //const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
 
     // ส่ง accessToken ใหม่พร้อม cookie ครอบ subdomain
     res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
       secure: isProduction,               // HTTPS บน production
-      sameSite: isProduction ? "none" : "lax",
-      domain: cookieDomain,               // ครอบทุก subdomain
+      sameSite: "none",
       maxAge: 15 * 60 * 1000,
     });
 

@@ -48,48 +48,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading: true
   });
 
-/*
-  useEffect(() => {
-    const initializeAuth = () => {
-      try {
-        // 🔥 สำหรับ development: ข้าม auth check
-        setAuthState({
-          user: {
-            user_id: 'user-001',           // ← ตรงกับ MOCK_CURRENT_USER_ID
-            email: 'user@example.com',     // ← ตรงกับ MOCK_CURRENT_USER_EMAIL
-            full_name: 'สมชาย ใจดี',
-            avatar_url: null
-          },
-          isAuthenticated: true,
-          isLoading: false
-        }); 
-        
-        console.log('✅ Mock auth initialized');
-
-        /* 
-        // โค้ดเดิม - comment ไว้ก่อน
-        const token = localStorage.getItem('jwtToken');
-        const userId = localStorage.getItem('userId');
-        const userEmail = localStorage.getItem('userEmail');
-
-        if (!token) {
-          console.warn('⚠️ No token found, redirecting to login');
-          if (pathname !== '/login') {
-            if (inviteCode) navigate(`/login?redirect=/join/${inviteCode}`);
-            else navigate('/login');
-          }
-          return;
-        }
-        */
-/*
-      } catch (error) {
-        console.error('Failed to initialize auth:', error);
-      }
-    };
-
-    initializeAuth();
-  }, []);*/
-
    useEffect(() => {
   const initializeAuth = async () => {
     try {
@@ -136,7 +94,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       body: JSON.stringify({
         access_token: accessToken
-      })
+      }),
+      credentials: "include",
     });
 
   const result: ApiResponse<GoogleLoginResponse> =
@@ -164,7 +123,8 @@ const logout = async (): Promise<void> => {
   try {
 
     await apiFetch(`/auth/logout`, {
-      method: "POST"
+      method: "POST",
+      credentials: "include",
     });
 
   } catch (error) {
