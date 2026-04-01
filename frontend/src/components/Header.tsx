@@ -61,8 +61,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   const [, forceUpdate] = useState(0);
   const [toast, setToast] = useState<{ text: string; type: string } | null>(null);
 
-  useEffect(() => {
-    const fetchNoti = async () => {
+  const fetchNoti = async () => {
       try {
         const res = await notiApi.getNoti();
         if (res?.success && Array.isArray(res.data?.notifications)) {
@@ -80,7 +79,21 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
         console.error("Failed to fetch notifications:", err);
       }
     };
+
+  useEffect(() => {
     fetchNoti();
+  }, []);
+
+  useEffect(() => {
+    const handleTokenRefreshed = () => {
+      console.log("🔄 Token refreshed → re-fetching header data...");
+      fetchNoti();
+    };
+
+    window.addEventListener("token:refreshed", handleTokenRefreshed);
+    return () => {
+      window.removeEventListener("token:refreshed", handleTokenRefreshed);
+    };
   }, []);
 
   // ============== Socket ==============
