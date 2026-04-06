@@ -27,7 +27,7 @@ async function bootstrap() {
     */
    // CORS สำหรับ cross-site cookie
   app.use(cors({
-    origin: "https://my-tripmate-wepapp-1.onrender.com", // frontend domain จริง
+    origin: "https://my-tripmate-wepapp-first.onrender.com", // frontend domain จริง
     credentials: true, 
   }));
 
