@@ -16,21 +16,29 @@ function LoginPage() {
 
   //  เปลี่ยนเป็น redirect ไป backend
   const handleGoogleLogin = () => {
-    setLoading(true);
-    setError('');
+  if (loading) return;
 
-    try {
-      console.log('🔐 Redirecting to Google OAuth...');
+  setLoading(true);
+  setError('');
 
-      // ส่ง redirect path ไป backend (optional)
-      const url = `${CONFIG.API_BASE_URL}/auth/google?redirect=${encodeURIComponent(redirectPath)}`;
+  try {
+    console.log('🔐 Redirecting to Google OAuth...');
 
-      window.location.href = url;
-    } catch (err: any) {
-      console.error('❌ Redirect failed:', err);
-      setError('ไม่สามารถเริ่มการเข้าสู่ระบบได้');
-      setLoading(false);
-    }
+    const rawRedirect = new URLSearchParams(location.search).get("redirect");
+
+    const redirectPath =
+      rawRedirect && rawRedirect !== "/login"
+        ? rawRedirect
+        : "/homepage";
+
+    const url = `${CONFIG.API_BASE_URL}/auth/google?redirect=${encodeURIComponent(redirectPath)}`;
+
+    window.location.href = url;
+  } catch (err: any) {
+    console.error('❌ Redirect failed:', err);
+    setError('ไม่สามารถเริ่มการเข้าสู่ระบบได้');
+    setLoading(false);
+  }
   };
 
   return (
