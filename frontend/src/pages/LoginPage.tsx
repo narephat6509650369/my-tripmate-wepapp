@@ -1,51 +1,37 @@
 // src/pages/LoginPage.tsx
 import React, { useState } from 'react';
-import { useGoogleLogin } from '@react-oauth/google';
-import { useAuth } from '../contexts/AuthContext';
 import bgImage from '../assets/login-bg.jpg';
-import { redirect, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { CONFIG } from '../config/app.config';
 
 function LoginPage() {
-  const { login } = useAuth();
-  const location = useLocation(); 
+  const location = useLocation();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const query = new URLSearchParams(location.search);
+
   const params = new URLSearchParams(location.search);
   const redirectPath = params.get("redirect") || "/homepage";
 
   console.log("Redirect param:", redirectPath);
 
-  // ✅ ใช้ useAuth hook แทนการ call API โดยตรง
-  const handleGoogleLogin = useGoogleLogin({
-  flow: 'implicit',
-  onSuccess: async (tokenResponse) => {
+  //  เปลี่ยนเป็น redirect ไป backend
+  const handleGoogleLogin = () => {
     setLoading(true);
     setError('');
 
     try {
-      console.log('🔐 Attempting Google login...');
-      console.log("Redirect param:", redirectPath);
+      console.log('🔐 Redirecting to Google OAuth...');
 
-      // ✅ เรียก login จาก AuthContext
-      await login(tokenResponse.access_token, redirectPath);
+      // ส่ง redirect path ไป backend (optional)
+      const url = `${CONFIG.API_BASE_URL}/auth/google?redirect=${encodeURIComponent(redirectPath)}`;
 
-      console.log('✅ Login successful');
-
+      window.location.href = url;
     } catch (err: any) {
-      console.error('❌ Login failed:', err);
-      setError(`เข้าสู่ระบบไม่สำเร็จ: ${err.message}`);
-    } finally {
+      console.error('❌ Redirect failed:', err);
+      setError('ไม่สามารถเริ่มการเข้าสู่ระบบได้');
       setLoading(false);
     }
-  },
-
-  onError: () => {
-    console.error('❌ Google login error');
-    setError('การเข้าสู่ระบบด้วย Google ล้มเหลว กรุณาลองใหม่อีกครั้ง');
-  },
-});
-
+  };
 
   return (
     <div className="wrap-login100">
@@ -106,7 +92,7 @@ function LoginPage() {
           <div className="login100-form-social">
             <button
               type="button"
-              onClick={() => handleGoogleLogin()}
+              onClick={handleGoogleLogin}
               className="login100-form-social-item bg-google"
               disabled={loading}
               style={{
@@ -115,7 +101,7 @@ function LoginPage() {
               }}
             >
               <i className="fab fa-google" style={{ marginRight: '8px' }} />
-              {loading ? 'Signing in...' : 'Sign in with Google'}
+              {loading ? 'Redirecting...' : 'Sign in with Google'}
             </button>
           </div>
 

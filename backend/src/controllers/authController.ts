@@ -1,141 +1,102 @@
 import type { Request, Response } from "express";
-import { googleLoginService } from "../services/authService.js";
-import type { AuthRequest   } from "../middleware/validate.js";
-import { randomUUID } from "crypto";
+import type { AuthRequest } from "../middleware/validate.js";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 
-export const googleLogin = async (req: Request, res: Response) => {
-  try {
-    const { access_token } = req.body;
+// ============================================================================
+// GET CURRENT USER (ใช้ session จาก passport)
+// ============================================================================
+export const getMe = async (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized",
+    });
+  }
 
-    if (!access_token) {
-      return res.status(400).json({
+  return res.status(200).json({
+    success: true,
+    data: req.user,
+  });
+};
+
+// ============================================================================
+// LOGOUT (ลบ session แทนการลบ JWT)
+// ============================================================================
+export const logout = (req: Request, res: Response) => {
+  req.logout((err) => {
+    if (err) {
+      console.error("Logout error:", err);
+      return res.status(500).json({
         success: false,
-        code: "MISSING_FIELD",
-        message: "access_token is required",
+        message: "Logout failed",
       });
     }
 
-    const result = await googleLoginService(access_token);
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid"); // cookie ของ session
 
-    const isProduction = process.env.NODE_ENV === "production";
-    //const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
-   
-  // Login Handler
-  res.cookie("accessToken", result.accessToken, {
-    httpOnly: true,
-    secure: true,        // ต้อง true บน production
-    sameSite: "none",
-    maxAge: 15 * 60 * 1000,
-    //domain: cookieDomain,
-  });
-
-res.cookie("refreshToken", result.refreshToken, {
-  httpOnly: true,
-  secure: true,
-  sameSite: "none",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-  //domain: cookieDomain,
-  });
-
-    return res.status(200).json({
-      success: true,
-      code: "AUTH_LOGIN_SUCCESS",
-      message: "Login successful",
-      data: {
-        user: {
-          user_id: result.user.user_id,
-          email: result.user.email
-        }
-      }
+      return res.status(200).json({
+        success: true,
+        message: "Logout successful",
+      });
     });
-
-    
-  } catch (err: any) {
-    console.error("Google API error:", err.response?.data || err.message);
-    return res.status(401).json({
-      success: false,
-      code: "AUTH_INVALID_TOKEN",
-      message: "Google login failed",
-      error: {
-        detail: err.message
-      }
-    });
-    
-  }
-};
-
-export const logout = (req: Request, res: Response) => {  
-  const isProduction = process.env.NODE_ENV === "production";
-  //const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
-  res.clearCookie("accessToken", {
-  httpOnly: true,
-  secure: true,
-  sameSite: "none",
-  //domain: cookieDomain,
-});
-
-res.clearCookie("refreshToken", {
-  httpOnly: true,
-  secure: true,
-  sameSite: "none",
-  //domain: cookieDomain,
-});
-  res.status(200).json({
-    success: true,
-    code: "AUTH_LOGOUT_SUCCESS",
-    message: "Logout successful"
   });
 };
 
-export const getMe = async (req: AuthRequest, res: Response) => {
-  return res.status(200).json({
-    success: true,
-    data: req.user
-  });
-};
 
-export const refreshToken = (req: Request, res: Response) => {
-  const refreshToken = req.cookies.refreshToken;
-
-  if (!refreshToken) {
-    return res.status(401).json({
-      success: false,
-      code: "NO_REFRESH_TOKEN",
-    });
-  }
-
+// ============================================================================
+// GOOGLE CALLBACK (หลังจาก Google auth ผ่านแล้ว จะมาที่นี่เพื่อสร้าง JWT และ set cookie)
+// ============================================================================
+export const googleCallback = (req: Request, res: Response) => {
   try {
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET!) as any;
+    const user = req.user;
 
-    const newAccessToken = jwt.sign(
+    if (!user) {
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
+    }
+
+    // create JWT
+    const accessToken = jwt.sign(
       {
-        user_id: decoded.sub,
+        user_id: user.user_id,
+        email: user.email,
         jti: randomUUID(),
       },
       process.env.ACCESS_SECRET!,
       { expiresIn: "15m" }
     );
 
-    //const isProduction = process.env.NODE_ENV === "production";
-    //const cookieDomain = isProduction ? ".my-tripmate.com" : undefined;
+    const refreshToken = jwt.sign(
+      {
+        sub: user.user_id,
+        jti: randomUUID(),
+      },
+      process.env.REFRESH_SECRET!,
+      { expiresIn: "7d" }
+    );
 
-    // ส่ง accessToken ใหม่พร้อม cookie ครอบ subdomain
-    res.cookie("accessToken", newAccessToken, {
+    // set cookie
+    res.cookie("accessToken", accessToken, {
       httpOnly: true,
-      secure: true,               // HTTPS บน production
+      secure: true,
       sameSite: "none",
       maxAge: 15 * 60 * 1000,
     });
 
-    return res.json({
-      success: true,
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+
+    // redirect
+    const redirect = req.query.state || "/homepage";
+    return res.redirect(`${process.env.FRONTEND_URL}${redirect}`);
+
   } catch (err) {
-    console.error("Refresh token invalid:", err);
-    return res.status(401).json({
-      success: false,
-      code: "INVALID_REFRESH_TOKEN",
-    });
+    console.error(err);
+    return res.redirect(`${process.env.FRONTEND_URL}/login?error=server_error`);
   }
 };

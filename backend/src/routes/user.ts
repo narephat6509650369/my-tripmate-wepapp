@@ -1,14 +1,39 @@
-import express from 'express';
-import { validateGoogleLogin,verifyToken } from '../middleware/validate.js';
-
-import { googleLogin, logout, getMe, refreshToken } from '../controllers/authController.js';
-
+import express from "express";
+import passport from "passport";
+import { requireAuth } from "../middleware/validate.js";
+import { logout, getMe, googleCallback} from "../controllers/authController.js";
 
 const router = express.Router();
 
-router.options('/google', (req, res) => {res.sendStatus(204);});
-router.post('/google', validateGoogleLogin, googleLogin);
-router.get('/me', verifyToken, getMe);
-router.post('/refresh',refreshToken)
-router.post('/logout', logout);
+// ============================================================================
+// ไป Google
+// ============================================================================
+router.get("/google",
+  (req, res, next) => {
+    const redirect = req.query.redirect || "/homepage";
+    passport.authenticate("google", {
+      scope: ["profile", "email"],
+      state: redirect as string,
+    })(req, res, next);
+  }
+);
+
+router.get("/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: `${process.env.FRONTEND_URL}/login`,
+    session: false, // สำคัญ
+  }),
+  googleCallback // ให้ตัวนี้จัดการทุกอย่าง
+);
+
+// ============================================================================
+// GET CURRENT USER
+// ============================================================================
+router.get("/me", requireAuth, getMe);
+
+// ============================================================================
+// LOGOUT
+// ============================================================================
+router.post("/logout", logout);
+
 export default router;

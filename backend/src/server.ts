@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import passport from "passport";
 import cookieParser from "cookie-parser";
+import session from "express-session";
 import http from "http";
 
 async function bootstrap() {
@@ -12,32 +13,45 @@ async function bootstrap() {
     const app = express();
     const server = http.createServer(app);
 
-    // CORS (รองรับ 2 domain ของคุณ)
-    /*
-    const isProduction = process.env.NODE_ENV === "production";
-
-    const allowedOrigin = isProduction
-      ? "https://my-tripmate-wepapp-1.onrender.com"
-      : "http://localhost:5173";
-
+    // CORS (สำคัญมาก)
     app.use(cors({
-      origin: allowedOrigin,
-      credentials: true, 
+      origin: process.env.FRONTEND_URL,
+      credentials: true,
     }));
-    */
-   // CORS สำหรับ cross-site cookie
-  app.use(cors({
-    origin: "https://my-tripmate-wepapp-first.onrender.com", // frontend domain จริง
-    credentials: true, 
-  }));
 
+    // middleware พื้นฐาน
     app.use(cookieParser());
     app.use(express.json());
-    app.use(passport.initialize());
 
+    // SESSION (สำคัญสุด)
+    app.use(
+      session({
+        secret: process.env.SESSION_SECRET || "secret",
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+          httpOnly: true,
+          secure: true,        // Render = HTTPS
+          sameSite: "none",    // cross-site cookie
+        },
+      })
+    );
+
+    // Passport
+    app.use(passport.initialize());
+    app.use(passport.session());
+
+    // log cookies (ย้ายขึ้นมา)
+    app.use((req, res, next) => {
+      console.log("cookies:", req.cookies);
+      next();
+    });
+
+    // socket
     const { initSocket } = await import("./socket/socket.js");
     initSocket(server);
 
+    // routes
     const authRoutes = (await import("./routes/user.js")).default;
     const tripRoutes = (await import("./routes/trip.js")).default;
     const voteRoutes = (await import("./routes/vote.js")).default;
@@ -48,16 +62,16 @@ async function bootstrap() {
     app.use("/api/votes", voteRoutes);
     app.use("/api/noti", notiRoutes);
 
+    // health check (สำคัญสำหรับ Render)
+    app.get("/", (req, res) => {
+      res.send("Server is running");
+    });
+
     const PORT = process.env.PORT || 5000;
 
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
-    });
-
-    app.use((req, res, next) => {
-      console.log("cookies:", req.cookies);
-      next();
     });
 
   } catch (err) {
@@ -67,11 +81,3 @@ async function bootstrap() {
 }
 
 bootstrap();
-  /*
-    app.use(cors({
-    origin: [
-      "http://localhost:5173",
-    ],
-    credentials: true
-    }));
-    */
