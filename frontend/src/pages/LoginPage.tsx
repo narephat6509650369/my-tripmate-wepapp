@@ -31,7 +31,7 @@ function LoginPage() {
         ? rawRedirect
         : "/homepage";
 
-    const url = `${CONFIG.API_BASE_URL}/auth/google?redirect=${encodeURIComponent(redirectPath)}`;
+    const url = `${CONFIG.API_BASE_URL}/api/auth/google?redirect=${encodeURIComponent(redirectPath)}`;
 
     window.location.href = url;
   } catch (err: any) {
