@@ -43,7 +43,6 @@ async function bootstrap() {
 
     // log cookies (ย้ายขึ้นมา)
     app.use((req, res, next) => {
-      console.log("cookies:", req.cookies);
       next();
     });
 
