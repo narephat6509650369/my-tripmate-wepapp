@@ -13,6 +13,8 @@ async function bootstrap() {
     const app = express();
     const server = http.createServer(app);
 
+    await import("./config/passport.config.js");
+
     // CORS (สำคัญมาก)
     app.use(cors({
       origin: process.env.FRONTEND_URL,
@@ -71,6 +73,8 @@ async function bootstrap() {
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+      console.log("GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID);
+      console.log("GOOGLE_CALLBACK_URL:", process.env.GOOGLE_CALLBACK_URL);
     });
 
   } catch (err) {
