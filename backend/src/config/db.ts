@@ -22,6 +22,8 @@ const dbConfig: PoolOptions = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  enableKeepAlive: true,     
+  keepAliveInitialDelay: 10000,
   ssl: {
     ca: fs.readFileSync(sslCertPath), 
   },
