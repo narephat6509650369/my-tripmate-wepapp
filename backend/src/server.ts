@@ -24,6 +24,8 @@ async function bootstrap() {
     // middleware พื้นฐาน
     app.use(cookieParser());
     app.use(express.json());
+    // Passport
+    app.use(passport.initialize());
 
     // SESSION (สำคัญสุด)
     app.use(
@@ -38,10 +40,6 @@ async function bootstrap() {
         },
       })
     );
-
-    // Passport
-    app.use(passport.initialize());
-    app.use(passport.session());
 
     // log cookies (ย้ายขึ้นมา)
     app.use((req, res, next) => {
