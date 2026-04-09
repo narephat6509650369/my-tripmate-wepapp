@@ -24,24 +24,33 @@ export const getMe = async (req: AuthRequest, res: Response) => {
 // LOGOUT (ลบ session แทนการลบ JWT)
 // ============================================================================
 export const logout = (req: Request, res: Response) => {
-  req.logout((err) => {
-    if (err) {
-      console.error("Logout error:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Logout failed",
-      });
-    }
-
-    req.session.destroy(() => {
-      res.clearCookie("connect.sid"); // cookie ของ session
-
-      return res.status(200).json({
-        success: true,
-        message: "Logout successful",
-      });
+  try {
+    // ลบ JWT cookies
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      domain: ".onrender.com",
     });
-  });
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      domain: ".onrender.com",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Logout successful",
+    });
+  } catch (err) {
+    console.error("Logout error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Logout failed",
+    });
+  }
 };
 
 
@@ -81,6 +90,7 @@ export const googleCallback = (req: Request, res: Response) => {
       httpOnly: true,
       secure: true,
       sameSite: "none",
+      domain: ".onrender.com",
       maxAge: 15 * 60 * 1000,
     });
 
@@ -88,6 +98,7 @@ export const googleCallback = (req: Request, res: Response) => {
       httpOnly: true,
       secure: true,
       sameSite: "none",
+      domain: ".onrender.com",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -98,5 +109,48 @@ export const googleCallback = (req: Request, res: Response) => {
   } catch (err) {
     console.error(err);
     return res.redirect(`${process.env.FRONTEND_URL}/login?error=server_error`);
+  }
+};
+
+export const refreshToken = (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.refreshToken;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "No refresh token",
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.REFRESH_SECRET!);
+
+    // create new access token
+    const newAccessToken = jwt.sign(
+      {
+        user_id: (decoded as any).sub,
+        jti: randomUUID(),
+      },
+      process.env.ACCESS_SECRET!,
+      { expiresIn: "15m" }
+    );
+
+    res.cookie("accessToken", newAccessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      domain: ".onrender.com",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      success: true,
+    });
+
+  } catch (err) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid refresh token",
+    });
   }
 };

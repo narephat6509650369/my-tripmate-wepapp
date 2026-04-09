@@ -5,6 +5,11 @@ import { CONFIG } from "../config/app.config";
 // ============================================================================
 const redirectToLogin = () => {
   const currentPath = window.location.pathname + window.location.search;
+
+  if (window.location.pathname === "/login") return;
+
+  if (window.location.search.includes("redirect=")) return;
+
   window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
 };
 
@@ -25,6 +30,9 @@ export class ApiError extends Error {
 // ============================================================================
 // apiFetch — simplified for session-based auth
 // ============================================================================
+let isRefreshing = false;
+let refreshPromise: Promise<void> | null = null;
+
 export const apiFetch = async (
   url: string,
   options: RequestInit = {}
@@ -32,18 +40,46 @@ export const apiFetch = async (
   const endpoint = url.startsWith("/") ? url : `/${url}`;
   const fullUrl = `${CONFIG.API_BASE_URL}${endpoint}`;
 
-  const baseOptions: RequestInit = {
+  const response = await fetch(fullUrl, {
     ...options,
-    credentials: "include", 
-  };
+    credentials: "include",
+  });
 
-  const response = await fetch(fullUrl, baseOptions);
-
-  // ถ้า unauthorized → redirect ไป login
+  //  access token หมด
   if (response.status === 401) {
-    console.warn("❌ Unauthorized, redirecting to login...");
-    redirectToLogin();
-    throw new ApiError(401, "Unauthorized");
+    console.warn("🔄 Access token expired, refreshing...");
+
+    // ถ้า refresh อยู่แล้ว → รอ
+    if (!isRefreshing) {
+      isRefreshing = true;
+
+      refreshPromise = fetch(`${CONFIG.API_BASE_URL}/api/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Refresh failed");
+        })
+        .finally(() => {
+          isRefreshing = false;
+        });
+    }
+
+    try {
+      await refreshPromise;
+
+      // retry request เดิม
+      return await fetch(fullUrl, {
+        ...options,
+        credentials: "include",
+      });
+
+    } catch (err) {
+      console.warn("❌ Refresh failed → redirect login");
+
+      redirectToLogin();
+      throw new ApiError(401, "Unauthorized");
+    }
   }
 
   return response;
