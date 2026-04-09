@@ -67,6 +67,14 @@ async function bootstrap() {
       res.send("Server is running");
     });
 
+    const __dirname = new URL('.', import.meta.url).pathname;
+
+    app.use(express.static(path.join(__dirname, "../../frontend/dist")));
+
+    app.use((req, res) => {
+      res.sendFile(path.join(__dirname, "../../frontend/dist/index.html"));
+    });
+
     const PORT = process.env.PORT || 5000;
 
     server.listen(PORT, () => {
@@ -74,17 +82,6 @@ async function bootstrap() {
       console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
       console.log("GOOGLE_CALLBACK_URL:", process.env.GOOGLE_CALLBACK_URL);
     });
-
-
-  const __dirname = new URL('.', import.meta.url).pathname;
-
-  // serve static frontend
-  app.use(express.static(path.join(__dirname, "../../frontend/dist")));
-
-  // fallback สำหรับ React Router
-  app.get("/*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../../frontend/dist/index.html"));
-  });
 
   } catch (err) {
     console.error("🔥 Backend bootstrap failed:", err);
