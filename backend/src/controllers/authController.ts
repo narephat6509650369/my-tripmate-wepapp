@@ -29,14 +29,12 @@ export const logout = (req: Request, res: Response) => {
       httpOnly: true,
       secure: true,
       sameSite: "none",
-      domain: ".onrender.com",
     });
 
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: true,
       sameSite: "none",
-      domain: ".onrender.com",
     });
 
     return res.status(200).json({
@@ -89,7 +87,6 @@ export const googleCallback = (req: Request, res: Response) => {
       httpOnly: true,
       secure: true,
       sameSite: "none",
-      domain: ".onrender.com",
       maxAge: 15 * 60 * 1000,
     });
 
@@ -97,7 +94,6 @@ export const googleCallback = (req: Request, res: Response) => {
       httpOnly: true,
       secure: true,
       sameSite: "none",
-      domain: ".onrender.com",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -139,7 +135,6 @@ export const refreshToken = (req: Request, res: Response) => {
       httpOnly: true,
       secure: true,
       sameSite: "none",
-      domain: ".onrender.com",
       maxAge: 15 * 60 * 1000,
     });
 
