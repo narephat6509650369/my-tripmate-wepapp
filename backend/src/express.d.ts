@@ -9,6 +9,7 @@ export interface JwtPayload {
 declare module "express-serve-static-core" {
   interface Request {
     user?: JwtPayload;
+    cookies: { [key: string]: string };
   }
 }
 

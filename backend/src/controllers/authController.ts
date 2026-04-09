@@ -1,12 +1,11 @@
 import type { Request, Response } from "express";
-import type { AuthRequest } from "../middleware/validate.js";
 import jwt from "jsonwebtoken";
 import { randomUUID } from "crypto";
 
 // ============================================================================
 // GET CURRENT USER (ใช้ session จาก passport)
 // ============================================================================
-export const getMe = async (req: AuthRequest, res: Response) => {
+export const getMe = async (req: Request, res: Response) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,

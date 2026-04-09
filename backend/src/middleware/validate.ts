@@ -1,16 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
-
-export interface AuthRequest extends Request {
-  user?: any;
-}
-
-// ============================================================================
-// CHECK AUTH (แทน verifyToken)
-// ============================================================================
 import jwt from "jsonwebtoken";
 
 export const requireAuth = (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -26,7 +18,7 @@ export const requireAuth = (
 
     const decoded = jwt.verify(token, process.env.ACCESS_SECRET!);
 
-    req.user = decoded; 
+    req.user = decoded as any; 
 
     next();
   } catch (err) {
