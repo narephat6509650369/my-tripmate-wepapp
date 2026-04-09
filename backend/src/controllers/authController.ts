@@ -103,6 +103,7 @@ export const googleCallback = (req: Request, res: Response) => {
 
     // redirect
     const redirect = req.query.state || "/homepage";
+    console.log("Redirecting to:", `${process.env.FRONTEND_URL}${redirect}`);
     return res.redirect(`${process.env.FRONTEND_URL}${redirect}`);
 
   } catch (err) {

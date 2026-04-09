@@ -51,56 +51,9 @@ import { apiFetch } from "./apiClient";
 // CONFIGURATION
 // ============================================================================
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_BASE_URL ;
 const API_TIMEOUT = 10000;
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-/*
-const fetchWithTimeout = async (
-  url: string,
-  options: RequestInit = {},
-  timeout: number = API_TIMEOUT
-): Promise<Response> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout - เซิร์ฟเวอร์ตอบสนองช้าเกินไป');
-    }
-    throw error;
-  }
-};
-*/
-/*
-const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('jwtToken');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` })
-  };
-};
-*/
-/*
-const checkAuth = (): boolean => {
-  const token = localStorage.getItem('jwtToken');
-  if (!token) {
-    console.warn('⚠️ No auth token found');
-    return false;
-  }
-  return true;
-};
-*/
 const handleApiError = (error: any): ApiResponse => {
   return {
     success: false,
