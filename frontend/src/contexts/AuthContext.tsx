@@ -48,7 +48,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // ============================================================================
 
 const fetchCurrentUser = async (): Promise<User> => {
-  const res = await apiFetch("/auth/me");
+  const res = await apiFetch("/api/auth/me");
   if (!res.ok) throw new Error("Not authenticated");
   const data = await res.json();
   return data.data as User;
