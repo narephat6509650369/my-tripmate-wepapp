@@ -81,7 +81,7 @@ export const tripAPI = {
 
     try {
       const response = await apiFetch(
-        `/trips/all-my-trips`,
+        `/api/trips/all-my-trips`,
         {
           method: "GET"
         }
@@ -105,7 +105,7 @@ export const tripAPI = {
 
     try {
 
-      const response = await apiFetch(`/trips/${tripId}`);
+      const response = await apiFetch(`/api/trips/${tripId}`);
 
       return await response.json();
 
@@ -126,7 +126,7 @@ export const tripAPI = {
 
     try {
       const response = await apiFetch(
-        `/trips/${tripId}/summary?template=${template}`,
+        `/api/trips/${tripId}/summary?template=${template}`,
         {
           method: "GET",
         }
@@ -144,7 +144,7 @@ export const tripAPI = {
    */
   updateTripSummary: async (tripId: string, data: { aiSummary: string }): Promise<ApiResponse> => {
     try {
-      const response = await apiFetch(`/trips/${tripId}/summary`, {
+      const response = await apiFetch(`/api/trips/${tripId}/summary`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ aiSummary: data.aiSummary })
@@ -166,7 +166,7 @@ export const tripAPI = {
 
     try {
 
-      const response = await apiFetch(`/trips/add-trip`, {
+      const response = await apiFetch(`/api/trips/add-trip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -190,7 +190,7 @@ export const tripAPI = {
   }
 
   try {
-    const response = await apiFetch(`/trips/request-join`, {
+    const response = await apiFetch(`/api/trips/request-join`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -226,7 +226,7 @@ export const tripAPI = {
     }
 
     try {
-      const response = await apiFetch(`/trips/${tripId}`, { // ← tripId ใน URL
+      const response = await apiFetch(`/api/trips/${tripId}`, { // ← tripId ใน URL
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
@@ -252,7 +252,7 @@ export const tripAPI = {
     try {
 
       const response = await apiFetch(
-        `/trips/${tripId}/members/${memberId}`,
+        `/api/trips/${tripId}/members/${memberId}`,
         {
           method: 'DELETE',
         }
@@ -266,7 +266,7 @@ export const tripAPI = {
 
   editDescription: async (tripId: string, description: string): Promise<ApiResponse> => {
     try {
-      const response = await apiFetch(`/trips/${tripId}/edit-describe`, {
+      const response = await apiFetch(`/api/trips/${tripId}/edit-description`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description })
@@ -279,7 +279,7 @@ export const tripAPI = {
 
   addLink: async (tripId: string, link: string): Promise<ApiResponse> => {
     try {
-      const response = await apiFetch(`/trips/${tripId}/addLink`, {
+      const response = await apiFetch(`/api/trips/${tripId}/add-link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ link })
@@ -296,7 +296,7 @@ export const tripAPI = {
    */
   requestToJoin: async (inviteCode: string): Promise<ApiResponse> => {
     try {
-      const response = await apiFetch(`/trips/request-join`, {
+      const response = await apiFetch(`/api/trips/request-join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invite_code: inviteCode })
@@ -329,7 +329,7 @@ export const tripAPI = {
    */
   getPendingRequests: async (tripId: string): Promise<ApiResponse> => {
     try {
-      const response = await apiFetch(`/trips/${tripId}/pending-requests`);
+      const response = await apiFetch(`/api/trips/${tripId}/pending-requests`);
       return await response.json();
     } catch (error) {
       return handleApiError(error);
@@ -342,7 +342,7 @@ export const tripAPI = {
   approveRequest: async (tripId: string, userId: string): Promise<ApiResponse> => {
     try {
       const response = await apiFetch(
-        `/trips/${tripId}/approve/${userId}`,
+        `/api/trips/${tripId}/approve/${userId}`,
         { 
           method: 'PATCH' 
         }
@@ -359,7 +359,7 @@ export const tripAPI = {
   rejectRequest: async (tripId: string, userId: string): Promise<ApiResponse> => {
     try {
       const response = await apiFetch(
-        `/trips/${tripId}/reject/${userId}`,
+        `/api/trips/${tripId}/reject/${userId}`,
         { 
           method: 'PATCH'
         }
@@ -372,7 +372,7 @@ export const tripAPI = {
 
   getMembers: async (tripId: string): Promise<ApiResponse> => {
     try {
-      const response = await apiFetch(`/trips/${tripId}/get-members`);
+      const response = await apiFetch(`/api/trips/${tripId}/get-members`);
       if (!response.ok) {
         return {
           success: false,
@@ -413,7 +413,7 @@ export const voteAPI = {
 
   try {
     const response = await apiFetch(
-      `/votes/${tripId}/date-matching-result`,
+      `/api/votes/${tripId}/date-matching-result`,
       {
         method: "GET", 
         headers: {
@@ -444,7 +444,7 @@ export const voteAPI = {
 
   try {
     const response = await apiFetch(
-      `/votes/availability`,
+      `/api/votes/availability`,
       {
         method: "POST",
         headers: {
@@ -473,7 +473,7 @@ export const voteAPI = {
 
     try {
 
-      const response = await apiFetch(`/votes/start-voting`, {
+      const response = await apiFetch(`/api/votes/start-voting`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trip_id: tripId })
@@ -500,7 +500,7 @@ export const voteAPI = {
   }
 
   try {
-    const response = await apiFetch(`/votes/${tripId}/get-budget`);
+    const response = await apiFetch(`/api/votes/${tripId}/get-budget`);
 
     return await response.json();
 
@@ -523,7 +523,7 @@ export const voteAPI = {
   try {
 
     const response = await apiFetch(
-      `/votes/${tripId}/budget`,
+      `/api/votes/${tripId}/budget`,
       {
         method: "POST",
         headers: {
@@ -568,7 +568,7 @@ export const voteAPI = {
 
   try {
     const response = await apiFetch(
-      `/votes/${tripId}/get-vote-place`,
+      `/api/votes/${tripId}/get-vote-place`,
       {
         method: "GET",
       }
@@ -604,7 +604,7 @@ export const voteAPI = {
 
   try {
     const response = await apiFetch(
-      `/votes/${tripid}/vote-place`,
+      `/api/votes/${tripid}/vote-place`,
       {
         method: "POST",
         headers: {
@@ -634,7 +634,7 @@ export const voteAPI = {
 
     try {
 
-      const response = await apiFetch(`/trips/${tripId}/manual-close`, {
+      const response = await apiFetch(`/api/trips/${tripId}/manual-close`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -660,7 +660,7 @@ export const notiApi = {
       return getMockNotifications("mock-user-id");
     }
     try {
-      const response = await apiFetch(`/noti/get-noti`, {
+      const response = await apiFetch(`/api/noti/get-noti`, {
         method: 'GET',
       });
       return await response.json();
@@ -671,7 +671,7 @@ export const notiApi = {
 
   markAsRead: async (notificationId: string) => {
     try {
-      const response = await apiFetch(`/noti/${notificationId}/read`, {
+      const response = await apiFetch(`/api/noti/${notificationId}/read`, {
         method: 'PATCH',
       });
       return await response.json();
@@ -682,7 +682,7 @@ export const notiApi = {
 
   markAllAsRead: async () => {
     try {
-      const response = await apiFetch(`/noti/read-all`, {
+      const response = await apiFetch(`/api/noti/read-all`, {
         method: 'PATCH',
       });
       return await response.json();
@@ -693,7 +693,7 @@ export const notiApi = {
 
   deleteNoti: async (notificationId: string) => {
     try {
-      const response = await apiFetch(`/noti/notifications/${notificationId}`, {
+      const response = await apiFetch(`/api/noti/notifications/${notificationId}`, {
         method: 'DELETE',
       });
       return await response.json();
