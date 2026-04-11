@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 
-const sslCertPath = path.resolve(__dirname, '../../isrgrootx1.pem');
+const sslCertPath = path.resolve(__dirname, '/etc/secrets/isrgrootx1.pem');
 
 const dbConfig: PoolOptions = {
   host: process.env.DB_HOST as string,
