@@ -52,7 +52,7 @@ export const logout = (req: Request, res: Response) => {
 
 
 // ============================================================================
-// GOOGLE CALLBACK (หลังจาก Google auth ผ่านแล้ว จะมาที่นี่เพื่อสร้าง JWT และ set cookie)
+// GOOGLE CALLBACK
 // ============================================================================
 export const googleCallback = (req: Request, res: Response) => {
   try {
@@ -73,11 +73,13 @@ export const googleCallback = (req: Request, res: Response) => {
       { expiresIn: "7d" }
     );
 
-    // เก็บ token ชั่วคราวใน memory 
-    const tempToken = randomUUID();
-    tempTokenStore.set(tempToken, { accessToken, refreshToken });
+    // ✅ เปลี่ยนเป็น sign JWT แทน Map
+    const tempToken = jwt.sign(
+      { accessToken, refreshToken },
+      process.env.ACCESS_SECRET!,
+      { expiresIn: "2m" } // หมดอายุใน 2 นาที
+    );
 
-    // ส่ง tempToken ไปกับ URL แทน
     const redirect = req.query.state || "/homepage";
     return res.redirect(
       `${process.env.FRONTEND_URL}/auth/callback?token=${tempToken}&redirect=${redirect}`
@@ -89,12 +91,7 @@ export const googleCallback = (req: Request, res: Response) => {
 };
 
 // ============================================================================
-// TEMP TOKEN STORE (in-memory, simple)
-// ============================================================================
-const tempTokenStore = new Map<string, { accessToken: string; refreshToken: string }>();
-
-// ============================================================================
-// EXCHANGE TEMP TOKEN → SET COOKIE (Frontend เรียก endpoint นี้)
+// EXCHANGE TEMP TOKEN → SET COOKIE
 // ============================================================================
 export const exchangeToken = (req: Request, res: Response) => {
   const { token } = req.query;
@@ -103,28 +100,33 @@ export const exchangeToken = (req: Request, res: Response) => {
     return res.status(400).json({ success: false, message: "Invalid token" });
   }
 
-  const tokens = tempTokenStore.get(token);
-  if (!tokens) {
-    return res.status(401).json({ success: false, message: "Token expired or not found" });
+  try {
+    // verify + decode ตรงๆ ไม่ต้องใช้ Map
+    const decoded = jwt.verify(token, process.env.ACCESS_SECRET!) as {
+      accessToken: string;
+      refreshToken: string;
+    };
+
+    res.cookie("accessToken", decoded.accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie("refreshToken", decoded.refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({ success: true });
+
+  } catch (err) {
+    // JWT หมดอายุหรือ invalid
+    return res.status(401).json({ success: false, message: "Token expired or invalid" });
   }
-
-  tempTokenStore.delete(token); // ✅ ใช้ครั้งเดียว
-
-  res.cookie("accessToken", tokens.accessToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "none",
-    maxAge: 15 * 60 * 1000,
-  });
-
-  res.cookie("refreshToken", tokens.refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "none",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
-  return res.status(200).json({ success: true });
 };
 
 // ============================================================================
