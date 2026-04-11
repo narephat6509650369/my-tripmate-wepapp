@@ -7,7 +7,7 @@ import { CONFIG } from '../config/app.config';
 function LoginPage() {
   const location = useLocation();
   const [error, setError] = useState('');
-  const [isInApp, setIsInApp] = useState(false);
+  //const [isInApp, setIsInApp] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const params = new URLSearchParams(location.search);
@@ -42,8 +42,8 @@ function LoginPage() {
 
   // ตรวจสอบ user agent ว่าเป็น in-app browser หรือไม่
   if (isInAppBrowser()) {
-    setIsInApp(true);
-    setError('');
+    //setIsInApp(true);
+    setError('⚠️ กรุณาเปิดลิงก์นี้ใน Chrome หรือ Safari แทน');
     return;
   }
 
@@ -126,6 +126,7 @@ function LoginPage() {
           )}
 
           {/* ✅ In-App Browser Warning — แยกจาก error */}
+          {/* 
           {isInApp && (
             <div style={{
               backgroundColor: '#fff8e1',
@@ -160,6 +161,7 @@ function LoginPage() {
               </button>
             </div>
           )}
+          */}
 
           {/* Google Login Button */}
           <div className="login100-form-social">
