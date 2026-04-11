@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "gen:readme": "node scripts/generate-readme.js"
+    "gen:readme": "node scripts/generate-readme.js",
+    "build": "cd frontend && npm install && npm run build && cd ../backend && npm install && npm run build",
+    "start": "cd backend && npm start"
   },
   "dependencies": {
     "@react-oauth/google": "^0.12.2",

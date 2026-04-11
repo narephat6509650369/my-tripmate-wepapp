@@ -25,10 +25,6 @@ async function bootstrap() {
     // middleware พื้นฐาน
     app.use(cookieParser());
     app.use(express.json());
-    // Passport
-    app.use(passport.initialize());
-
-    // SESSION (สำคัญสุด)
     app.use(
       session({
         secret: process.env.SESSION_SECRET || "secret",
@@ -36,11 +32,14 @@ async function bootstrap() {
         saveUninitialized: false,
         cookie: {
           httpOnly: true,
-          secure: true,        // Render = HTTPS
-          sameSite: "none",    // cross-site cookie
+          secure: true,
+          sameSite: "none", // 👈 เดี๋ยวอธิบาย
         },
       })
     );
+
+    app.use(passport.initialize());
+    app.use(passport.session());
 
     // log cookies (ย้ายขึ้นมา)
     app.use((req, res, next) => {
