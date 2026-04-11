@@ -11,13 +11,17 @@ import HomePage from './pages/HomePage';
 import Dashboard from './pages/Dashboard';
 import VotePage from './pages/VotePage';
 import JoinPage from './pages/JoinPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
+
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
 
           <Route path="/join/:inviteCode" element={<JoinPage />} />

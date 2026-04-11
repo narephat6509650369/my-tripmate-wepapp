@@ -57,57 +57,79 @@ export const logout = (req: Request, res: Response) => {
 export const googleCallback = (req: Request, res: Response) => {
   try {
     const user = req.user;
-
     if (!user) {
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
     }
 
-    // create JWT
     const accessToken = jwt.sign(
-      {
-        user_id: user.user_id,
-        email: user.email,
-        jti: randomUUID(),
-      },
+      { user_id: user.user_id, email: user.email, jti: randomUUID() },
       process.env.ACCESS_SECRET!,
       { expiresIn: "15m" }
     );
 
     const refreshToken = jwt.sign(
-      {
-        sub: user.user_id,
-        jti: randomUUID(),
-      },
+      { sub: user.user_id, jti: randomUUID() },
       process.env.REFRESH_SECRET!,
       { expiresIn: "7d" }
     );
 
-    // set cookie
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      maxAge: 15 * 60 * 1000,
-    });
+    // เก็บ token ชั่วคราวใน memory 
+    const tempToken = randomUUID();
+    tempTokenStore.set(tempToken, { accessToken, refreshToken });
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    // redirect
+    // ส่ง tempToken ไปกับ URL แทน
     const redirect = req.query.state || "/homepage";
-    console.log("Redirecting to:", `${process.env.FRONTEND_URL}${redirect}`);
-    return res.redirect(`${process.env.FRONTEND_URL}${redirect}`);
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/auth/callback?token=${tempToken}&redirect=${redirect}`
+    );
 
   } catch (err) {
-    console.error(err);
     return res.redirect(`${process.env.FRONTEND_URL}/login?error=server_error`);
   }
 };
 
+// ============================================================================
+// TEMP TOKEN STORE (in-memory, simple)
+// ============================================================================
+const tempTokenStore = new Map<string, { accessToken: string; refreshToken: string }>();
+
+// ============================================================================
+// EXCHANGE TEMP TOKEN → SET COOKIE (Frontend เรียก endpoint นี้)
+// ============================================================================
+export const exchangeToken = (req: Request, res: Response) => {
+  const { token } = req.query;
+
+  if (!token || typeof token !== "string") {
+    return res.status(400).json({ success: false, message: "Invalid token" });
+  }
+
+  const tokens = tempTokenStore.get(token);
+  if (!tokens) {
+    return res.status(401).json({ success: false, message: "Token expired or not found" });
+  }
+
+  tempTokenStore.delete(token); // ✅ ใช้ครั้งเดียว
+
+  res.cookie("accessToken", tokens.accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    maxAge: 15 * 60 * 1000,
+  });
+
+  res.cookie("refreshToken", tokens.refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  return res.status(200).json({ success: true });
+};
+
+// ============================================================================
+// REFRESH TOKEN (ถ้าจำเป็น แต่ถ้าใช้ session แทน JWT อาจไม่จำเป็น)
+// ============================================================================
 export const refreshToken = (req: Request, res: Response) => {
   try {
     const token = req.cookies.refreshToken;

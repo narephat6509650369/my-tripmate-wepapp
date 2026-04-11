@@ -1,7 +1,7 @@
 import express from "express";
 import passport from "passport";
 import { requireAuth } from "../middleware/validate.js";
-import { logout, getMe, googleCallback, refreshToken } from "../controllers/authController.js";
+import { logout, getMe, googleCallback, refreshToken, exchangeToken } from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -35,6 +35,11 @@ router.get("/me", requireAuth, getMe);
 // REFRESH TOKEN (ถ้าจำเป็น แต่ถ้าใช้ session แทน JWT อาจไม่จำเป็น)
 // ============================================================================
 router.post("/refresh", refreshToken);
+
+//===========================================================================
+// EXCHANGE TEMP TOKEN → SET COOKIE (Frontend เรียก endpoint นี้)
+// ============================================================================
+router.get("/exchange-token", exchangeToken);
 
 // ============================================================================
 // LOGOUT
