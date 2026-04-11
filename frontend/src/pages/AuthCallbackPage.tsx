@@ -22,12 +22,13 @@ function AuthCallbackPage() {
     })
       .then(res => res.json())
       .then(data => {
-        if (data.success) {
-          navigate(redirect);
-        } else {
-          navigate('/login?error=exchange_failed');
-        }
-      })
+  if (data.success) {
+    // ✅ navigate ด้วย replace เพื่อไม่ให้กด back กลับมา callback
+    navigate(redirect, { replace: true });
+  } else {
+    navigate('/login?error=exchange_failed', { replace: true });
+  }
+})
       .catch(() => navigate('/login?error=network'));
   }, []);
 

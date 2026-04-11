@@ -71,6 +71,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     let cancelled = false;
 
     const initializeAuth = async () => {
+      if (window.location.pathname === '/auth/callback') {
+        setAuthState({ user: null, isAuthenticated: false, isLoading: false });
+        return;
+      }
       try {
         const user = await fetchCurrentUser();
         if (!cancelled) {
