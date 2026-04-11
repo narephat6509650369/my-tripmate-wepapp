@@ -18,7 +18,7 @@ async function bootstrap() {
 
     // CORS (สำคัญมาก)
     app.use(cors({
-      origin: process.env.FRONTEND_URL,
+      origin: process.env.FRONTEND_URL||true,
       credentials: true,
     }));
 
@@ -33,7 +33,7 @@ async function bootstrap() {
         cookie: {
           httpOnly: true,
           secure: true,
-          sameSite: "none", // 👈 เดี๋ยวอธิบาย
+          sameSite: "lax", 
         },
       })
     );
