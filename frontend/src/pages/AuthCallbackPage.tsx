@@ -8,28 +8,43 @@ function AuthCallbackPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = params.get('token');
-    const redirect = params.get('redirect') || '/homepage';
+  const token = params.get('token');
+  const redirect = params.get('redirect') || '/homepage';
 
-    if (!token) {
-      navigate('/login?error=no_token');
-      return;
-    }
+  console.log('🟡 AuthCallbackPage loaded');
+  console.log('🔑 token:', token ? 'EXISTS' : 'NULL');
+  console.log('📍 redirect:', redirect);
 
-    // เรียก backend โดยตรง (same-site) → Safari ยอมรับ cookie
-    fetch(`${CONFIG.API_BASE_URL}/api/auth/exchange-token?token=${token}`, {
-      credentials: 'include',
+  if (!token) {
+    console.error('❌ No token in URL');
+    navigate('/login?error=no_token');
+    return;
+  }
+
+  console.log('📡 Calling exchange-token...');
+
+  fetch(`${CONFIG.API_BASE_URL}/api/auth/exchange-token?token=${token}`, {
+    credentials: 'include',
+  })
+    .then(res => {
+      console.log('📡 exchange-token status:', res.status);
+      return res.json();
     })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-            window.location.href = redirect; 
-        } else {
-            navigate('/login?error=exchange_failed', { replace: true });
-        }
-      })
-      .catch(() => navigate('/login?error=network'));
-  }, []);
+    .then(data => {
+      console.log('📡 exchange-token data:', data);
+      if (data.success) {
+        console.log('✅ Success! redirecting to:', redirect);
+        window.location.href = redirect;
+      } else {
+        console.error('❌ exchange failed:', data.message);
+        navigate('/login?error=exchange_failed', { replace: true });
+      }
+    })
+    .catch(err => {
+      console.error('❌ Network error:', err);
+      navigate('/login?error=network');
+    });
+}, []);
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
