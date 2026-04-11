@@ -61,23 +61,11 @@ export const googleCallback = (req: Request, res: Response) => {
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
     }
 
-    const accessToken = jwt.sign(
-      { user_id: user.user_id, email: user.email, jti: randomUUID() },
-      process.env.ACCESS_SECRET!,
-      { expiresIn: "15m" }
-    );
-
-    const refreshToken = jwt.sign(
-      { sub: user.user_id, jti: randomUUID() },
-      process.env.REFRESH_SECRET!,
-      { expiresIn: "7d" }
-    );
-
-    // ✅ เปลี่ยนเป็น sign JWT แทน Map
+    // เก็บแค่ user_id — JWT สั้นมาก
     const tempToken = jwt.sign(
-      { accessToken, refreshToken },
+      { user_id: user.user_id, email: user.email },
       process.env.ACCESS_SECRET!,
-      { expiresIn: "2m" } // หมดอายุใน 2 นาที
+      { expiresIn: "2m" }
     );
 
     const redirect = req.query.state || "/homepage";
@@ -101,20 +89,32 @@ export const exchangeToken = (req: Request, res: Response) => {
   }
 
   try {
-    // verify + decode ตรงๆ ไม่ต้องใช้ Map
+    //  decode เอา user_id แล้วสร้าง token ใหม่
     const decoded = jwt.verify(token, process.env.ACCESS_SECRET!) as {
-      accessToken: string;
-      refreshToken: string;
+      user_id: string;
+      email: string;
     };
 
-    res.cookie("accessToken", decoded.accessToken, {
+    const accessToken = jwt.sign(
+      { user_id: decoded.user_id, email: decoded.email, jti: randomUUID() },
+      process.env.ACCESS_SECRET!,
+      { expiresIn: "15m" }
+    );
+
+    const refreshToken = jwt.sign(
+      { sub: decoded.user_id, jti: randomUUID() },
+      process.env.REFRESH_SECRET!,
+      { expiresIn: "7d" }
+    );
+
+    res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: true,
       sameSite: "none",
       maxAge: 15 * 60 * 1000,
     });
 
-    res.cookie("refreshToken", decoded.refreshToken, {
+    res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: "none",
@@ -124,7 +124,6 @@ export const exchangeToken = (req: Request, res: Response) => {
     return res.status(200).json({ success: true });
 
   } catch (err) {
-    // JWT หมดอายุหรือ invalid
     return res.status(401).json({ success: false, message: "Token expired or invalid" });
   }
 };
