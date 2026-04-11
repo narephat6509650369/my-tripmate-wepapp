@@ -7,6 +7,7 @@ import { CONFIG } from '../config/app.config';
 function LoginPage() {
   const location = useLocation();
   const [error, setError] = useState('');
+  const [isInApp, setIsInApp] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const params = new URLSearchParams(location.search);
@@ -14,9 +15,37 @@ function LoginPage() {
 
   console.log("Redirect param:", redirectPath);
 
+  const isInAppBrowser = (): boolean => {
+  const ua = navigator.userAgent || '';
+  
+  return (
+    // Facebook / Instagram
+    /FBAN|FBAV|Instagram/i.test(ua) ||
+    // Line
+    /Line\//i.test(ua) ||
+    // Twitter / X
+    /Twitter/i.test(ua) ||
+    // WeChat
+    /MicroMessenger/i.test(ua) ||
+    // TikTok
+    /musical_ly|TikTok/i.test(ua) ||
+    // Android WebView (สำคัญมาก)
+    (/Android/i.test(ua) && /wv/i.test(ua)) ||
+    // iOS WebView — ไม่มี Safari ใน UA แต่มี AppleWebKit
+    (/iPhone|iPad/i.test(ua) && !/Safari/i.test(ua))
+  );
+};
+
   //  เปลี่ยนเป็น redirect ไป backend
   const handleGoogleLogin = () => {
   if (loading) return;
+
+  // ตรวจสอบ user agent ว่าเป็น in-app browser หรือไม่
+  if (isInAppBrowser()) {
+    setIsInApp(true);
+    setError('');
+    return;
+  }
 
   setLoading(true);
   setError('');
@@ -93,6 +122,42 @@ function LoginPage() {
                 style={{ marginRight: '8px' }}
               />
               {error}
+            </div>
+          )}
+
+          {/* ✅ In-App Browser Warning — แยกจาก error */}
+          {isInApp && (
+            <div style={{
+              backgroundColor: '#fff8e1',
+              border: '1px solid #ffe082',
+              borderRadius: '8px',
+              padding: '16px',
+              marginBottom: '16px',
+              color: '#5d4037'
+            }}>
+              <p>⚠️ ไม่รองรับ Browser นี้</p>
+              <p style={{ fontSize: '13px', marginTop: '8px' }}>
+                กรุณาเปิดลิงก์นี้ใน Chrome หรือ Safari
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert('คัดลอกลิงก์แล้ว! 🎉 เปิดใน Chrome หรือ Safari ได้เลย');
+                }}
+                style={{
+                  marginTop: '10px',
+                  padding: '8px 16px',
+                  backgroundColor: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  width: '100%'
+                }}
+              >
+                📋 คัดลอกลิงก์
+              </button>
             </div>
           )}
 
