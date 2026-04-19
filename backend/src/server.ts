@@ -46,12 +46,12 @@ async function bootstrap() {
     app.use("/api/noti", notiRoutes);
 
 
-    const PORT = process.env.PORT || 5000;
+    const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
-    server.listen(PORT, () => {
+    server.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on port ${PORT}`);
     });
-
+    
   } catch (err) {
     console.error("🔥 Backend bootstrap failed:", err);
     process.exit(1);
