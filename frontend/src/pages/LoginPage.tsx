@@ -26,7 +26,7 @@ function LoginPage() {
     try {
       console.log('🔐 Attempting Google login...');
       console.log("Redirect param:", redirectPath);
-
+      console.log(tokenResponse.access_token);
       // ✅ เรียก login จาก AuthContext
       await login(tokenResponse.access_token, redirectPath);
 
