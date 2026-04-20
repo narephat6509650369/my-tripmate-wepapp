@@ -17,15 +17,21 @@ async function bootstrap() {
 
     app.set('trust proxy', 1);
 
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || "https://my-tripmate.netlify.app",
+      "http://localhost:5173"
+    ];
+
     app.use(cors({
       origin: (origin, callback) => {
-        const allowedOrigin = process.env.FRONTEND_URL;
+      console.log("🌍 Origin:", origin);
 
-        if (!origin || origin === allowedOrigin) {
-          callback(null, true);
-        } else {
-          callback(new Error("Not allowed by CORS"));
-        }
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.error("❌ Blocked by CORS:", origin);
+        callback(null, false); // 🔥 เปลี่ยนตรงนี้
+      }
       },
       credentials: true
     }));
