@@ -95,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
        try {
          const res = await apiFetch(`/auth/me`, {
            method: "GET",
+           credentials: "include",
          });
 
          if (!res.ok) {
@@ -135,6 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       headers: {
         "Content-Type": "application/json"
       },
+      credentials: "include",
       body: JSON.stringify({
         access_token: accessToken
       })
@@ -165,7 +167,8 @@ const logout = async (): Promise<void> => {
   try {
 
     await apiFetch(`/auth/logout`, {
-      method: "POST"
+      method: "POST",
+      credentials: "include",
     });
 
   } catch (error) {
