@@ -130,7 +130,8 @@ export const tripAPI = {
       const response = await apiFetch(
         `/trips/all-my-trips`,
         {
-          method: "GET"
+          method: "GET",
+          credentials: "include"
         }
       );
 
@@ -152,7 +153,9 @@ export const tripAPI = {
 
     try {
 
-      const response = await apiFetch(`/trips/${tripId}`);
+      const response = await apiFetch(`/trips/${tripId}`,{
+        credentials: "include"
+      });
 
       return await response.json();
 
@@ -176,6 +179,7 @@ export const tripAPI = {
         `/trips/${tripId}/summary?template=${template}`,
         {
           method: "GET",
+          credentials: "include"
         }
       );
 
@@ -193,6 +197,7 @@ export const tripAPI = {
     try {
       const response = await apiFetch(`/trips/${tripId}/summary`, {
         method: 'PATCH',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ aiSummary: data.aiSummary })
       });
@@ -215,6 +220,7 @@ export const tripAPI = {
 
       const response = await apiFetch(`/trips/add-trip`, {
         method: 'POST',
+        credentials: "include",
         headers: {
           'Content-Type': 'application/json'
         },
@@ -239,6 +245,7 @@ export const tripAPI = {
   try {
     const response = await apiFetch(`/trips/request-join`, {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json'
       },
@@ -275,6 +282,7 @@ export const tripAPI = {
     try {
       const response = await apiFetch(`/trips/${tripId}`, { // ← tripId ใน URL
         method: 'DELETE',
+        credentials: "include",
         headers: {
           'Content-Type': 'application/json'
         }
@@ -302,6 +310,7 @@ export const tripAPI = {
         `/trips/${tripId}/members/${memberId}`,
         {
           method: 'DELETE',
+          credentials: "include"
         }
       );
 
@@ -315,6 +324,7 @@ export const tripAPI = {
     try {
       const response = await apiFetch(`/trips/${tripId}/edit-describe`, {
         method: 'POST',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description })
       });
@@ -328,6 +338,7 @@ export const tripAPI = {
     try {
       const response = await apiFetch(`/trips/${tripId}/addLink`, {
         method: 'POST',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ link })
       });
@@ -345,6 +356,7 @@ export const tripAPI = {
     try {
       const response = await apiFetch(`/trips/request-join`, {
         method: 'POST',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invite_code: inviteCode })
       });
@@ -376,7 +388,9 @@ export const tripAPI = {
    */
   getPendingRequests: async (tripId: string): Promise<ApiResponse> => {
     try {
-      const response = await apiFetch(`/trips/${tripId}/pending-requests`);
+      const response = await apiFetch(`/trips/${tripId}/pending-requests`, {
+        credentials: "include"
+      });
       return await response.json();
     } catch (error) {
       return handleApiError(error);
@@ -391,7 +405,8 @@ export const tripAPI = {
       const response = await apiFetch(
         `/trips/${tripId}/approve/${userId}`,
         { 
-          method: 'PATCH' 
+          method: 'PATCH',
+          credentials: "include"
         }
       );
       return await response.json();
@@ -408,7 +423,8 @@ export const tripAPI = {
       const response = await apiFetch(
         `/trips/${tripId}/reject/${userId}`,
         { 
-          method: 'PATCH'
+          method: 'PATCH',
+          credentials: "include"
         }
       );
       return await response.json();
@@ -419,7 +435,9 @@ export const tripAPI = {
 
   getMembers: async (tripId: string): Promise<ApiResponse> => {
     try {
-      const response = await apiFetch(`/trips/${tripId}/get-members`);
+      const response = await apiFetch(`/trips/${tripId}/get-members`,{
+        credentials: "include"
+      });
       if (!response.ok) {
         return {
           success: false,
@@ -463,6 +481,7 @@ export const voteAPI = {
       `/votes/${tripId}/date-matching-result`,
       {
         method: "GET", 
+        credentials: "include",
         headers: {
           "Content-Type": "application/json"
         }
@@ -494,6 +513,7 @@ export const voteAPI = {
       `/votes/availability`,
       {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json"
         },
@@ -522,6 +542,7 @@ export const voteAPI = {
 
       const response = await apiFetch(`/votes/start-voting`, {
         method: 'POST',
+        credentials: "include",
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trip_id: tripId })
       });
@@ -547,7 +568,10 @@ export const voteAPI = {
   }
 
   try {
-    const response = await apiFetch(`/votes/${tripId}/get-budget`);
+    const response = await apiFetch(`/votes/${tripId}/get-budget`,{
+      method: "GET",
+      credentials: "include"
+    });
 
     return await response.json();
 
@@ -573,6 +597,7 @@ export const voteAPI = {
       `/votes/${tripId}/budget`,
       {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json"
         },
@@ -618,6 +643,7 @@ export const voteAPI = {
       `/votes/${tripId}/get-vote-place`,
       {
         method: "GET",
+        credentials: "include"
       }
     );
 
@@ -654,6 +680,7 @@ export const voteAPI = {
       `/votes/${tripid}/vote-place`,
       {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json"
         },
@@ -683,6 +710,7 @@ export const voteAPI = {
 
       const response = await apiFetch(`/trips/${tripId}/manual-close`, {
         method: 'PATCH',
+        credentials: "include",
         headers: {
           'Content-Type': 'application/json'
         } 
@@ -709,6 +737,7 @@ export const notiApi = {
     try {
       const response = await apiFetch(`/noti/get-noti`, {
         method: 'GET',
+        credentials: "include"
       });
       return await response.json();
     } catch (error) {
@@ -720,6 +749,7 @@ export const notiApi = {
     try {
       const response = await apiFetch(`/noti/${notificationId}/read`, {
         method: 'PATCH',
+        credentials: "include"
       });
       return await response.json();
     } catch (error) {
@@ -731,6 +761,7 @@ export const notiApi = {
     try {
       const response = await apiFetch(`/noti/read-all`, {
         method: 'PATCH',
+        credentials: "include"
       });
       return await response.json();
     } catch (error) {
@@ -742,6 +773,7 @@ export const notiApi = {
     try {
       const response = await apiFetch(`/noti/notifications/${notificationId}`, {
         method: 'DELETE',
+        credentials: "include"
       });
       return await response.json();
     } catch (error) {
