@@ -296,8 +296,7 @@ const HomePage: React.FC = () => {
                           <User className="w-4 h-4" />
                           <span>{trip.people} คน</span>
                         </div>
-                        {!trip.isCompleted && (
-                          <button
+                        <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setTripToDelete(trip);
@@ -307,7 +306,6 @@ const HomePage: React.FC = () => {
                           >
                             <Trash2 className="w-4 h-4" />
                         </button>
-                        )}
                       </div>
                     ))
                   )}
@@ -414,7 +412,7 @@ const HomePage: React.FC = () => {
       )}
 
       {/* Delete Confirm Modal */}
-      {tripToDelete && !tripToDelete.isCompleted && (
+      {tripToDelete && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4"
           onClick={() => setTripToDelete(null)}
