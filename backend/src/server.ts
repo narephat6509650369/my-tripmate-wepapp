@@ -15,11 +15,26 @@ async function bootstrap() {
     const { initSocket } = await import("./socket/socket.js");
     initSocket(server);
 
+    app.set('trust proxy', 1);
+
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || "https://my-tripmate.netlify.app",
+      "http://localhost:5173"
+    ];
+
     app.use(cors({
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      origin: (origin, callback) => {
+      console.log("🌍 Origin:", origin);
+
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.error("❌ Blocked by CORS:", origin);
+        callback(null, false);
+      }
+      },
       credentials: true
     }));
-
 
     app.use(cookieParser());
     app.use(express.json());
@@ -29,21 +44,20 @@ async function bootstrap() {
     const tripRoutes = (await import("./routes/trip.js")).default;
     const voteRoutes = (await import("./routes/vote.js")).default;
     const notiRoutes = (await import("./routes/noti.js")).default;
-    const { setupSwagger } = await import("./config/swagger.js");
+
 
     app.use("/api/auth", authRoutes);
     app.use("/api/trips", tripRoutes);
     app.use("/api/votes", voteRoutes);
     app.use("/api/noti", notiRoutes);
 
-    setupSwagger(app);
 
-    const PORT = process.env.PORT || 5000;
+    const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
-    server.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on port ${PORT}`);
     });
-
+    
   } catch (err) {
     console.error("🔥 Backend bootstrap failed:", err);
     process.exit(1);

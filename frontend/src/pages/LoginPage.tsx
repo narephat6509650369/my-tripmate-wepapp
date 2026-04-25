@@ -4,6 +4,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import bgImage from '../assets/login-bg.jpg';
 import { redirect, useLocation } from 'react-router-dom';
+import googleLogo from '../assets/google-logo-icon-gsuite-hd-701751694791470gzbayltphh.png';
 
 function LoginPage() {
   const { login } = useAuth();
@@ -115,6 +116,12 @@ function LoginPage() {
               }}
             >
               <i className="fab fa-google" style={{ marginRight: '8px' }} />
+              <img
+                src={googleLogo}
+                alt="google"
+                style={{ width: '20px', marginRight: '10px' }}
+              />
+
               {loading ? 'Signing in...' : 'Sign in with Google'}
             </button>
           </div>

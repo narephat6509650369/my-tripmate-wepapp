@@ -128,7 +128,8 @@ code {
 }
 
 .bg-google {
-  background: linear-gradient(135deg, #ea4335 0%, #d62516 100%);
+  background: #f1f3f4;
+  color: #5f6368;
 }
 
 .error-message {
