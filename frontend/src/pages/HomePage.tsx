@@ -193,7 +193,7 @@ const HomePage: React.FC = () => {
       console.error('Error creating trip:', error);
       const errorMessage =
         error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างทริป";
-      alert(`เกิดข้อผิดพลาด: ${errorMessage}`);
+      setDialogMessage('ไม่สามารถสร้างทริปได้ กรุณาลองใหม่อีกครั้ง');
     }
   };
   

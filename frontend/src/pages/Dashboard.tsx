@@ -96,7 +96,7 @@ const Dashboard: React.FC = () => {
 
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred while loading dashboard stats');
+      setError('ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setLoading(false);
     }

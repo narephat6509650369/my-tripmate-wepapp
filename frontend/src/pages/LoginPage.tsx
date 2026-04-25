@@ -34,7 +34,7 @@ function LoginPage() {
 
     } catch (err: any) {
       console.error('❌ Login failed:', err);
-      setError(`เข้าสู่ระบบไม่สำเร็จ: ${err.message}`);
+      setError('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setLoading(false);
     }

@@ -221,7 +221,7 @@ const VotePage: React.FC = () => {
       if (res.success) {
         setPendingRequests(prev => prev.filter(r => r.user_id !== userId));
       } else {
-        alert(res.message || 'อนุมัติไม่สำเร็จ');
+        alert('อนุมัติไม่สำเร็จไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
       }
     } catch (e) {
       console.error('Approve failed:', e);
@@ -237,7 +237,7 @@ const VotePage: React.FC = () => {
       if (res.success) {
         setPendingRequests(prev => prev.filter(r => r.user_id !== userId));
       } else {
-        alert(res.message || 'ปฏิเสธไม่สำเร็จ');
+        alert('ปฏิเสธไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
       }
     } catch (e) {
       console.error('Reject failed:', e);
@@ -286,7 +286,7 @@ const VotePage: React.FC = () => {
       if (res.success) {
         setMembers(prev => prev.filter(m => m.member_id !== memberId));
       } else {
-        alert(res.message || 'ลบสมาชิกไม่สำเร็จ');
+        alert('ลบสมาชิกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
       }
     } catch (e) {
       alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
@@ -327,6 +327,7 @@ const VotePage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error saving dates:', error);
+      alert('ไม่สามารถบันทึกวันที่ได้ กรุณาลองใหม่อีกครั้ง');
     }
   };
 
@@ -354,6 +355,7 @@ const VotePage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error saving budget:', error);
+      alert('ไม่สามารถบันทึกงบประมาณได้ กรุณาลองใหม่อีกครั้ง');
     }
   };
 
@@ -379,6 +381,7 @@ const VotePage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error voting location:', error);
+      alert('ไม่สามารถบันทึกการโหวตได้ กรุณาลองใหม่อีกครั้ง');
     }
   };
 

@@ -26,7 +26,17 @@ export const useTripData = (tripCode: string) => {
         
       } catch (error: any) {
         console.error("Error:", error);
-        setError(error.message || "ไม่สามารถโหลดข้อมูลทริปได้");
+        
+        const status = error?.response?.status;
+        if (status === 401) {
+          navigate('/login');
+          return;
+        }
+        if (status === 404) {
+          setError("ไม่พบทริปนี้ในระบบ");
+        } else {
+          setError("ไม่สามารถโหลดข้อมูลทริปได้ กรุณาลองใหม่อีกครั้ง");
+        }
       } finally {
         setLoading(false);
       }

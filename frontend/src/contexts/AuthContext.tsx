@@ -131,7 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await response.json();
 
   if (!result.success || !result.data) {
-    throw new Error(result.message || "Login failed");
+    throw new Error("เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
   }
 
   setAuthState({
