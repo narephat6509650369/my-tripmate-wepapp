@@ -6,6 +6,7 @@ import { Plus, Check, Loader2 } from "lucide-react";
 import { useAuth } from '../contexts/AuthContext';
 import { tripAPI } from '../services/tripService';
 import { formatInviteCode, validateInviteCode } from '../utils';
+import { useToast } from './VotePage/hooks/useToast';
 import {
   PieChart,
   Pie,
@@ -34,10 +35,12 @@ interface DashboardStats {
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const { toasts, showToast, removeToast } = useToast();
   
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [voteStatusLoading, setVoteStatusLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState("");
   const [joiningTrip, setJoiningTrip] = useState(false);
@@ -57,47 +60,53 @@ const Dashboard: React.FC = () => {
 
       const { owned, joined } = response.data;
 
-      // คำนวณสถิติทริปที่สร้าง
-      const myOngoing = owned.filter(t => 
-        t.status === 'planning' || t.status === 'voting'
-      ).length;
-      const myCompleted = owned.filter(t => 
-        t.status === 'completed' || t.status === 'archived'|| t.status === 'confirmed'
-      ).length;
+      const myOngoing = owned.filter(t => ['planning','voting'].includes(t.status)).length;
+      const myCompleted = owned.filter(t => ['completed','archived','confirmed'].includes(t.status)).length;
+      const joinedOngoing = joined.filter(t => ['planning','voting'].includes(t.status)).length;
+      const joinedCompleted = joined.filter(t => ['completed','archived','confirmed'].includes(t.status)).length;
 
-      // คำนวณสถิติทริปที่เข้าร่วม
-      const joinedOngoing = joined.filter(t => 
-        t.status === 'planning' || t.status === 'voting'
-      ).length;
-      const joinedCompleted = joined.filter(t => 
-        t.status === 'completed' || t.status === 'archived' || t.status === 'confirmed'
-      ).length;
-
-      // TODO: ดึงข้อมูล "สถานะของคุณ" จาก API (ตอนนี้ใช้ mock)
-      const myStatusCompleted = Math.floor(joinedOngoing * 0.6);
-      const myStatusPending = joinedOngoing - myStatusCompleted;
-
+      // โหลด stats พื้นฐานก่อน → UI แสดงโดย ไม่ต้องรอ vote status
       setStats({
-        myTrips: {
-          total: owned.length,
-          ongoing: myOngoing,
-          completed: myCompleted
-        },
+        myTrips: { total: owned.length, ongoing: myOngoing, completed: myCompleted },
         joinedTrips: {
-          total: joined.length,
-          ongoing: joinedOngoing,
-          completed: joinedCompleted,
-          myStatus: {
-            completed: myStatusCompleted,
-            pending: myStatusPending
-          }
+          total: joined.length, ongoing: joinedOngoing, completed: joinedCompleted,
+          myStatus: { completed: 0, pending: 0 } // ← placeholder ก่อน
         }
       });
+      setLoading(false);
+
+      // โหลด vote status ใน background (N calls แต่ไม่ block UI)
+      const ongoingJoined = joined.filter(t => ['planning','voting'].includes(t.status));
+      if (ongoingJoined.length > 0 && user?.user_id) {
+        setVoteStatusLoading(true);
+        try {
+          const detailResults = await Promise.allSettled(
+            ongoingJoined.map(t => tripAPI.getTripDetail(t.trip_id))
+          );
+
+          let voted = 0, notVoted = 0;
+          detailResults.forEach(result => {
+            if (result.status === 'fulfilled' && result.value.success && result.value.data) {
+              const hasVoted = result.value.data.memberAvailabilitys?.some(
+                (a: any) => a.user_id === user.user_id
+              ) ?? false;
+              hasVoted ? voted++ : notVoted++;
+            }
+          });
+
+          // อัปเดต myStatus โดยไม่ reset ส่วนอื่น
+          setStats(prev => prev ? {
+            ...prev,
+            joinedTrips: { ...prev.joinedTrips, myStatus: { completed: voted, pending: notVoted } }
+          } : prev);
+        } finally {
+          setVoteStatusLoading(false);
+        }
+      }
 
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred while loading dashboard stats');
-    } finally {
+      setError(error instanceof Error ? error.message : 'เกิดข้อผิดพลาด');
       setLoading(false);
     }
   };
@@ -106,12 +115,12 @@ const Dashboard: React.FC = () => {
     const cleanCode = code.trim().toUpperCase();
     
     if (!cleanCode) {
-      alert("กรุณากรอกรหัสห้อง");
+      showToast("กรุณากรอกรหัสห้อง", "error"); // ← toast แทน alert
       return;
     }
 
     if (!validateInviteCode(cleanCode)) {
-      alert("รูปแบบรหัสห้องไม่ถูกต้อง\nกรุณากรอกในรูปแบบ XXXX-XXXX-XXXX-XXXX");
+      showToast("รูปแบบรหัสห้องไม่ถูกต้อง (XXXX-XXXX-XXXX-XXXX)", "error");
       return;
     }
     
@@ -119,24 +128,22 @@ const Dashboard: React.FC = () => {
       setJoiningTrip(true);
       const response = await tripAPI.joinTrip(cleanCode);
       
-      if (response.success && response.data) {
-        alert('เข้าร่วมทริปสำเร็จ!');
-        navigate(`/votepage/${response.data.trip_id}`);
+      if (response.success) {
+        showToast("ส่งคำขอเข้าร่วมสำเร็จ! รอ Owner อนุมัติ", "success"); // ← เปลี่ยนข้อความ ตรงกับ backend
         setRoomCode("");
+        // ❌ ไม่ navigate ทันที เพราะต้องรอ owner approve ก่อน
       } else {
-        alert(response.message || 'ไม่สามารถเข้าร่วมทริปได้');
+        // แสดง error message จาก backend ตรงๆ
+        showToast(response.message || 'ไม่สามารถเข้าร่วมทริปได้', "error");
       }
     } catch (error) {
-      console.error('Error joining trip:', error);
-      alert('เกิดข้อผิดพลาดในการเข้าร่วมทริป');
+      showToast('เกิดข้อผิดพลาดในการเข้าร่วมทริป', "error");
     } finally {
       setJoiningTrip(false);
     }
   };
 
-  const handleLogout = () => {
-    logout();
-  };
+  const handleLogout = () => logout();
 
   if (loading) {
     return (
@@ -187,6 +194,20 @@ const Dashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       <Header onLogout={handleLogout} />
+
+      {/* Toast Container */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium transition-all
+              ${toast.type === 'success' ? 'bg-green-500' : 
+                toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'}`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
@@ -381,45 +402,78 @@ const Dashboard: React.FC = () => {
                       <p>ยังไม่มีข้อมูลเพียงพอ</p>
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={joinedTripsChartData.filter(d => d.value > 0)}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label={({ name, value, percent }) => 
-                            `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
-                          }
-                        >
-                          {joinedTripsChartData
-                            .filter(d => d.value > 0)
-                            .map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
+                    <>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={joinedTripsChartData.filter(d => d.value > 0)}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={({ name, value, percent }) =>
+                              `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
+                            }
+                          >
+                            {joinedTripsChartData
+                              .filter(d => d.value > 0)
+                              .map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
 
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-green-500 rounded"></div>
-                      <span className="text-sm text-blue-900">
-                        กำลังดำเนินการ ({stats.joinedTrips.ongoing} ทริป)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-gray-500 rounded"></div>
-                      <span className="text-sm text-blue-900">
-                        เสร็จสิ้น ({stats.joinedTrips.completed} ทริป)
-                      </span>
-                    </div>
-                  </div>
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-green-500 rounded"></div>
+                          <span className="text-sm text-blue-900">
+                            กำลังดำเนินการ ({stats.joinedTrips.ongoing} ทริป)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-gray-500 rounded"></div>
+                          <span className="text-sm text-blue-900">
+                            เสร็จสิ้น ({stats.joinedTrips.completed} ทริป)
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
+
+                {/* สถานะการโหวต */}
+                {stats.joinedTrips.ongoing > 0 && (
+                  <div className="bg-blue-100 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-blue-900 mb-3">
+                      ✅ สถานะการโหวตของคุณ
+                    </h3>
+                    {voteStatusLoading ? (
+                      <div className="text-center py-4 text-gray-400 text-sm">
+                        กำลังตรวจสอบสถานะโหวต...
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white rounded-lg p-3 text-center">
+                          <p className="text-xs text-gray-600 mb-1">โหวตแล้ว</p>
+                          <p className="text-2xl font-bold text-green-600">
+                            {stats.joinedTrips.myStatus.completed}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">ทริป</p>
+                        </div>
+                        <div className="bg-white rounded-lg p-3 text-center">
+                          <p className="text-xs text-gray-600 mb-1">ยังไม่โหวต</p>
+                          <p className="text-2xl font-bold text-orange-500">
+                            {stats.joinedTrips.myStatus.pending}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">ทริป</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
