@@ -39,14 +39,10 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   const [myVote, setMyVote] = useState<[string, string, string]>(["", "", ""]);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [votingResults, setVotingResults] = useState<LocationVoteResult[]>([]);
-  const [isLoading, setIsLoading] = useState(initialVotingResults.length === 0);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [hasSaved, setHasSaved] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [votedCount, setVotedCount] = useState(0);
-  const [totalMembers, setTotalMembers] = useState(0);
-  const [locationAnalysis, setLocationAnalysis] = useState<any>(null);
 
   // ============== EFFECTS ==============
 
@@ -59,68 +55,12 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
         if (idx < 3) newVote[idx] = vote.place;
       });
       setMyVote(newVote);
-    }
-    if (initialVotes && initialVotes.length > 0) {
       setHasSaved(true);
       setIsAnalysisOpen(true);
       if (initialAnalysis) setAnalysisResult(initialAnalysis);
       if (initialVotedCount) setVotedCount(initialVotedCount);
     }
   }, [initialVotes]);
-
-  // Load voting results
-  useEffect(() => {
-    if (initialVotingResults.length > 0) return;
-    const loadVotingResults = async () => {
-      if (!trip?.tripid) return;
-
-      try {
-        setIsLoading(true);
-        setError('');
-        const response = await voteAPI.getLocationVote(trip.tripid);
-        const votingData = response?.data as LocationVoteResponse | undefined; 
-
-        if (!votingData?.locationVotesTotal || !Array.isArray(votingData.locationVotesTotal)) {
-          setVotingResults([]);
-          setAnalysisResult(null);
-          return;
-        }
-
-        const validResults = votingData.locationVotesTotal.filter((r: any) => {
-          if (!r.place || typeof r.total_score !== 'number' || typeof r.voteCount !== 'number') return false;
-          if (r.total_score < 0 || r.voteCount < 0) return false;
-          return true;
-        });
-
-        setVotingResults(validResults);
-        setVotedCount(votingData?.actualVote || 0);
-        setTotalMembers(votingData?.totalMembers || 0);
-
-        if (votingData.analysis) {
-          setAnalysisResult(votingData.analysis);
-        } else {
-          setAnalysisResult(null);
-        }
-
-        // ✅ เช็คจาก rows ของ user (votes ที่ user นี้โหวต)
-        const userVotes = votingData.rows as any[];
-        if (userVotes && userVotes.length > 0) {
-          setHasSaved(true);
-          setIsAnalysisOpen(true);
-        }
-
-      } catch (err) {
-        console.error("Failed to load voting results:", err);
-        setVotingResults([]);
-        setAnalysisResult(null);
-        setError('ไม่สามารถโหลดผลการโหวตได้');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadVotingResults();
-  }, [trip?.tripid]);
 
   // ============== HANDLERS ==============
   const handleSelect = useCallback((index: number, value: string) => {
@@ -153,70 +93,16 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     setError("");
 
     try {
-      const startTime = Date.now();
-      
       await onVote(payload);
-      
-      const elapsed = Date.now() - startTime;
-      
-      // Wait for backend to process if response was too fast
-      if (elapsed < 100) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-      } else if (elapsed < 300) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
       setHasSaved(true);
       setIsAnalysisOpen(true);
-
-      // Retry to get updated results
-      let retries = 0;
-      const maxRetries = 3;
-      let hasMyVote = false;
-      
-      while (retries < maxRetries && !hasMyVote) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        const response = await voteAPI.getLocationVote(trip.tripid);
-        const votingData = response?.data as LocationVoteResponse | undefined; 
-        const newResults = votingData?.locationVotesTotal || [];
-
-        hasMyVote = newResults.some((r: any) => 
-          myVote.some(place => r.place === place)
-        );
-
-        if (hasMyVote && newResults.length > 0) {
-          setVotingResults(newResults);
-          setVotedCount(votingData?.actualVote || 0);
-          setTotalMembers(votingData?.totalMembers || 0);
-          
-          if (votingData?.analysis) {
-            setAnalysisResult(votingData.analysis);
-          } else {
-            console.warn('⚠️ Backend did not return analysis after vote');
-            setAnalysisResult(null);
-          }
-          break;
-        }
-        
-        retries++;
-      }
+      // ไม่ต้อง retry — socket "vote_updated" → reloadTripData() → props update เอง
     } catch (e) {
-      console.error("Failed to submit vote:", e);
       setError('ไม่สามารถส่งคะแนนโหวตได้ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // ============== LOADING STATE ==============
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <Loader2 className="w-14 h-14 text-purple-600 animate-spin mb-4" />
-        <p className="text-gray-600 font-medium">กำลังโหลดข้อมูลการโหวต...</p>
-      </div>
-    );
-  }
 
   // ============== MAIN RENDER ==============
   return (

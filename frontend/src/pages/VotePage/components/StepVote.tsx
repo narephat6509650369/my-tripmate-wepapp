@@ -20,6 +20,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const [matchingInfo, setMatchingInfo] = useState<MatchingData | null>(null);
 
@@ -99,7 +100,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
 
   const handleSave = async () => {
     if (selectedDates.length === 0) {
-      alert("กรุณาเลือกอย่างน้อย 1 วัน");
+      setError("กรุณาเลือกอย่างน้อย 1 วัน");
       return;
     }
 
@@ -116,8 +117,8 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
       setHasSaved(true);
       setIsAnalysisOpen(true);
     } catch (err: any) {
-      console.error(err); 
-      alert(err?.response?.data?.message || "บันทึกไม่สำเร็จ");
+      console.error(err);
+      setError(err?.response?.data?.message || "บันทึกไม่สำเร็จ");
     } finally {
       setLoading(false);
     }
@@ -127,7 +128,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
   const renderAnalysisModal = () => {
     if (!showAnalysisModal || !matchingInfo) return null;
 
-    // ✅ ใช้ recommendation จาก Backend
+    // ใช้ recommendation จาก Backend
     const { recommendation, availability, summary } = matchingInfo;
 
     return (
@@ -324,6 +325,21 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
   return (
     <>
         <div className="space-y-6">        
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div className="flex-1">
+              <p className="font-semibold text-red-800 mb-1">เกิดข้อผิดพลาด</p>
+              <p className="text-sm text-red-700">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+              >
+                ปิดข้อความนี้
+              </button>
+            </div>
+          </div>
+        )}
         {/* คำอธิบาย */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
           <button
@@ -341,8 +357,8 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
               <ul className="text-sm text-blue-800 space-y-1 mt-3">
                 <li>• คลิกเลือกวันที่คุณว่าง (เลือกได้หลายวัน)</li>
                 <li>• ระบบจะวิเคราะห์ช่วงวันที่เหมาะสม<strong>หลังจากบันทึก</strong></li>
-                <li>• หากต้องการยกเลิกคลิกวันที่เลือกแล้วอีกครั้งเพื่อยกเลิก</li>
-                <li>• ถ้าเลือกไม่ครบ {tripDuration} วันติดกัน ระบบจะเตือนเมื่อบันทึก</li>
+                <li>• หากต้องการยกเลิก คลิกวันที่เลือกแล้วอีกครั้งเพื่อยกเลิก</li>
+                <li>• ยิ่งเลือกหลายวัน ระบบยิ่งหาช่วงเวลาที่เหมาะสมได้แม่นยำขึ้น</li>
               </ul>
             </div>
           )}

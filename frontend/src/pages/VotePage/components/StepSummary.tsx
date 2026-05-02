@@ -234,10 +234,10 @@ useEffect(() => {
 
   };
 
-  const handleAddInfo = () =>{
+  const handleAddInfo = () => {
     fetchVoteData();
-    fetchAiSummary();
-  }
+    if (canViewSummary) fetchAiSummary();
+  };
 
   socket.on("vote_updated", handleVoteUpdate);
   socket.on("add_Info", handleAddInfo );
@@ -313,25 +313,16 @@ useEffect(() => {
     try {
       setIsSavingDesc(true);
       await tripAPI.editDescription(trip.tripid, editedDesc);
-      setEditedDesc(editedDesc);
       setIsEditingDesc(false);
-      fetchAiSummary();
+      if (canViewSummary) fetchAiSummary();
       showToast('บันทึกเรียบร้อย', 'success');
-
-      // re-fetch prompt ถ้า unlock แล้ว
-      if (canViewSummary) {
-        const summaryRes = await tripAPI.getTripSummary(trip.tripid, selectedTemplate);
-        if (summaryRes?.data?.aiSummary) {
-          setAiSummary(summaryRes.data.aiSummary);
-          setAiMeta(summaryRes.data.aiMeta);
-        }
-      }
     } catch (err) {
       showToast('บันทึกไม่สำเร็จ', 'error');
     } finally {
       setIsSavingDesc(false);
     }
   };
+
   const handleSaveLink = async () => {
     if (!summaryLink.trim()) return;
 

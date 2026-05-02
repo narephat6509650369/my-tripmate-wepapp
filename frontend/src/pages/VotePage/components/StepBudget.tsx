@@ -49,7 +49,7 @@ const BUDGET_CATEGORIES = [
   { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b', required: false }
 ] as const;
 
-// ✅ Validation Constants
+// Validation Constants
 const MAX_BUDGET = 10_000_000; // 10 ล้านบาท
 const MIN_BUDGET = 0;
 
@@ -73,17 +73,16 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     totalMembers: number;
   } | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-  // ✅ เปลี่ยนจาก justSaved เป็น hasSaved + isAnalysisOpen เหมือน StepVote
   const [hasSaved, setHasSaved] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const budgetRef = useRef(budget);
   useEffect(() => { budgetRef.current = budget; }, [budget]);
 
-  // ✅ useRef สำหรับจัดการ timeout
-  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // useRef สำหรับจัดการ timeout
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ✅ Cleanup timeout เมื่อ unmount
+  // Cleanup timeout เมื่อ unmount
   useEffect(() => {
     return () => {
       if (toastTimeoutRef.current) {
@@ -156,7 +155,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       setIsAnalysisOpen(true);
     }
 
-    // 3. statsMap ใช้ loadedBudget ที่มีค่าแล้ว ✅
+    // 3. statsMap ใช้ loadedBudget ที่มีค่าแล้ว
     if (budgetInfo.stats) {
       const statsMap: BudgetStatsMap = {
         accommodation: {
@@ -200,12 +199,12 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     if (isLocked) return;
     const amount = budget[category];
     const validation = validateBudget(amount);
-    if (!validation.valid) {  
-      alert(validation.error);
+    if (!validation.valid) {
+      setError(validation.error ?? 'ตัวเลขไม่ถูกต้อง');
       return;
     }
     if (amount === 0) {
-      alert('กรุณากรอกจำนวนเงินที่มากกว่า 0');
+      setError('กรุณากรอกจำนวนเงินที่มากกว่า 0');
       return;
     }
 
@@ -220,7 +219,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       console.error(`Error saving ${category}:`, error);
       const errorMsg = error instanceof Error ? error.message : 'ไม่สามารถบันทึกได้';
       setError(`ไม่สามารถบันทึก ${category} ได้: ${errorMsg}`);
-      alert(`❌ บันทึกไม่สำเร็จ: ${errorMsg}`);
     } finally {
       setIsSaving(false);
     }
@@ -229,7 +227,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
   const handleBudgetChange = useCallback((key: keyof BudgetState, value: number) => {
     const validation = validateBudget(value);
     if (!validation.valid) {
-      alert(`❌ ${validation.error}`);
+      setError(validation.error ?? 'ตัวเลขไม่ถูกต้อง');
       return;
     }
     setBudget(prev => ({ ...prev, [key]: value }));
@@ -243,7 +241,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       budget.food > 0;
 
     if (!hasRequiredBudget) {
-      alert('กรุณากรอกงบประมาณที่จำเป็น (ที่พัก, เดินทาง, อาหาร)');
+      setError('กรุณากรอกงบประมาณที่จำเป็น (ที่พัก*, เดินทาง*, อาหาร*)');
       return;
     }
 
@@ -267,7 +265,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       if (failures.length > 0) {
         const failedCategories = failures.map((f: any) => f.category).join(', ');
         setError(`บันทึกไม่สำเร็จสำหรับ: ${failedCategories}`);
-        alert(`⚠️ บันทึกสำเร็จบางส่วน (${results.length - failures.length}/${results.length} หมวด)`);
+        setError('เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่');
       } else {
         setBudgetStats(prev => prev ? {
           ...prev,
@@ -286,8 +284,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       }
     } catch (error) {
       console.error('Error saving budget:', error);
-      setError('เกิดข้อผิดพลาดในการบันทึก');
-      alert('❌ เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่');
+      setError('เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่');
+
     } finally {
       setIsSaving(false);
     }
@@ -671,7 +669,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
           )}
         </button>
 
-        {/* ✅ ผลการวิเคราะห์ inline (เหมือน StepVote) — แสดงหลังบันทึก */}
+        {/* ผลการวิเคราะห์ inline (เหมือน StepVote) — แสดงหลังบันทึก */}
         {hasSaved && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
 
