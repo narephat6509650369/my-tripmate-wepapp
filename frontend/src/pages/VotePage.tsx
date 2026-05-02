@@ -63,6 +63,7 @@ const VotePage: React.FC = () => {
   const displayCode = inviteCode || tripCode;
   const isClosed = trip?.status === 'completed' || trip?.status === 'archived' || trip?.status === 'confirmed';
 
+  const [shouldNavigateOnClose, setShouldNavigateOnClose] = useState(false);
   const isSummaryUnlocked = (tripData: TripDetail): boolean => {
     if (tripData.status === 'completed' || tripData.status === 'archived' || tripData.status === 'confirmed') return true;
     if (!tripData.createdat) return false;
@@ -243,12 +244,9 @@ useEffect(() => {
     await reloadTripData();
 
   };
-  socket.on("you_were_removed", (data) => {
-
-  console.log("Removed from trip:", data.trip_id);
-
-  setDialogMessage("คุณถูกนำออกจากทริป");
-
+  socket.on("you_were_removed", () => {
+    setDialogMessage("คุณถูกนำออกจากทริป");
+    setShouldNavigateOnClose(true);
   });
 
   const handleReload = () => {
@@ -259,6 +257,7 @@ useEffect(() => {
   socket.on("vote_updated", handleVoteUpdate);
   socket.on("member_updated", handleMemberUpdate);
   socket.on("add_Info", handleReload);
+  socket.on("trip_closed", reloadTripData);
   
 
   return () => {
@@ -266,6 +265,7 @@ useEffect(() => {
     socket.off("vote_updated", handleVoteUpdate);
     socket.off("member_updated", handleMemberUpdate);
     socket.off("add_Info",handleReload)
+    socket.off("trip_closed");
   };
 
 }, [trip?.tripid]);
@@ -380,73 +380,65 @@ const reloadTripData = async (tripId?: string) => {
     logout();
   };
 
-  // ✅ Approve Request
+  // Approve Request
   const handleApprove = async (userId: string) => {
     if (!trip) return;
     try {
       const res = await tripAPI.approveRequest(trip.tripid, userId);
       if (res.success) {
         setPendingRequests(prev => prev.filter(r => r.user_id !== userId));
-        await reloadTripData();
       } else {
-        alert(res.message || 'อนุมัติไม่สำเร็จ');
+        setDialogMessage(res.message || 'อนุมัติไม่สำเร็จ');
       }
     } catch (e) {
-      console.error('Approve failed:', e);
-      alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+      setDialogMessage('เกิดข้อผิดพลาด กรุณาลองใหม่');
     }
   };
 
-  // ✅ Reject Request
+  // Reject Request
   const handleReject = async (userId: string) => {
     if (!trip) return;
     try {
       const res = await tripAPI.rejectRequest(trip.tripid, userId);
       if (res.success) {
         setPendingRequests(prev => prev.filter(r => r.user_id !== userId));
-        await reloadTripData();
+        // รอ socket "member_updated" → reloadTripData() เอง
       } else {
-        alert(res.message || 'ปฏิเสธไม่สำเร็จ');
+        setDialogMessage(res.message || 'ปฏิเสธไม่สำเร็จ');
       }
     } catch (e) {
-      console.error('Reject failed:', e);
-      alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+      setDialogMessage('เกิดข้อผิดพลาด กรุณาลองใหม่');
     }
   };
 
-  // ✅ Approve All
+  // Approve All
   const handleApproveAll = async () => {
     if (!trip) return;
-    const toApprove = [...pendingRequests];
-    
-    // ✅ clear ทันทีก่อน call API เพื่อป้องกัน double trigger
-    setPendingRequests([]);
-    
-    for (const req of toApprove) {
-      try {
-        await tripAPI.approveRequest(trip.tripid, req.user_id);
-        await reloadTripData();
-      } catch (e) {
-        console.error('Approve failed:', e);
-      }
+    try {
+      const toApprove = [...pendingRequests];
+      setPendingRequests([]);
+      await Promise.all(
+        toApprove.map(req => tripAPI.approveRequest(trip.tripid, req.user_id))
+      );
+      await reloadTripData();
+      setDialogMessage(`รับสมาชิก ${toApprove.length} คนสำเร็จ ✅`);
+    } catch (e) {
+      setDialogMessage('เกิดข้อผิดพลาด กรุณาลองใหม่');
     }
   };
 
-  // ✅ Reject All
   const handleRejectAll = async () => {
     if (!trip) return;
-    const toReject = [...pendingRequests];
-    
-    // ✅ clear ทันทีก่อน call API
-    setPendingRequests([]);
-    
-    for (const req of toReject) {
-      try {
-        await tripAPI.rejectRequest(trip.tripid, req.user_id);
-        await reloadTripData();
-      } catch (e) {
-        console.error('Reject failed:', e);
-      }
+    try {
+      const toReject = [...pendingRequests];
+      setPendingRequests([]);
+      await Promise.all(
+        toReject.map(req => tripAPI.rejectRequest(trip.tripid, req.user_id))
+      );
+      await reloadTripData();
+      setDialogMessage(`ปฏิเสธ ${toReject.length} คำขอสำเร็จ ✅`);
+    } catch (e) {
+      setDialogMessage('เกิดข้อผิดพลาด กรุณาลองใหม่');
     }
   };
 
@@ -456,26 +448,20 @@ const reloadTripData = async (tripId?: string) => {
       const res = await tripAPI.removeMember(trip.tripid, memberId);
       if (res.success) {
         setMembers(prev => prev.filter(m => m.member_id !== memberId));
-        await reloadTripData();
+        // รอ socket "member_updated" → reloadTripData() เอง
       } else {
-        alert(res.message || 'ลบสมาชิกไม่สำเร็จ');
+        setDialogMessage(res.message || 'ลบสมาชิกไม่สำเร็จ');
       }
     } catch (e) {
-      alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+      setDialogMessage('เกิดข้อผิดพลาด กรุณาลองใหม่');
     }
   };
 
-  // ✅ Save Dates — blocked when trip is closed
+  // Save Dates — blocked when trip is closed
   const handleSaveDates = async (dates: string[]) => {
     if (isClosed) return;
-    if (!trip) {
-      console.log('No trip data available');
-      return;
-    }
-    if (!user) {
-      console.log('No user data available');
-      return;
-    }
+    if (!trip) return;
+    if (!user) return;
     try {
       const response = await voteAPI.submitAvailability({
         trip_id: trip.tripid,
@@ -483,26 +469,18 @@ const reloadTripData = async (tripId?: string) => {
         ranges: dates.sort(),
       });
       if (response.success) {
-        console.log('✅ บันทึกวันที่สำเร็จ');
         setUserDates(dates);
         setStepCompleted(prev => ({ ...prev, 2: true }));
-        const dateRes = await voteAPI.getDateMatchingResult(trip.tripid);
-        if (dateRes?.data) {
-          setMatchingData({
-            availability: dateRes.data.availability || [],
-            recommendation: dateRes.data.recommendation || null,
-            summary: dateRes.data.summary || { totalMembers: 0, actualVote: 0, totalAvailableDays: 0 }
-          });
-        }
+        // ไม่ต้องเรียก getDateMatchingResult — socket "vote_updated" → reloadTripData() เอง
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
-      console.error('Error saving dates:', error);
+      setDialogMessage('บันทึกวันที่ไม่สำเร็จ กรุณาลองใหม่');
     }
   };
 
-  // ✅ Save Budget — blocked when trip is closed
+  // Save Budget — blocked when trip is closed
   const handleSaveBudget = async (category: string, amount: number) => {
     if (isClosed) return;
     if (!trip) return;
@@ -512,50 +490,31 @@ const reloadTripData = async (tripId?: string) => {
         amount
       });
       if (response.success) {
-        console.log('บันทึกงบประมาณสำเร็จ');
         setStepCompleted(prev => ({ ...prev, 3: true }));
-        const budgetRes = await voteAPI.getBudgetVoting(trip.tripid);
-        console.log("getBudgetVoting after update:", budgetRes);
-        console.log('budgetRes.data:', JSON.stringify(budgetRes.data));
-        if (budgetRes?.data) {
-          setBudgetInfo(budgetRes.data);
-          if (budgetRes.data.stats) setBudgetAnalysis(budgetRes.data.stats);
-        }
+        // ไม่ต้องเรียก getBudgetVoting — socket "vote_updated" → reloadTripData() เอง
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
-      console.error('Error saving budget:', error);
+      setDialogMessage('บันทึกงบประมาณไม่สำเร็จ กรุณาลองใหม่');
     }
   };
 
-  // ✅ Vote Location — blocked when trip is closed
+  // Vote Location — blocked when trip is closed
   const handleVoteLocation = async (votes: LocationVote[]) => {
     if (isClosed) return;
     if (!trip) return;
     try {
       const response = await voteAPI.submitLocationVote(trip.tripid, { votes });
-      console.log("submitLocationVote", response);
       if (response.success) {
-        console.log('โหวตสำเร็จ');
-        const updatedLocations = votes.map(v => ({
-          place: v.place,
-          score: v.score
-        }));
-        setUserLocations(updatedLocations);
-        const locRes = await voteAPI.getLocationVote(trip.tripid);
-        console.log("location response:",locRes)
-       //
-      if (locRes?.data?.actualVote !== undefined) {
-        setLocationVotedCount(locRes.data.actualVote);
-      }
-        if (locRes?.data?.analysis) setLocationAnalysis(locRes.data.analysis);
+        setUserLocations(votes.map(v => ({ place: v.place, score: v.score })));
         setStepCompleted(prev => ({ ...prev, 4: true }));
+        // ไม่ต้องเรียก getLocationVote — socket "vote_updated" → reloadTripData() เอง
       } else {
         throw new Error(response.message);
       }
     } catch (error) {
-      console.error('Error voting location:', error);
+      setDialogMessage('โหวตสถานที่ไม่สำเร็จ กรุณาลองใหม่');
     }
   };
 
@@ -588,8 +547,7 @@ const reloadTripData = async (tripId?: string) => {
         throw new Error(response.message);
       }
     } catch (error) {
-      console.error('Delete trip failed:', error);
-      alert('ลบทริปไม่สำเร็จ กรุณาลองใหม่');
+      setDialogMessage('ลบทริปไม่สำเร็จ กรุณาลองใหม่');
     }
   };
 
@@ -991,7 +949,10 @@ const reloadTripData = async (tripId?: string) => {
             <button
               onClick={() => {
                 setDialogMessage(null);
-                navigate("/homepage");
+                if (shouldNavigateOnClose) {
+                  setShouldNavigateOnClose(false);
+                  navigate("/homepage");
+                }
               }}
               className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
             >

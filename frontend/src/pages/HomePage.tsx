@@ -1,10 +1,10 @@
 // src/pages/HomePage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check, User, Trash2 } from "lucide-react";
 import { useAuth } from '../contexts/AuthContext';
-import { tripAPI, notiApi } from '../services/tripService';
+import { tripAPI } from '../services/tripService';
 import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils';
 import type { TripSummary } from '../types';
 import { initSocket, getSocket } from "../socket";
@@ -36,6 +36,7 @@ const HomePage: React.FC = () => {
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [tripToDelete, setTripToDelete] = useState<TripCard | null>(null);
   const [joiningTrip, setJoiningTrip] = useState(false);
+  const isLoadingRef = useRef(false);
   
   // ✅ Helper: แปลง TripSummary → TripCard
   const formatTripSummary = (trip: TripSummary): TripCard => {
@@ -62,84 +63,76 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
 
-  if (!user?.user_id) return;
+    if (!user?.user_id) return;
 
-  const socket = initSocket(user.user_id);
+    const socket = initSocket(user.user_id);
 
-  socket.on("new_notification", async (data) => {
+    // ฟัง event แจ้งเตือนใหม่
+    socket.on("new_notification", async () => {
+      loadTrips();
+    });
 
-  //console.log("🔔 new notification:", data);
+    // ถูกลบออกจากทริป
+    socket.on("you_were_removed", (data) => {
+      console.log("Removed from trip:", data.trip_id);
+      setDialogMessage("คุณถูกนำออกจากทริป");
+      loadTrips(); // reload trips
+    });
 
-  try {
+    // ownerปฎิเสธ
+    socket.on("join_rejected", (data) => {
+      console.log("Owner has rejected from join trip:", data.trip_id);
+      setDialogMessage("เจ้าของทริปปฏิเสธคำขอของคุณ ❌");
+      loadTrips();
+    });
 
-    // เรียก API โหลด notification
-    const res = await notiApi.getNoti();
-  
-    loadTrips();
+    // ปิดทริป
+    socket.on("trip_closed", (data) => {
+      console.log("This trip has been close :", data.trip_id);
+      setDialogMessage("ทริปนี้ถูกปิดแล้ว 🔒");
+      loadTrips();
+    });
 
-    console.log("notifications:", res);
-    /*
-    if (data.owner_id === user.user_id) {
-      setDialogMessage(`มีคำขอเข้าร่วมทริป ${data.trip_name}`);
-    }
-    */
+    // ลบทริป
+    socket.on("trip_deleted", (data) => {
+      console.log("Trip deleted:", data.trip_id);
+      setDialogMessage("ทริปนี้ถูกลบโดยเจ้าของ 🗑️");
+      loadTrips();
+    });
 
-  } catch (err) {
-    console.error("load notification failed", err);
-  }
+    return () => {
+    socket.off("new_notification");
+    socket.off("you_were_removed");
+    socket.off("join_rejected");
+    socket.off("trip_closed");
+    socket.off("trip_deleted");
+  };
 
-});
-// ถูกลบออกจากทริป
-  socket.on("you_were_removed", (data) => {
-
-    console.log("Removed from trip:", data.trip_id);
-
-    setDialogMessage("คุณถูกนำออกจากทริป");
-
-    loadTrips(); // reload trips
-  });
-
-// ownerปฎิเสธ
-  socket.on("join_rejected", (data) => {
-    console.log("Owner has rejected from join trip:", data.trip_id);
-    loadTrips();
-  });
-
-//ปิดทริป
-  socket.on("trip_closed", (data) => {
-    console.log("This trip has been close :", data.trip_id);
-    loadTrips();
-  });
-
-  return () => {
-  socket.off("new_notification");
-  socket.off("you_were_removed");
-  socket.off("join_rejected");
-  socket.off("trip_closed");
-};
-
-}, [user]);
+  }, [user]);
 
   useEffect(() => {
-  const state = location.state as any;
+    const state = location.state as any;
 
-  if (state?.joinError) {
-    setDialogMessage(state.joinError);
-    navigate(location.pathname, { replace: true });
-  }
+    if (state?.joinError) {
+      setDialogMessage(state.joinError);
+      navigate(location.pathname, { replace: true });
+    }
 
-  if (state?.joinSuccess) {
-    setDialogMessage("เข้าร่วมห้องสำเร็จ 🎉");
-    navigate(location.pathname, { replace: true });
-  }
-  
-  if (state?.joinPending) {
-    setDialogMessage("ส่งคำขอเข้าร่วมแล้ว รอเจ้าของทริปอนุมัติ ⏳");
-  }
-}, [location]);
+    if (state?.joinSuccess) {
+      setDialogMessage("เข้าร่วมห้องสำเร็จ 🎉");
+      navigate(location.pathname, { replace: true });
+    }
+    
+    if (state?.joinPending) {
+      setDialogMessage(`ส่งคำขอเข้าร่วม "${state.tripName}" แล้ว รอเจ้าของทริปอนุมัติ ⏳`);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location]);
 
 
   const loadTrips = async () => {
+    if (isLoadingRef.current) return; // ← guard
+    isLoadingRef.current = true;
     try {
       setLoading(true);
       const response = await tripAPI.getMyTrips();
@@ -165,9 +158,10 @@ const HomePage: React.FC = () => {
       console.error("Load trips failed:", error);
       setMyTrips([]);
       setInvitedTrips([]);
-      alert("ไม่สามารถโหลดข้อมูลทริปได้ กรุณาลองใหม่อีกครั้ง");
+      setDialogMessage("ไม่สามารถโหลดข้อมูลทริปได้ กรุณาลองใหม่");
     } finally {
-      setLoading(false);
+      setLoading(false); 
+      isLoadingRef.current = false;
     }
   };
 
@@ -177,7 +171,7 @@ const HomePage: React.FC = () => {
       const response = await tripAPI.deleteTrip(tripToDelete.id);
       if (response.success) {
         setTripToDelete(null);
-        loadTrips();
+        setDialogMessage("ลบทริปสำเร็จ ✅");
       } else {
         setTripToDelete(null);
         setDialogMessage(response.message || 'ลบทริปไม่สำเร็จ');
@@ -192,19 +186,17 @@ const HomePage: React.FC = () => {
   // ✅ เข้าร่วมทริป
   const handleJoinTrip = async (code: string) => {
     const cleanCode = code.trim().toUpperCase();
-    if (!cleanCode) { alert("กรุณากรอกรหัสห้อง"); return; }
-    if (!validateInviteCode(cleanCode)) { alert("รูปแบบรหัสไม่ถูกต้อง"); return; }
+    if (!cleanCode) { setDialogMessage("กรุณากรอกรหัสห้อง"); return; }
+    if (!validateInviteCode(cleanCode)) { setDialogMessage("รูปแบบรหัสไม่ถูกต้อง (XXXX-XXXX-XXXX-XXXX)"); return; }
     if (joiningTrip) return;
 
     try {
       setJoiningTrip(true);
       const response = await tripAPI.requestToJoin(cleanCode);
       if (response.success) {
-        
-
         console.log("response", response);
         setRoomCode("");
-        setDialogMessage("ส่งคำขอเข้าร่วมแล้ว รอเจ้าของทริปอนุมัติ ⏳");
+        setDialogMessage(`ส่งคำขอเข้าร่วม "${response.data?.tripName}" แล้ว รอเจ้าของทริปอนุมัติ ⏳`);
         loadTrips();
       } else {
         setDialogMessage(response.message || 'ไม่สามารถส่งคำขอได้');
@@ -219,14 +211,14 @@ const HomePage: React.FC = () => {
   // ✅ สร้างทริป
   const handleCreateTrip = async () => {
     const nameValidation = validateTripName(newTrip.name);
-    if (!nameValidation.valid) {
-      alert(nameValidation.error);
-      return;
+    if (!nameValidation.valid) { 
+      setDialogMessage(nameValidation.error ?? "ชื่อทริปไม่ถูกต้อง"); 
+      return; 
     }
 
     const daysValidation = validateDays(Number(newTrip.days));
     if (!daysValidation.valid) {
-      alert(daysValidation.error);
+      setDialogMessage(daysValidation.error ?? "จำนวนวันไม่ถูกต้อง");
       return;
     }
 
@@ -255,7 +247,7 @@ const HomePage: React.FC = () => {
       console.error('Error creating trip:', error);
       const errorMessage =
         error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างทริป";
-      alert(`เกิดข้อผิดพลาด: ${errorMessage}`);
+      setDialogMessage(`เกิดข้อผิดพลาด: ${errorMessage}`);
     }
   };
   
