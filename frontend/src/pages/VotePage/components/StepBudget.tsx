@@ -43,10 +43,10 @@ interface BudgetState {
 
 // ============== CONSTANTS ==============
 const BUDGET_CATEGORIES = [
-  { key: 'accommodation' as const, label: 'ค่าที่พัก*', color: '#3b82f6', required: true },
-  { key: 'transport' as const, label: 'ค่าเดินทาง*', color: '#8b5cf6', required: true },
-  { key: 'food' as const, label: 'ค่าอาหาร*', color: '#10b981', required: true },
-  { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b', required: false }
+  { key: 'accommodation' as const, label: 'ค่าที่พัก', color: '#3b82f6', required: true,  requiresOvernight: true  },
+  { key: 'transport'     as const, label: 'ค่าเดินทาง', color: '#8b5cf6', required: true,  requiresOvernight: false },
+  { key: 'food'          as const, label: 'ค่าอาหาร',   color: '#10b981', required: true,  requiresOvernight: false },
+  { key: 'other'         as const, label: 'เงินสำรอง',  color: '#f59e0b', required: false, requiresOvernight: false }
 ] as const;
 
 // Validation Constants
@@ -103,6 +103,12 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
   console.log("totalMembers:", totalBudgetInfo?.totalMembers);
   const tripDuration = trip.numdays;
 
+  // ค่าที่พักจำเป็นต้องกรอกเมื่อทริปมากกว่า 1 วัน
+  const getIsRequired = (category: typeof BUDGET_CATEGORIES[number]) => {
+    if (category.requiresOvernight && tripDuration <= 1) return false;
+    return category.required;
+  };
+
   const validateBudget = useCallback((amount: number): { valid: boolean; error?: string } => {
     if (!Number.isFinite(amount)) {
       return { valid: false, error: 'ตัวเลขไม่ถูกต้อง' };
@@ -119,6 +125,8 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
   // ============== LOAD BUDGET DATA ==============
   useEffect(() => {
     if (!budgetInfo) { setIsLoading(false); return; }
+    // console.log("budgetInfo.rows:", budgetInfo.rows);
+    // console.log("budgetInfo.stats:", budgetInfo.stats);
 
     setTotalBudgetInfo({
       budgetTotal: budgetInfo.budgetTotal || 0,
@@ -235,13 +243,19 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
 
   const handleSaveAll = useCallback(async () => {
     if (isLocked) return;
+
+    // accommodation required เฉพาะเมื่อ > 1 วัน
     const hasRequiredBudget =
-      budget.accommodation > 0 &&
+      (tripDuration > 1 ? budget.accommodation > 0 : true) &&
       budget.transport > 0 &&
       budget.food > 0;
 
     if (!hasRequiredBudget) {
-      setError('กรุณากรอกงบประมาณที่จำเป็น (ที่พัก*, เดินทาง*, อาหาร*)');
+      const missing = [];
+      if (tripDuration > 1 && budget.accommodation === 0) missing.push('ที่พัก');
+      if (budget.transport === 0) missing.push('เดินทาง');
+      if (budget.food === 0) missing.push('อาหาร');
+      setError(`กรุณากรอกงบประมาณที่จำเป็น: ${missing.join(', ')}`);
       return;
     }
 
@@ -578,6 +592,11 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
         <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg border border-gray-200">
           <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">
             💰 กรุณากรอกงบประมาณ (จำนวนเงินแต่ละหมวดต่อ {tripDuration} วัน)
+            {tripDuration <= 1 && (
+              <span className="block text-sm font-normal text-blue-600 mt-1">
+                🏃 ทริปเที่ยวเดียว — ไม่จำเป็นต้องกรอกค่าที่พัก
+              </span>
+            )}
           </h3>
 
           <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -590,48 +609,69 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                 </tr>
               </thead>
               <tbody>
-                {BUDGET_CATEGORIES.map(({ key, label, color }) => (
-                  <tr key={key} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: color }} />
-                        <span className="font-medium text-gray-800">{label}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="number"
-                        disabled={isSaving || isLocked}
-                        min={MIN_BUDGET}
-                        max={MAX_BUDGET}
-                        step={100}
-                        value={budget[key] || ''}
-                        placeholder="0"
-                        className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        onChange={e => handleBudgetChange(key, Number(e.target.value) || 0)}
-                        id={`budget-input-${key}`}
-                        onKeyDown={async (e) => {
-                          if (e.key !== 'Enter') return;
-                          await handleSaveCategory(key);
-                          const keys = BUDGET_CATEGORIES.map(c => c.key);
-                          const nextKey = keys[keys.indexOf(key) + 1];
-                          if (nextKey) {
-                            document.getElementById(`budget-input-${nextKey}`)?.focus();
-                          }
-                        }}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => handleSaveCategory(key)}
-                        disabled={isSaving || budget[key] === 0 || isLocked}
-                        className="px-3 py-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm rounded-lg transition"
-                      >
-                        {isLocked ? '🔒' : 'บันทึก'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {BUDGET_CATEGORIES.map((category) => {
+                  const { key, color } = category;
+
+                  // accommodation จำเป็นต้องกรอกเฉพาะทริปที่มากกว่า 1 วัน
+                  const isRequired = category.key === 'accommodation'
+                    ? tripDuration > 1
+                    : category.required;
+
+                  const displayLabel = category.key === 'accommodation'
+                    ? tripDuration > 1 ? 'ค่าที่พัก*' : 'ค่าที่พัก'
+                    : category.label;
+
+                  return (
+                    <tr key={key} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className="w-3 h-3 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: color }} />
+                          <span className="font-medium text-gray-800">
+                            {displayLabel}
+                            {isRequired && <span className="text-red-500 ml-0.5">*</span>}
+                          </span>
+                          {category.key === 'accommodation' && tripDuration <= 1 && (
+                            <span className="text-xs bg-blue-50 text-blue-500 border border-blue-200 px-2 py-0.5 rounded-full">
+                              🏃 เที่ยวเดียว ไม่จำเป็น
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="number"
+                          disabled={isSaving || isLocked}
+                          min={MIN_BUDGET}
+                          max={MAX_BUDGET}
+                          step={100}
+                          value={budget[key] || ''}
+                          placeholder="0"
+                          className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          onChange={e => handleBudgetChange(key, Number(e.target.value) || 0)}
+                          id={`budget-input-${key}`}
+                          onKeyDown={async (e) => {
+                            if (e.key !== 'Enter') return;
+                            await handleSaveCategory(key);
+                            const keys = BUDGET_CATEGORIES.map(c => c.key);
+                            const nextKey = keys[keys.indexOf(key) + 1];
+                            if (nextKey) {
+                              document.getElementById(`budget-input-${nextKey}`)?.focus();
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleSaveCategory(key)}
+                          disabled={isSaving || budget[key] === 0 || isLocked}
+                          className="px-3 py-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm rounded-lg transition"
+                        >
+                          {isLocked ? '🔒' : 'บันทึก'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {/* รวม */}
                 <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 font-bold">
@@ -838,7 +878,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
             💡 <strong>หมายเหตุ:</strong> คุณสามารถบันทึกทีละหมวดหมู่ หรือบันทึกทั้งหมดพร้อมกันได้
           </p>
           <p className="text-xs text-blue-700 mt-1">
-            * หมวดหมู่ที่มี * เป็นหมวดหมู่ที่จำเป็นต้องกรอก
+            <span className="text-red-500">*</span> หมวดหมู่ที่จำเป็นต้องกรอก
           </p>
         </div>
       </div>
