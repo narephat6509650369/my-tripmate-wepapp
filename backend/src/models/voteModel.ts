@@ -298,38 +298,29 @@ export const updateBudget = async (trip_id: string, user_id: string, category: s
 
     if (existing && existing.length > 0) {
       budget_voting_id = existing[0].budget_voting_id;
+      console.log(`[updateBudget] found budget_voting_id=${budget_voting_id}`);
     } else {
-      const { v4: uuidv4 } = await import('uuid');
       const newId = uuidv4();
       await connection.query(
         `INSERT INTO budget_votings (budget_voting_id, trip_id, status) VALUES (?, ?, 'active')`,
         [newId, trip_id]
       );
       budget_voting_id = newId;
+      console.log(`[updateBudget] created new budget_voting_id=${budget_voting_id}`);
     }
 
-    // 3. insert / update budget_options
+    // สร้าง id ใน JS แทน UUID() ใน SQL
+    const budget_option_id = uuidv4();
+    console.log(`[updateBudget] inserting budget_option → id=${budget_option_id}`);
+
     await connection.query(
-      `
-      INSERT INTO budget_options
+      `INSERT INTO budget_options
         (budget_option_id, budget_voting_id, proposed_by, category_name, estimated_amount)
-      VALUES (UUID(), ?, ?, ?, ?)
-      `,
-      [budget_voting_id, user_id, category, amount]
+       VALUES (?, ?, ?, ?, ?)`,
+      [budget_option_id, budget_voting_id, user_id, category, amount]
     );
 
-    // 4. get budget_option_id
-    const [optionRows]: any = await connection.query(
-      `
-      SELECT budget_option_id
-      FROM budget_options
-      WHERE budget_voting_id = ? AND proposed_by = ? AND category_name = ?
-      `,
-      [budget_voting_id, user_id, category]
-    );
-    const budget_option_id = optionRows[0].budget_option_id;
-
-    // 5. insert / update budget_votes
+    console.log(`[updateBudget] inserting budget_vote for option_id=${budget_option_id}`);
     await connection.query(
       `
       INSERT INTO budget_votes
@@ -345,8 +336,11 @@ export const updateBudget = async (trip_id: string, user_id: string, category: s
 
 
     await connection.commit();
+    console.log(`[updateBudget] ✅ COMMIT SUCCESS → category=${category}`);
+
   } catch (err) {
     await connection.rollback();
+    console.error(`[updateBudget] ❌ ROLLBACK →`, err);
     throw err;
   } finally {
     connection.release();
