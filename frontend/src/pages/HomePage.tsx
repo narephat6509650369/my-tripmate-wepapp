@@ -172,12 +172,13 @@ const HomePage: React.FC = () => {
       if (response.success) {
         setTripToDelete(null);
         setDialogMessage("ลบทริปสำเร็จ ✅");
+        loadTrips();
       } else {
         setTripToDelete(null);
         setDialogMessage(response.message || 'ลบทริปไม่สำเร็จ');
       }
     } catch (error) {
-      console.error('Delete trip failed:<tool_call>', error);
+      console.error('Delete trip failed:', error);
       setTripToDelete(null);
       setDialogMessage('ลบทริปไม่สำเร็จ กรุณาลองใหม่');
     }
