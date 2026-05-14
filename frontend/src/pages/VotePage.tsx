@@ -3,17 +3,15 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Loader2, AlertCircle, Copy, Trash2 } from "lucide-react";
 
-// Components
 import Header from "../components/Header";
 import StepVote from "./VotePage/components/StepVote";
 import StepBudget from './VotePage/components/StepBudget';
 import StepPlace from './VotePage/components/StepPlace';
 import StepSummary from './VotePage/components/StepSummary';
 
-// Hooks & Utils
 import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, voteAPI } from '../services/tripService';
-import type { TripDetail, LocationVote, DateMatchingResponse, BudgetVotingResponse } from '../types';
+import type { TripDetail, LocationVote, LocationVoteResult, DateMatchingResponse, BudgetVotingResponse } from '../types';
 import { getSocket } from "../socket";
 type MatchingData = Pick<DateMatchingResponse, 'availability' | 'recommendation' | 'summary'>;
 type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers' | 'totalMembers'>;
@@ -28,14 +26,12 @@ interface PendingRequest {
   joined_at: string;
 }
 
-// ============== MAIN COMPONENT ==============
 const VotePage: React.FC = () => {
   const { tripCode: urlCode } = useParams<{ tripCode: string }>();
   const tripCode = urlCode || "UNKNOWN";
   const navigate = useNavigate();
   const { logout, user } = useAuth();
 
-  // ============== STATE ==============
   const [trip, setTrip] = useState<TripDetail | null>(null);
   const [inviteCode, setInviteCode] = useState<string>("");
   const [step, setStep] = useState(2);
@@ -48,17 +44,32 @@ const VotePage: React.FC = () => {
   const [budgetInfo, setBudgetInfo] = useState<BudgetInfo | null>(null);
   const [budgetAnalysis, setBudgetAnalysis] = useState<any>(null);
   const [userLocations, setUserLocations] = useState<{ place: string; score: number }[]>([]);
+  const [locationResults, setLocationResults] = useState<LocationVoteResult[]>([]);
   const [locationAnalysis, setLocationAnalysis] = useState<any>(null);
   const [locationVotedCount, setLocationVotedCount] = useState(0);
+  const [locationTotalMembers, setLocationTotalMembers] = useState(0);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const toastTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ✅ Pending Requests state
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [panelTab, setPanelTab] = useState<'pending' | 'members'>('pending');
   const [members, setMembers] = useState<{user_id: string, member_id: string, full_name?: string, name?: string, email?: string}[]>([]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'error') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3000);
+  };
 
   const displayCode = inviteCode || tripCode;
   const isClosed = trip?.status === 'completed' || trip?.status === 'archived' || trip?.status === 'confirmed';
@@ -76,7 +87,6 @@ const VotePage: React.FC = () => {
     4: false, // สถานที่
   });
 
-  // ============== LOAD TRIP DATA ==============
   useEffect(() => {
     const loadTripData = async () => {
       if (tripCode === "UNKNOWN") {
@@ -90,7 +100,6 @@ const VotePage: React.FC = () => {
         setError(null);
 
         const response = await tripAPI.getTripDetail(tripCode);
-        console.log("Trip detail response:", response);
         if (!response || !response.success || !response.data) {
           throw new Error('ไม่พบข้อมูลทริป');
         }
@@ -100,12 +109,9 @@ const VotePage: React.FC = () => {
         setInviteCode(tripData.invitecode);
         setTrip(tripData);
 
-        // ✅ โหลด pending requests ถ้าเป็น Owner
         if (tripData.ownerid === user?.user_id) {
-          console.log('✅ เป็น Owner โหลด members'); 
           try {
             const pendingRes = await tripAPI.getPendingRequests(tripData.tripid);
-            console.log('pending requests response:', JSON.stringify(pendingRes));
             if (pendingRes.success) {
               const list = pendingRes.data?.data?.data ?? pendingRes.data?.data ?? pendingRes.data ?? [];
               setPendingRequests(Array.isArray(list) ? list : []);
@@ -122,12 +128,9 @@ const VotePage: React.FC = () => {
           } catch (e) {
             console.error('Load pending requests failed:', e);
           }
-        } else {
-          console.log('❌ ไม่ใช่ Owner:', tripData.ownerid, 'vs', user?.user_id);
         }
 
         try {
-          // ========== วันที่ ==========
           const dateRes = await voteAPI.getDateMatchingResult(tripData.tripid);
           if (dateRes?.data) {
             setMatchingData({
@@ -142,7 +145,6 @@ const VotePage: React.FC = () => {
           );
           if (hasDates) setStepCompleted(prev => ({ ...prev, 2: true }));
 
-          // ========== งบประมาณ ==========
           const budgetRes = await voteAPI.getBudgetVoting(tripData.tripid);
           if (budgetRes?.data) setBudgetInfo(budgetRes.data);
           if (budgetRes?.data?.stats) setBudgetAnalysis(budgetRes.data.stats);
@@ -151,7 +153,6 @@ const VotePage: React.FC = () => {
           );
           if (hasBudget) setStepCompleted(prev => ({ ...prev, 3: true }));
 
-          // ========== จังหวัด ==========
           const locRes = await voteAPI.getLocationVote(tripData.tripid);
           const hasPlace = locRes?.data?.rowlog?.some(
             (r: any) => r.proposed_by === user?.user_id
@@ -162,8 +163,10 @@ const VotePage: React.FC = () => {
               .filter((log: any) => log.proposed_by === user.user_id)
               .map((log: any) => ({ place: log.province_name, score: log.score }));
             if (myVotes.length > 0) setUserLocations(myVotes);
+            if (Array.isArray(locRes?.data?.locationVotesTotal)) setLocationResults(locRes.data.locationVotesTotal);
             if (locRes?.data?.analysis) setLocationAnalysis(locRes.data.analysis);
-            if (locRes?.data?.actualVote) setLocationVotedCount(locRes.data.actualVote);
+            if (locRes?.data?.actualVote !== undefined) setLocationVotedCount(locRes.data.actualVote);
+            if (locRes?.data?.totalMembers !== undefined) setLocationTotalMembers(locRes.data.totalMembers);
           }
 
           const isCompleted = tripData.status === 'completed' || tripData.status === 'archived' || tripData.status === 'confirmed';
@@ -184,11 +187,9 @@ const VotePage: React.FC = () => {
           return;
         }
         if (status === 403) {
-          console.log("User not in trip → auto join flow");
           try {
             const joinRes = await tripAPI.joinTrip(tripCode);
             if (joinRes.success) {
-              console.log("Auto join success → reload trip");
               await loadTripData();
               return;
             }
@@ -204,8 +205,6 @@ const VotePage: React.FC = () => {
     loadTripData();
   }, [tripCode, navigate]);
 
-  // ============== Socket ==============
-
 useEffect(() => {
 
   if (!trip?.tripid) return;
@@ -213,20 +212,15 @@ useEffect(() => {
   const socket = getSocket();
   if (!socket) return;
 
-  console.log("🔌 VotePage socket listen:", trip.tripid);
-
-  // join room
   socket.emit("join_trip", trip.tripid);
 
-  let reloadTimer: any = null;
+    let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   const handleVoteUpdate = (data: any) => {
 
     if (String(data.tripId) !== String(trip.tripid)) return;
 
-    console.log("🗳 vote updated");
-
-    clearTimeout(reloadTimer);
+    if (reloadTimer) clearTimeout(reloadTimer);
 
     reloadTimer = setTimeout(() => {
       reloadTripData();
@@ -238,34 +232,31 @@ useEffect(() => {
 
     if (String(data.tripId) !== String(trip.tripid)) return;
 
-    console.log("👥 member updated");
-
     await reloadTripData();
 
   };
-  socket.on("you_were_removed", (data) => {
-
-  console.log("Removed from trip:", data.trip_id);
+  const handleRemoved = (data: any) => {
 
   setDialogMessage("คุณถูกนำออกจากทริป");
 
-  });
+  };
 
   const handleReload = () => {
-    console.log("🔥 socket reload");
     reloadTripData(trip.tripid);
   };
 
+  socket.on("you_were_removed", handleRemoved);
   socket.on("vote_updated", handleVoteUpdate);
   socket.on("member_updated", handleMemberUpdate);
   socket.on("add_Info", handleReload);
   
 
   return () => {
-    socket.off("you_were_removed");
+    socket.off("you_were_removed", handleRemoved);
     socket.off("vote_updated", handleVoteUpdate);
     socket.off("member_updated", handleMemberUpdate);
     socket.off("add_Info",handleReload)
+    if (reloadTimer) clearTimeout(reloadTimer);
   };
 
 }, [trip?.tripid]);
@@ -299,7 +290,6 @@ const reloadTripData = async (tripId?: string) => {
 
     let index = 0;
 
-    // ===== DATE =====
     const dateRes = results[index++];
     if (dateRes.status === "fulfilled" && dateRes.value?.data) {
       const data = dateRes.value.data;
@@ -317,7 +307,6 @@ const reloadTripData = async (tripId?: string) => {
       });
     }
 
-    // ===== BUDGET =====
     const budgetRes = results[index++];
     if (budgetRes.status === "fulfilled" && budgetRes.value?.data) {
       const data = budgetRes.value.data;
@@ -325,13 +314,14 @@ const reloadTripData = async (tripId?: string) => {
       if (data.stats) setBudgetAnalysis(data.stats);
     }
 
-    // ===== LOCATION =====
     const locRes = results[index++];
     if (locRes.status === "fulfilled" && locRes.value?.data) {
       const data = locRes.value.data;
 
+      setLocationResults(Array.isArray(data.locationVotesTotal) ? data.locationVotesTotal : []);
       if (data.analysis) setLocationAnalysis(data.analysis);
       if (data.actualVote !== undefined) setLocationVotedCount(data.actualVote);
+      if (data.totalMembers !== undefined) setLocationTotalMembers(data.totalMembers);
 
       if (data?.rowlog && user?.user_id) {
         const myVotes = data.rowlog
@@ -345,7 +335,6 @@ const reloadTripData = async (tripId?: string) => {
       }
     }
 
-    // ===== OWNER =====
     if (isOwner) {
       const membersRes = results[index++];
       if (membersRes?.status === "fulfilled") {
@@ -369,7 +358,6 @@ const reloadTripData = async (tripId?: string) => {
   }
 };
 
-  // ============== HANDLERS ==============
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
     setCopied(type);
@@ -380,7 +368,6 @@ const reloadTripData = async (tripId?: string) => {
     logout();
   };
 
-  // ✅ Approve Request
   const handleApprove = async (userId: string) => {
     if (!trip) return;
     try {
@@ -389,15 +376,14 @@ const reloadTripData = async (tripId?: string) => {
         setPendingRequests(prev => prev.filter(r => r.user_id !== userId));
         await reloadTripData();
       } else {
-        alert(res.message || 'อนุมัติไม่สำเร็จ');
+        showToast(res.message || 'อนุมัติไม่สำเร็จ', 'error');
       }
     } catch (e) {
       console.error('Approve failed:', e);
-      alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+      showToast('เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
     }
   };
 
-  // ✅ Reject Request
   const handleReject = async (userId: string) => {
     if (!trip) return;
     try {
@@ -406,47 +392,49 @@ const reloadTripData = async (tripId?: string) => {
         setPendingRequests(prev => prev.filter(r => r.user_id !== userId));
         await reloadTripData();
       } else {
-        alert(res.message || 'ปฏิเสธไม่สำเร็จ');
+        showToast(res.message || 'ปฏิเสธไม่สำเร็จ', 'error');
       }
     } catch (e) {
       console.error('Reject failed:', e);
-      alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+      showToast('เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
     }
   };
 
-  // ✅ Approve All
   const handleApproveAll = async () => {
     if (!trip) return;
     const toApprove = [...pendingRequests];
     
-    // ✅ clear ทันทีก่อน call API เพื่อป้องกัน double trigger
     setPendingRequests([]);
-    
-    for (const req of toApprove) {
-      try {
-        await tripAPI.approveRequest(trip.tripid, req.user_id);
-        await reloadTripData();
-      } catch (e) {
-        console.error('Approve failed:', e);
-      }
+
+    const results = await Promise.allSettled(
+      toApprove.map(req => tripAPI.approveRequest(trip.tripid, req.user_id))
+    );
+    await reloadTripData();
+
+    const failed = results.filter(result => result.status === 'rejected' || !result.value?.success).length;
+    if (failed > 0) {
+      showToast(`อนุมัติสำเร็จบางส่วน (${toApprove.length - failed}/${toApprove.length})`, 'warning');
+    } else {
+      showToast('อนุมัติคำขอทั้งหมดแล้ว', 'success');
     }
   };
 
-  // ✅ Reject All
   const handleRejectAll = async () => {
     if (!trip) return;
     const toReject = [...pendingRequests];
     
-    // ✅ clear ทันทีก่อน call API
     setPendingRequests([]);
-    
-    for (const req of toReject) {
-      try {
-        await tripAPI.rejectRequest(trip.tripid, req.user_id);
-        await reloadTripData();
-      } catch (e) {
-        console.error('Reject failed:', e);
-      }
+
+    const results = await Promise.allSettled(
+      toReject.map(req => tripAPI.rejectRequest(trip.tripid, req.user_id))
+    );
+    await reloadTripData();
+
+    const failed = results.filter(result => result.status === 'rejected' || !result.value?.success).length;
+    if (failed > 0) {
+      showToast(`ปฏิเสธสำเร็จบางส่วน (${toReject.length - failed}/${toReject.length})`, 'warning');
+    } else {
+      showToast('ปฏิเสธคำขอทั้งหมดแล้ว', 'success');
     }
   };
 
@@ -458,22 +446,19 @@ const reloadTripData = async (tripId?: string) => {
         setMembers(prev => prev.filter(m => m.member_id !== memberId));
         await reloadTripData();
       } else {
-        alert(res.message || 'ลบสมาชิกไม่สำเร็จ');
+        showToast(res.message || 'ลบสมาชิกไม่สำเร็จ', 'error');
       }
     } catch (e) {
-      alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+      showToast('เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
     }
   };
 
-  // ✅ Save Dates — blocked when trip is closed
   const handleSaveDates = async (dates: string[]) => {
     if (isClosed) return;
     if (!trip) {
-      console.log('No trip data available');
       return;
     }
     if (!user) {
-      console.log('No user data available');
       return;
     }
     try {
@@ -483,7 +468,6 @@ const reloadTripData = async (tripId?: string) => {
         ranges: dates.sort(),
       });
       if (response.success) {
-        console.log('✅ บันทึกวันที่สำเร็จ');
         setUserDates(dates);
         setStepCompleted(prev => ({ ...prev, 2: true }));
         const dateRes = await voteAPI.getDateMatchingResult(trip.tripid);
@@ -502,24 +486,23 @@ const reloadTripData = async (tripId?: string) => {
     }
   };
 
-  // ✅ Save Budget — blocked when trip is closed
-  const handleSaveBudget = async (category: string, amount: number) => {
+  const handleSaveBudget = async (category: string, amount: number, options: { refresh?: boolean } = {}) => {
     if (isClosed) return;
     if (!trip) return;
+    const shouldRefresh = options.refresh !== false;
     try {
       const response = await voteAPI.updateBudget(trip.tripid, {
         category: category as any,
         amount
       });
       if (response.success) {
-        console.log('บันทึกงบประมาณสำเร็จ');
         setStepCompleted(prev => ({ ...prev, 3: true }));
-        const budgetRes = await voteAPI.getBudgetVoting(trip.tripid);
-        console.log("getBudgetVoting after update:", budgetRes);
-        console.log('budgetRes.data:', JSON.stringify(budgetRes.data));
-        if (budgetRes?.data) {
-          setBudgetInfo(budgetRes.data);
-          if (budgetRes.data.stats) setBudgetAnalysis(budgetRes.data.stats);
+        if (shouldRefresh) {
+          const budgetRes = await voteAPI.getBudgetVoting(trip.tripid);
+          if (budgetRes?.data) {
+            setBudgetInfo(budgetRes.data);
+            if (budgetRes.data.stats) setBudgetAnalysis(budgetRes.data.stats);
+          }
         }
       } else {
         throw new Error(response.message);
@@ -529,26 +512,25 @@ const reloadTripData = async (tripId?: string) => {
     }
   };
 
-  // ✅ Vote Location — blocked when trip is closed
   const handleVoteLocation = async (votes: LocationVote[]) => {
     if (isClosed) return;
     if (!trip) return;
     try {
       const response = await voteAPI.submitLocationVote(trip.tripid, { votes });
-      console.log("submitLocationVote", response);
       if (response.success) {
-        console.log('โหวตสำเร็จ');
         const updatedLocations = votes.map(v => ({
           place: v.place,
           score: v.score
         }));
         setUserLocations(updatedLocations);
         const locRes = await voteAPI.getLocationVote(trip.tripid);
-        console.log("location response:",locRes)
-       //
+        if (Array.isArray(locRes?.data?.locationVotesTotal)) {
+          setLocationResults(locRes.data.locationVotesTotal);
+        }
       if (locRes?.data?.actualVote !== undefined) {
         setLocationVotedCount(locRes.data.actualVote);
       }
+        if (locRes?.data?.totalMembers !== undefined) setLocationTotalMembers(locRes.data.totalMembers);
         if (locRes?.data?.analysis) setLocationAnalysis(locRes.data.analysis);
         setStepCompleted(prev => ({ ...prev, 4: true }));
       } else {
@@ -572,7 +554,6 @@ const reloadTripData = async (tripId?: string) => {
     if (step > 2) setStep(step - 1);
   };
 
-  // When closed: next is disabled (no more data to submit), but back is allowed for reviewing
   const isNextDisabled =
     step === 5 ||
     isClosed ||
@@ -589,11 +570,10 @@ const reloadTripData = async (tripId?: string) => {
       }
     } catch (error) {
       console.error('Delete trip failed:', error);
-      alert('ลบทริปไม่สำเร็จ กรุณาลองใหม่');
+      showToast('ลบทริปไม่สำเร็จ กรุณาลองใหม่', 'error');
     }
   };
 
-  // ============== LOADING & ERROR STATES ==============
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -624,7 +604,6 @@ const reloadTripData = async (tripId?: string) => {
     );
   }
 
-  // ============== MAIN RENDER ==============
   const stepLabels = ["สร้างทริป", "เลือกวันที่", "งบประมาณ", "สถานที่", "สรุปผล"];
   const isOwner = trip.ownerid === user?.user_id;
 
@@ -673,7 +652,7 @@ const reloadTripData = async (tripId?: string) => {
               <Copy className="w-4 h-4" />
             </button>
 
-            {/* ✅ ปุ่มคำขอเข้าร่วม - เฉพาะ Owner */}
+            {/* ปุ่มคำขอเข้าร่วม - เฉพาะ Owner */}
             {isOwner && (
               <button
                 onClick={() => setShowPendingPanel(true)}
@@ -712,7 +691,7 @@ const reloadTripData = async (tripId?: string) => {
               {trip.createdat && ` · ${new Date(trip.createdat).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}`}
             </p> */}
 
-            {/* ✅ Closed trip banner */}
+            {/* Closed trip banner */}
             {isClosed && (
               <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-full text-sm text-gray-600 font-medium">
                 🔒 ทริปนี้ปิดแล้ว — ไม่สามารถแก้ไขข้อมูลได้
@@ -784,6 +763,7 @@ const reloadTripData = async (tripId?: string) => {
               trip={trip}
               budgetInfo={budgetInfo}
               onSave={handleSaveBudget}
+              onSaveAllComplete={() => reloadTripData()}
               onManualNext={next}
               initialAnalysis={budgetAnalysis}
               isLocked={isClosed}
@@ -794,9 +774,10 @@ const reloadTripData = async (tripId?: string) => {
               trip={trip}
               onVote={handleVoteLocation}
               initialVotes={userLocations}
-              initialVotingResults={userLocations}
+              initialVotingResults={locationResults}
               initialAnalysis={locationAnalysis}
               initialVotedCount={locationVotedCount}
+              initialTotalMembers={locationTotalMembers}
               isLocked={isClosed}
             />
           )}
@@ -841,7 +822,7 @@ const reloadTripData = async (tripId?: string) => {
         )}
       </main>
 
-      {/* ✅ Pending Requests Panel (Notification-style ด้านล่างขวา) */}
+      {/* Pending Requests Panel */}
       {showPendingPanel && isOwner && (
       <div className="fixed inset-0 z-40" onClick={() => setShowPendingPanel(false)}>
         <div
@@ -967,7 +948,7 @@ const reloadTripData = async (tripId?: string) => {
       </div>
     )}
 
-      {/* ✅ Notification badge (fixed bottom-right เมื่อปิด panel) */}
+      {/* Notification badge */}
       {!showPendingPanel && isOwner && pendingRequests.length > 0 && (
         <button
           onClick={() => setShowPendingPanel(true)}
@@ -980,7 +961,7 @@ const reloadTripData = async (tripId?: string) => {
           </span>
         </button>
       )}
-      {/* ✅ Join Result Dialog */}
+      {/* Join Result Dialog */}
       {dialogMessage && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
           <div className="bg-white rounded-xl shadow-lg p-6 w-11/12 max-w-sm text-center">
@@ -998,6 +979,18 @@ const reloadTripData = async (tripId?: string) => {
               ปิด
             </button>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${
+          toast.type === 'success'
+            ? 'bg-green-500'
+            : toast.type === 'warning'
+              ? 'bg-yellow-500'
+              : 'bg-red-500'
+        }`}>
+          {toast.message}
         </div>
       )}
 

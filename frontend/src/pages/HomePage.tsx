@@ -36,10 +36,16 @@ const HomePage: React.FC = () => {
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [tripToDelete, setTripToDelete] = useState<TripCard | null>(null);
   const [joiningTrip, setJoiningTrip] = useState(false);
+  const reloadTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleLoadTrips = () => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => {
+      loadTrips();
+    }, 300);
+  };
   
-  // ✅ Helper: แปลง TripSummary → TripCard
   const formatTripSummary = (trip: TripSummary): TripCard => {
-    console.log('Trip status:', trip.trip_id, trip.status);
     const isCompleted = trip.status === 'completed' || trip.status === 'archived'|| trip.status === 'confirmed';
 
     return {
@@ -52,13 +58,9 @@ const HomePage: React.FC = () => {
     };
   };
 
-  // ================= EFFECTS =================
-
   useEffect(() => {
     loadTrips();
   }, []);
-
-  // ============== Socket ==============
 
   useEffect(() => {
 
@@ -66,56 +68,45 @@ const HomePage: React.FC = () => {
 
   const socket = initSocket(user.user_id);
 
-  socket.on("new_notification", async (data) => {
-
-  //console.log("🔔 new notification:", data);
+  const handleNewNotification = async () => {
 
   try {
 
-    // เรียก API โหลด notification
-    const res = await notiApi.getNoti();
+    await notiApi.getNoti();
   
-    loadTrips();
-
-    console.log("notifications:", res);
-    /*
-    if (data.owner_id === user.user_id) {
-      setDialogMessage(`มีคำขอเข้าร่วมทริป ${data.trip_name}`);
-    }
-    */
+    scheduleLoadTrips();
 
   } catch (err) {
     console.error("load notification failed", err);
   }
 
-});
-// ถูกลบออกจากทริป
-  socket.on("you_were_removed", (data) => {
+};
 
-    console.log("Removed from trip:", data.trip_id);
-
+  const handleRemoved = (data: any) => {
     setDialogMessage("คุณถูกนำออกจากทริป");
 
-    loadTrips(); // reload trips
-  });
+    scheduleLoadTrips();
+  };
 
-// ownerปฎิเสธ
-  socket.on("join_rejected", (data) => {
-    console.log("Owner has rejected from join trip:", data.trip_id);
-    loadTrips();
-  });
+  const handleJoinRejected = () => {
+    scheduleLoadTrips();
+  };
 
-//ปิดทริป
-  socket.on("trip_closed", (data) => {
-    console.log("This trip has been close :", data.trip_id);
-    loadTrips();
-  });
+  const handleTripClosed = () => {
+    scheduleLoadTrips();
+  };
+
+  socket.on("new_notification", handleNewNotification);
+  socket.on("you_were_removed", handleRemoved);
+  socket.on("join_rejected", handleJoinRejected);
+  socket.on("trip_closed", handleTripClosed);
 
   return () => {
-  socket.off("new_notification");
-  socket.off("you_were_removed");
-  socket.off("join_rejected");
-  socket.off("trip_closed");
+  socket.off("new_notification", handleNewNotification);
+  socket.off("you_were_removed", handleRemoved);
+  socket.off("join_rejected", handleJoinRejected);
+  socket.off("trip_closed", handleTripClosed);
+  if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
 };
 
 }, [user]);
@@ -143,8 +134,6 @@ const HomePage: React.FC = () => {
     try {
       setLoading(true);
       const response = await tripAPI.getMyTrips();
-      console.log('getMyTrips response:', response);
-
       if (!response.success && response.code === 'AUTH_UNAUTHORIZED') {
         navigate('/login');
         return;
@@ -159,13 +148,11 @@ const HomePage: React.FC = () => {
       setMyTrips(owned.map(formatTripSummary));
       setInvitedTrips(joined.map(formatTripSummary));
 
-      console.log('✅ Loaded trips:', { owned: owned.length, joined: joined.length });
-
     } catch (error) {
       console.error("Load trips failed:", error);
       setMyTrips([]);
       setInvitedTrips([]);
-      alert("ไม่สามารถโหลดข้อมูลทริปได้ กรุณาลองใหม่อีกครั้ง");
+      setDialogMessage("ไม่สามารถโหลดข้อมูลทริปได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setLoading(false);
     }
@@ -189,11 +176,10 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // ✅ เข้าร่วมทริป
   const handleJoinTrip = async (code: string) => {
     const cleanCode = code.trim().toUpperCase();
-    if (!cleanCode) { alert("กรุณากรอกรหัสห้อง"); return; }
-    if (!validateInviteCode(cleanCode)) { alert("รูปแบบรหัสไม่ถูกต้อง"); return; }
+    if (!cleanCode) { setDialogMessage("กรุณากรอกรหัสห้อง"); return; }
+    if (!validateInviteCode(cleanCode)) { setDialogMessage("รูปแบบรหัสไม่ถูกต้อง"); return; }
     if (joiningTrip) return;
 
     try {
@@ -202,7 +188,6 @@ const HomePage: React.FC = () => {
       if (response.success) {
         
 
-        console.log("response", response);
         setRoomCode("");
         setDialogMessage("ส่งคำขอเข้าร่วมแล้ว รอเจ้าของทริปอนุมัติ ⏳");
         loadTrips();
@@ -216,17 +201,16 @@ const HomePage: React.FC = () => {
   }
   };
 
-  // ✅ สร้างทริป
   const handleCreateTrip = async () => {
     const nameValidation = validateTripName(newTrip.name);
     if (!nameValidation.valid) {
-      alert(nameValidation.error);
+      setDialogMessage(nameValidation.error || 'ชื่อทริปไม่ถูกต้อง');
       return;
     }
 
     const daysValidation = validateDays(Number(newTrip.days));
     if (!daysValidation.valid) {
-      alert(daysValidation.error);
+      setDialogMessage(daysValidation.error || 'จำนวนวันไม่ถูกต้อง');
       return;
     }
 
@@ -241,12 +225,6 @@ const HomePage: React.FC = () => {
         throw new Error(response.message || "ไม่สามารถสร้างทริปได้");
       }
 
-      const inviteCode = response.data.invite_code;
-      
-      // alert(
-      //   `สร้างทริปสำเร็จ!\n\nรหัสเชิญ: ${inviteCode}\n\nกรุณาบันทึกรหัสนี้ไว้`
-      // );
-
       navigate(`/votepage/${response.data.trip_id}`);
       setShowCreateModal(false);
       setNewTrip({ name: "", days: "", detail: "" });
@@ -255,11 +233,10 @@ const HomePage: React.FC = () => {
       console.error('Error creating trip:', error);
       const errorMessage =
         error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสร้างทริป";
-      alert(`เกิดข้อผิดพลาด: ${errorMessage}`);
+      setDialogMessage(`เกิดข้อผิดพลาด: ${errorMessage}`);
     }
   };
   
-  // ✅ Logout
   const handleLogout = () => {
     logout();
   };
@@ -511,7 +488,7 @@ const HomePage: React.FC = () => {
           </div>
         </div>
       )}
-      {/* ✅ Join Result Dialog */}
+      {/* Join Result Dialog */}
       {dialogMessage && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[9999]">
           <div className="bg-white rounded-xl shadow-lg p-6 w-11/12 max-w-sm text-center">

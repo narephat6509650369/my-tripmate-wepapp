@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { tripAPI } from '../services/tripService';
 import { formatInviteCode, validateInviteCode } from '../utils';
 import { useToast } from './VotePage/hooks/useToast';
+import { initSocket } from "../socket";
 import {
   PieChart,
   Pie,
@@ -44,6 +45,7 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState("");
   const [joiningTrip, setJoiningTrip] = useState(false);
+  const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadDashboardStats();
@@ -65,17 +67,15 @@ const Dashboard: React.FC = () => {
       const joinedOngoing = joined.filter(t => ['planning','voting'].includes(t.status)).length;
       const joinedCompleted = joined.filter(t => ['completed','archived','confirmed'].includes(t.status)).length;
 
-      // โหลด stats พื้นฐานก่อน → UI แสดงโดย ไม่ต้องรอ vote status
       setStats({
         myTrips: { total: owned.length, ongoing: myOngoing, completed: myCompleted },
         joinedTrips: {
           total: joined.length, ongoing: joinedOngoing, completed: joinedCompleted,
-          myStatus: { completed: 0, pending: 0 } // ← placeholder ก่อน
+          myStatus: { completed: 0, pending: 0 }
         }
       });
       setLoading(false);
 
-      // โหลด vote status ใน background (N calls แต่ไม่ block UI)
       const ongoingJoined = joined.filter(t => ['planning','voting'].includes(t.status));
       if (ongoingJoined.length > 0 && user?.user_id) {
         setVoteStatusLoading(true);
@@ -94,7 +94,6 @@ const Dashboard: React.FC = () => {
             }
           });
 
-          // อัปเดต myStatus โดยไม่ reset ส่วนอื่น
           setStats(prev => prev ? {
             ...prev,
             joinedTrips: { ...prev.joinedTrips, myStatus: { completed: voted, pending: notVoted } }
@@ -111,11 +110,42 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!user?.user_id) return;
+
+    const socket = initSocket(user.user_id);
+    if (!socket) return;
+
+    const scheduleRefresh = () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => {
+        loadDashboardStats();
+      }, 400);
+    };
+
+    const events = [
+      "new_notification",
+      "you_were_removed",
+      "join_rejected",
+      "trip_closed",
+      "member_updated",
+      "vote_updated",
+      "add_Info"
+    ];
+
+    events.forEach(event => socket.on(event, scheduleRefresh));
+
+    return () => {
+      events.forEach(event => socket.off(event, scheduleRefresh));
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, [user?.user_id]);
+
   const handleJoinTrip = async (code: string) => {
     const cleanCode = code.trim().toUpperCase();
     
     if (!cleanCode) {
-      showToast("กรุณากรอกรหัสห้อง", "error"); // ← toast แทน alert
+      showToast("กรุณากรอกรหัสห้อง", "error");
       return;
     }
 
@@ -129,11 +159,9 @@ const Dashboard: React.FC = () => {
       const response = await tripAPI.joinTrip(cleanCode);
       
       if (response.success) {
-        showToast("ส่งคำขอเข้าร่วมสำเร็จ! รอ Owner อนุมัติ", "success"); // ← เปลี่ยนข้อความ ตรงกับ backend
+        showToast("ส่งคำขอเข้าร่วมสำเร็จ! รอ Owner อนุมัติ", "success");
         setRoomCode("");
-        // ❌ ไม่ navigate ทันที เพราะต้องรอ owner approve ก่อน
       } else {
-        // แสดง error message จาก backend ตรงๆ
         showToast(response.message || 'ไม่สามารถเข้าร่วมทริปได้', "error");
       }
     } catch (error) {

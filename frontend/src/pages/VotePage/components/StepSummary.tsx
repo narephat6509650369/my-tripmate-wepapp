@@ -119,12 +119,21 @@ export const StepSummary: React.FC<StepSummaryProps> = ({
   const [aiSummary, setAiSummary] = useState<string>('');
   const [aiMeta, setAiMeta] = useState<any>(null);
   const voteTimerRef = useRef<any>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 2500);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
   };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const fetchVoteData = useCallback(async () => {
 
@@ -222,8 +231,6 @@ useEffect(() => {
     if (!data) return;
     if (data.tripId !== trip.tripid) return;
 
-    console.log("vote updated -> reload summary");
-
     if (voteTimerRef.current) {
       clearTimeout(voteTimerRef.current);
     }
@@ -287,8 +294,12 @@ useEffect(() => {
   };
 
   const handleCloseVoting = async () => {
-    if (!confirm('ยืนยันปิดการโหวต? สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีก')) return;
+    setConfirmCloseOpen(true);
+  };
+
+  const confirmCloseVoting = async () => {
     try {
+      setConfirmCloseOpen(false);
       setIsClosing(true);
       await voteAPI.manualClose(trip.tripid);
       onClosed?.();
@@ -931,6 +942,37 @@ useEffect(() => {
       {!isOwner && !canViewSummary && (
         <div className="w-full py-4 bg-gray-100 rounded-xl text-center text-gray-400 text-sm">
           🔒 รอเจ้าของทริปปิดการโหวต หรือรอครบ 7 วัน
+        </div>
+      )}
+
+      {confirmCloseOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4"
+          onClick={() => setConfirmCloseOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-gray-800 mb-2">ยืนยันปิดการโหวต?</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              สมาชิกจะไม่สามารถแก้ไขข้อมูลได้อีกหลังจากปิดการโหวต
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmCloseOpen(false)}
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={confirmCloseVoting}
+                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+              >
+                ปิดการโหวต
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

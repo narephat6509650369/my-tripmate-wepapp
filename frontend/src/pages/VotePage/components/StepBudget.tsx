@@ -4,8 +4,6 @@ import { Loader2 } from 'lucide-react';
 import { formatCurrency } from '../../../utils';
 import type { TripDetail, BudgetVotingResponse } from '../../../types';
 
-// ============== API RESPONSE TYPES ==============
-
 interface BudgetStats {
   avg: number;
   min: number;
@@ -22,13 +20,12 @@ interface BudgetStatsMap {
   other: BudgetStats;
 }
 
-// ============== COMPONENT TYPES ==============
-
 type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers' | 'totalMembers'>;
 interface StepBudgetProps {
   trip: TripDetail;
   budgetInfo?: BudgetInfo | null;
-  onSave: (category: string, amount: number) => Promise<void>;
+  onSave: (category: string, amount: number, options?: { refresh?: boolean }) => Promise<void>;
+  onSaveAllComplete?: () => Promise<void>;
   onManualNext?: () => void;
   isLocked?: boolean;
   initialAnalysis?: any;
@@ -41,21 +38,17 @@ interface BudgetState {
   other: number;
 }
 
-// ============== CONSTANTS ==============
 const BUDGET_CATEGORIES = [
-  { key: 'accommodation' as const, label: 'ค่าที่พัก*', color: '#3b82f6', required: true },
-  { key: 'transport' as const, label: 'ค่าเดินทาง*', color: '#8b5cf6', required: true },
-  { key: 'food' as const, label: 'ค่าอาหาร*', color: '#10b981', required: true },
-  { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b', required: false }
+  { key: 'accommodation' as const, label: 'ค่าที่พัก', color: '#3b82f6' },
+  { key: 'transport' as const, label: 'ค่าเดินทาง', color: '#8b5cf6' },
+  { key: 'food' as const, label: 'ค่าอาหาร', color: '#10b981' },
+  { key: 'other' as const, label: 'เงินสำรอง', color: '#f59e0b' }
 ] as const;
 
-// ✅ Validation Constants
-const MAX_BUDGET = 10_000_000; // 10 ล้านบาท
+const MAX_BUDGET = 10_000_000;
 const MIN_BUDGET = 0;
 
-// ============== COMPONENT ==============
-export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave, onManualNext, isLocked, initialAnalysis }, ) => {
-  // ============== STATE ==============
+export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave, onSaveAllComplete, onManualNext, isLocked, initialAnalysis }, ) => {
   const [budget, setBudget] = useState<BudgetState>({
     accommodation: 0,
     transport: 0,
@@ -73,17 +66,15 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     totalMembers: number;
   } | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-  // ✅ เปลี่ยนจาก justSaved เป็น hasSaved + isAnalysisOpen เหมือน StepVote
   const [hasSaved, setHasSaved] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const budgetRef = useRef(budget);
   useEffect(() => { budgetRef.current = budget; }, [budget]);
 
-  // ✅ useRef สำหรับจัดการ timeout
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ✅ Cleanup timeout เมื่อ unmount
   useEffect(() => {
     return () => {
       if (toastTimeoutRef.current) {
@@ -92,7 +83,14 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     };
   }, []);
 
-  // ============== COMPUTED VALUES (useMemo) ==============
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'error') => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
   const totalBudget = useMemo(() =>
     Object.values(budget).reduce((sum, val) => sum + val, 0),
     [budget]
@@ -100,9 +98,17 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
 
   const totalMembers = totalBudgetInfo?.totalMembers || trip.members?.length || 1;
   const filledBudgetMembers = totalBudgetInfo?.filledMembers || 0;
-  console.log("filledBudgetMembers:", filledBudgetMembers);
-  console.log("totalMembers:", totalBudgetInfo?.totalMembers);
   const tripDuration = trip.numdays;
+  const requiresAccommodation = (tripDuration || 0) > 1;
+
+  const isRequiredCategory = useCallback((key: keyof BudgetState) => {
+    if (key === 'accommodation') return requiresAccommodation;
+    return key === 'transport' || key === 'food';
+  }, [requiresAccommodation]);
+
+  const getCategoryLabel = useCallback((key: keyof BudgetState, label: string) => {
+    return `${label}${isRequiredCategory(key) ? '*' : ''}`;
+  }, [isRequiredCategory]);
 
   const validateBudget = useCallback((amount: number): { valid: boolean; error?: string } => {
     if (!Number.isFinite(amount)) {
@@ -117,7 +123,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     return { valid: true };
   }, []);
 
-  // ============== LOAD BUDGET DATA ==============
   useEffect(() => {
     if (!budgetInfo) { setIsLoading(false); return; }
 
@@ -129,7 +134,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       totalMembers: budgetInfo.totalMembers || 0,
     });
 
-    // 1. build loadedBudget ก่อน
     const loadedBudget: BudgetState = { accommodation: 0, transport: 0, food: 0, other: 0 };
     if (budgetInfo.rows && Array.isArray(budgetInfo.rows)) {
       budgetInfo.rows.forEach((vote: any) => {
@@ -140,7 +144,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       });
     }
 
-    // 2. set budget จาก loadedBudget ที่ build แล้ว
     if (budgetInfo.rows?.length > 0) {
       setBudget(prev => {
         const merged = { ...prev };
@@ -156,7 +159,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       setIsAnalysisOpen(true);
     }
 
-    // 3. statsMap ใช้ loadedBudget ที่มีค่าแล้ว ✅
     if (budgetInfo.stats) {
       const statsMap: BudgetStatsMap = {
         accommodation: {
@@ -194,18 +196,16 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     setIsLoading(false);
   }, [budgetInfo]);
 
-  // ============== HANDLERS ==============
-
   const handleSaveCategory = useCallback(async (category: keyof BudgetState) => {
     if (isLocked) return;
     const amount = budget[category];
     const validation = validateBudget(amount);
     if (!validation.valid) {  
-      alert(validation.error);
+      showToast(validation.error || 'งบประมาณไม่ถูกต้อง', 'error');
       return;
     }
     if (amount === 0) {
-      alert('กรุณากรอกจำนวนเงินที่มากกว่า 0');
+      showToast('กรุณากรอกจำนวนเงินที่มากกว่า 0', 'error');
       return;
     }
 
@@ -213,37 +213,36 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     setError(null);
     try {
       await onSave(category, amount);
-      console.log(`✅ บันทึก ${category} สำเร็จ: ฿${amount}`);
       setHasSaved(true);
       setIsAnalysisOpen(true);
+      showToast('บันทึกงบประมาณสำเร็จ', 'success');
     } catch (error) {
       console.error(`Error saving ${category}:`, error);
       const errorMsg = error instanceof Error ? error.message : 'ไม่สามารถบันทึกได้';
       setError(`ไม่สามารถบันทึก ${category} ได้: ${errorMsg}`);
-      alert(`❌ บันทึกไม่สำเร็จ: ${errorMsg}`);
+      showToast(`บันทึกไม่สำเร็จ: ${errorMsg}`, 'error');
     } finally {
       setIsSaving(false);
     }
-  }, [budget, validateBudget, onSave]);
+  }, [budget, validateBudget, onSave, showToast]);
 
   const handleBudgetChange = useCallback((key: keyof BudgetState, value: number) => {
     const validation = validateBudget(value);
     if (!validation.valid) {
-      alert(`❌ ${validation.error}`);
+      showToast(validation.error || 'งบประมาณไม่ถูกต้อง', 'error');
       return;
     }
     setBudget(prev => ({ ...prev, [key]: value }));
-  }, [validateBudget]);
+  }, [validateBudget, showToast]);
 
   const handleSaveAll = useCallback(async () => {
     if (isLocked) return;
-    const hasRequiredBudget =
-      budget.accommodation > 0 &&
-      budget.transport > 0 &&
-      budget.food > 0;
+    const missingRequiredCategories = BUDGET_CATEGORIES
+      .filter(({ key }) => isRequiredCategory(key) && budget[key] <= 0)
+      .map(({ label }) => label);
 
-    if (!hasRequiredBudget) {
-      alert('กรุณากรอกงบประมาณที่จำเป็น (ที่พัก, เดินทาง, อาหาร)');
+    if (missingRequiredCategories.length > 0) {
+      showToast(`กรุณากรอกงบประมาณที่จำเป็น (${missingRequiredCategories.join(', ')})`, 'error');
       return;
     }
 
@@ -255,7 +254,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       for (const category of BUDGET_CATEGORIES) {
         if (budget[category.key] === 0) continue;
         try {
-          await onSave(category.key, budget[category.key]);
+          await onSave(category.key, budget[category.key], { refresh: false });
           results.push({ category: category.key });
         } catch (err) {
           console.error(`Failed to save ${category.key}:`, err);
@@ -267,7 +266,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
       if (failures.length > 0) {
         const failedCategories = failures.map((f: any) => f.category).join(', ');
         setError(`บันทึกไม่สำเร็จสำหรับ: ${failedCategories}`);
-        alert(`⚠️ บันทึกสำเร็จบางส่วน (${results.length - failures.length}/${results.length} หมวด)`);
+        showToast(`บันทึกสำเร็จบางส่วน (${results.length - failures.length}/${results.length} หมวด)`, 'warning');
       } else {
         setBudgetStats(prev => prev ? {
           ...prev,
@@ -283,17 +282,18 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
         });
       setHasSaved(true);
       setIsAnalysisOpen(true);
+      showToast('บันทึกงบประมาณทั้งหมดสำเร็จ', 'success');
       }
+      await onSaveAllComplete?.();
     } catch (error) {
       console.error('Error saving budget:', error);
       setError('เกิดข้อผิดพลาดในการบันทึก');
-      alert('❌ เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่');
+      showToast('เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่', 'error');
     } finally {
       setIsSaving(false);
     }
-  }, [budget, onSave]);
+  }, [budget, isRequiredCategory, onSave, onSaveAllComplete, showToast]);
 
-  // ============== ANALYSIS MODAL ==============
   const renderAnalysisModal = () => {
     if (!showAnalysisModal || !budgetStats) return null;
 
@@ -385,6 +385,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                 {BUDGET_CATEGORIES.map(({ key, label, color }) => {
                   const stat = budgetStats[key];
                   if (!stat || stat.myValue === 0) return null;
+                  const displayLabel = getCategoryLabel(key, label);
 
                   const range = stat.max - stat.min;
                   const position = range > 0
@@ -395,7 +396,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                     <div key={key} className="bg-white border border-gray-200 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-                        <span className="text-sm font-semibold text-gray-800">{label}</span>
+                        <span className="text-sm font-semibold text-gray-800">{displayLabel}</span>
                       </div>
 
                       {hasRealStats ? (
@@ -545,7 +546,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     );
   };
 
-  // ============== LOADING STATE ==============
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -555,7 +555,6 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
     );
   }
 
-  // ============== RENDER ==============
   return (
     <>
       {/* Error Message */}
@@ -592,48 +591,52 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                 </tr>
               </thead>
               <tbody>
-                {BUDGET_CATEGORIES.map(({ key, label, color }) => (
-                  <tr key={key} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: color }} />
-                        <span className="font-medium text-gray-800">{label}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="number"
-                        disabled={isSaving || isLocked}
-                        min={MIN_BUDGET}
-                        max={MAX_BUDGET}
-                        step={100}
-                        value={budget[key] || ''}
-                        placeholder="0"
-                        className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        onChange={e => handleBudgetChange(key, Number(e.target.value) || 0)}
-                        id={`budget-input-${key}`}
-                        onKeyDown={async (e) => {
-                          if (e.key !== 'Enter') return;
-                          await handleSaveCategory(key);
-                          const keys = BUDGET_CATEGORIES.map(c => c.key);
-                          const nextKey = keys[keys.indexOf(key) + 1];
-                          if (nextKey) {
-                            document.getElementById(`budget-input-${nextKey}`)?.focus();
-                          }
-                        }}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => handleSaveCategory(key)}
-                        disabled={isSaving || budget[key] === 0 || isLocked}
-                        className="px-3 py-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm rounded-lg transition"
-                      >
-                        {isLocked ? '🔒' : 'บันทึก'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {BUDGET_CATEGORIES.map(({ key, label, color }) => {
+                  const displayLabel = getCategoryLabel(key, label);
+
+                  return (
+                    <tr key={key} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: color }} />
+                          <span className="font-medium text-gray-800">{displayLabel}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="number"
+                          disabled={isSaving || isLocked}
+                          min={MIN_BUDGET}
+                          max={MAX_BUDGET}
+                          step={100}
+                          value={budget[key] || ''}
+                          placeholder="0"
+                          className="w-full text-right border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          onChange={e => handleBudgetChange(key, Number(e.target.value) || 0)}
+                          id={`budget-input-${key}`}
+                          onKeyDown={async (e) => {
+                            if (e.key !== 'Enter') return;
+                            await handleSaveCategory(key);
+                            const keys = BUDGET_CATEGORIES.map(c => c.key);
+                            const nextKey = keys[keys.indexOf(key) + 1];
+                            if (nextKey) {
+                              document.getElementById(`budget-input-${nextKey}`)?.focus();
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleSaveCategory(key)}
+                          disabled={isSaving || budget[key] === 0 || isLocked}
+                          className="px-3 py-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm rounded-lg transition"
+                        >
+                          {isLocked ? '🔒' : 'บันทึก'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {/* รวม */}
                 <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 font-bold">
@@ -671,7 +674,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
           )}
         </button>
 
-        {/* ✅ ผลการวิเคราะห์ inline (เหมือน StepVote) — แสดงหลังบันทึก */}
+        {/* ผลการวิเคราะห์หลังบันทึก */}
         {hasSaved && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
 
@@ -720,6 +723,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                   {BUDGET_CATEGORIES.map(({ key, label, color }) => {
                     const stat = budgetStats[key];
                     if (!stat || stat.myValue === 0) return null;
+                    const displayLabel = getCategoryLabel(key, label);
 
                     const diffFromAvg = stat.myValue - stat.avg;
                     const diffPercent = stat.avg > 0 ? Math.round((diffFromAvg / stat.avg) * 100) : 0;
@@ -729,7 +733,7 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-                            <span className="text-sm font-semibold text-gray-800">{label}</span>
+                            <span className="text-sm font-semibold text-gray-800">{displayLabel}</span>
                           </div>
                           <span className="text-lg font-bold" style={{ color }}>
                             ฿{formatCurrency(stat.myValue)}
@@ -840,13 +844,24 @@ export const StepBudget: React.FC<StepBudgetProps> = ({ trip, budgetInfo, onSave
             💡 <strong>หมายเหตุ:</strong> คุณสามารถบันทึกทีละหมวดหมู่ หรือบันทึกทั้งหมดพร้อมกันได้
           </p>
           <p className="text-xs text-blue-700 mt-1">
-            * หมวดหมู่ที่มี * เป็นหมวดหมู่ที่จำเป็นต้องกรอก
+            * หมวดหมู่ที่จำเป็นต้องกรอก โดยค่าที่พักจะบังคับเฉพาะทริปมากกว่า 1 วัน
           </p>
         </div>
       </div>
 
       {/* Analysis Modal */}
       {renderAnalysisModal()}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${
+          toast.type === 'success'
+            ? 'bg-green-500'
+            : toast.type === 'warning'
+              ? 'bg-yellow-500'
+              : 'bg-red-500'
+        }`}>
+          {toast.message}
+        </div>
+      )}
     </>
   );
 };

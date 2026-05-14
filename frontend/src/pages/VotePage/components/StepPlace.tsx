@@ -5,25 +5,23 @@ import { voteAPI } from '../../../services/tripService';
 import { THAILAND_PROVINCES } from '../../../constants/provinces';
 import type { LocationVote, TripDetail, LocationVoteResponse, LocationVoteResult  } from '../../../types';
 
-// ============== CONSTANTS ==============
 const WEIGHTS = [3, 2, 1] as const;
 
-// ============== TYPES ==============
 interface StepPlaceProps {
   trip: TripDetail;
   initialVotes?: { place: string; score: number }[];
-  initialVotingResults?: { place: string; score: number }[];
+  initialVotingResults?: LocationVoteResult[];
   onVote: (votes: LocationVote[]) => Promise<void>;
   onManualNext?: () => void;
   onInputChange?: () => void;
   isLocked?: boolean;
   initialAnalysis?: any;
   initialVotedCount?: number;
+  initialTotalMembers?: number;
 }
 
 type AnalysisResult = NonNullable<LocationVoteResponse['analysis']>;
 
-// ============== MAIN COMPONENT ==============
 export const StepPlace: React.FC<StepPlaceProps> = ({
   trip,
   initialVotes = [],
@@ -33,9 +31,9 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   onInputChange,
   isLocked = false,
   initialVotedCount = 0,
+  initialTotalMembers = 0,
   initialAnalysis
 }) => {
-  // ============== STATE ==============
   const [myVote, setMyVote] = useState<[string, string, string]>(["", "", ""]);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,11 +44,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [votedCount, setVotedCount] = useState(0);
   const [totalMembers, setTotalMembers] = useState(0);
-  const [locationAnalysis, setLocationAnalysis] = useState<any>(null);
 
-  // ============== EFFECTS ==============
-
-  // Load initial votes
   useEffect(() => {
     if (initialVotes.length > 0) {
       const sorted = [...initialVotes].sort((a, b) => b.score - a.score);
@@ -63,12 +57,22 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     if (initialVotes && initialVotes.length > 0) {
       setHasSaved(true);
       setIsAnalysisOpen(true);
-      if (initialAnalysis) setAnalysisResult(initialAnalysis);
-      if (initialVotedCount) setVotedCount(initialVotedCount);
     }
   }, [initialVotes]);
 
-  // Load voting results
+  useEffect(() => {
+    setVotingResults(initialVotingResults);
+    if (initialVotingResults.length > 0) {
+      setIsLoading(false);
+    }
+  }, [initialVotingResults]);
+
+  useEffect(() => {
+    setAnalysisResult(initialAnalysis || null);
+    setVotedCount(initialVotedCount || 0);
+    setTotalMembers(initialTotalMembers || 0);
+  }, [initialAnalysis, initialVotedCount, initialTotalMembers]);
+
   useEffect(() => {
     if (initialVotingResults.length > 0) return;
     const loadVotingResults = async () => {
@@ -102,7 +106,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
           setAnalysisResult(null);
         }
 
-        // ✅ เช็คจาก rows ของ user (votes ที่ user นี้โหวต)
         const userVotes = votingData.rows as any[];
         if (userVotes && userVotes.length > 0) {
           setHasSaved(true);
@@ -120,9 +123,8 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     };
 
     loadVotingResults();
-  }, [trip?.tripid]);
+  }, [trip?.tripid, initialVotingResults.length]);
 
-  // ============== HANDLERS ==============
   const handleSelect = useCallback((index: number, value: string) => {
     if (isLocked) return;
     if (myVote.includes(value) && myVote[index] !== value) {
@@ -159,7 +161,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
       
       const elapsed = Date.now() - startTime;
       
-      // Wait for backend to process if response was too fast
       if (elapsed < 100) {
         await new Promise(resolve => setTimeout(resolve, 200));
       } else if (elapsed < 300) {
@@ -168,7 +169,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
       setHasSaved(true);
       setIsAnalysisOpen(true);
 
-      // Retry to get updated results
       let retries = 0;
       const maxRetries = 3;
       let hasMyVote = false;
@@ -192,7 +192,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
           if (votingData?.analysis) {
             setAnalysisResult(votingData.analysis);
           } else {
-            console.warn('⚠️ Backend did not return analysis after vote');
             setAnalysisResult(null);
           }
           break;
@@ -208,7 +207,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     }
   };
 
-  // ============== LOADING STATE ==============
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -218,7 +216,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
     );
   }
 
-  // ============== MAIN RENDER ==============
   return (
     <>
       <div className="space-y-6 max-w-4xl mx-auto">
@@ -332,22 +329,22 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
 
               {/* Progress bar */}
               {(() => {
-                const totalMembers = trip.members?.length || 0;
+                const memberTotal = totalMembers || trip.members?.length || 0;
                 return (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <div className="flex items-center gap-3 mb-1">
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-gradient-to-r from-purple-500 to-pink-600 h-2 rounded-full transition-all"
-                          style={{ width: `${totalMembers > 0 ? Math.min(100, (votedCount / totalMembers) * 100) : 0}%` }}
+                          style={{ width: `${memberTotal > 0 ? Math.min(100, (votedCount / memberTotal) * 100) : 0}%` }}
                         />
                       </div>
                       <span className="text-xs font-semibold text-blue-900 whitespace-nowrap">
-                        {votedCount}/{totalMembers || trip.members?.length || 0} คน
+                        {votedCount}/{memberTotal} คน
                       </span>
                     </div>
                     <p className="text-xs text-blue-700">
-                      {votedCount >= (trip.members?.length || 0)
+                      {memberTotal > 0 && votedCount >= memberTotal
                       ? '✅ ทุกคนโหวตแล้ว'
                       : '⏳ รอสมาชิกคนอื่นโหวต'}
                     </p>
@@ -355,7 +352,7 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                 );
               })()}
 
-              {/* ✅ มีผลวิเคราะห์ */}
+              {/* ผลวิเคราะห์ */}
               {analysisResult ? (
                 <>
                   {analysisResult.hasWinner && analysisResult.topProvinces && (
@@ -395,7 +392,6 @@ export const StepPlace: React.FC<StepPlaceProps> = ({
                   )}
                 </>
               ) : (
-                // ✅ ยังไม่มีผลวิเคราะห์ (คนโหวตคนแรก)
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <p className="text-gray-500 text-sm text-center">
                     💭 บันทึกเรียบร้อยแล้ว รอสมาชิกคนอื่นโหวตเพื่อดูผลเปรียบเทียบ

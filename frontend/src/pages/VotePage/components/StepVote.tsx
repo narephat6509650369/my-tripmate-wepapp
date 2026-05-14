@@ -23,19 +23,31 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
   
   const [matchingInfo, setMatchingInfo] = useState<MatchingData | null>(null);
 
-  // State สำหรับ Smart Toast & Modal
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false); 
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const toastTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const tripDuration = trip.numdays;
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'error') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 2500);
+  };
   const parseLocalDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year!, month! - 1, day!);
   };
 
   const formatThaiDate = (dateStr: string) => {
-    console.log("formatThaiDate result:", dateStr);
     const [, month, day] = dateStr.slice(0, 10).split('-').map(Number);
     const monthNames = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
                         'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -43,7 +55,7 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
   };
 
   const toLocalDateStr = (dateStr: string) => {
-    if (!dateStr.includes('T')) return dateStr; // ถ้าเป็น YYYY-MM-DD แล้ว ไม่ต้องแปลง
+    if (!dateStr.includes('T')) return dateStr;
     const d = new Date(dateStr);
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   };
@@ -59,7 +71,6 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
   useEffect(() => {
     if (initialDates?.length) {
       const normalized = initialDates.map(d => {
-        // แปลง UTC → local date ก่อน slice
         const date = new Date(d);
         const localYear = date.getFullYear();
         const localMonth = String(date.getMonth() + 1).padStart(2, '0');
@@ -82,13 +93,6 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
     }
   }, [initialDates]);
 
-  useEffect(() => {
-    console.log("initialDates:", initialDates);
-    console.log("selectedDates:", selectedDates);
-  }, [initialDates, selectedDates]);
-
-  // ================= HANDLERS =================
-
   const toggleDate = (dateStr: string) => {
     setSelectedDates(prev =>
       prev.includes(dateStr)
@@ -99,14 +103,14 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
 
   const handleSave = async () => {
     if (selectedDates.length === 0) {
-      alert("กรุณาเลือกอย่างน้อย 1 วัน");
+      showToast("กรุณาเลือกอย่างน้อย 1 วัน", 'error');
       return;
     }
 
     try {
       setLoading(true);
       if (!trip.tripid || !trip.ownerid) {
-        alert("ไม่พบข้อมูลทริปหรือผู้ใช้");
+        showToast("ไม่พบข้อมูลทริปหรือผู้ใช้", 'error');
         return;
       }
       if (onSave) {
@@ -115,19 +119,18 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
       setJustSaved(true);
       setHasSaved(true);
       setIsAnalysisOpen(true);
+      showToast("บันทึกวันที่สำเร็จ", 'success');
     } catch (err: any) {
       console.error(err); 
-      alert(err?.response?.data?.message || "บันทึกไม่สำเร็จ");
+      showToast(err?.response?.data?.message || "บันทึกไม่สำเร็จ", 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // ============== ANALYSIS MODAL ==============
   const renderAnalysisModal = () => {
     if (!showAnalysisModal || !matchingInfo) return null;
 
-    // ✅ ใช้ recommendation จาก Backend
     const { recommendation, availability, summary } = matchingInfo;
 
     return (
@@ -273,7 +276,6 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
     );
   };
 
-  // ================= RENDER CALENDAR =================
   const renderCalendar = () => {
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
@@ -320,7 +322,6 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
     return days;
   };
 
-  // ============== RENDER ==============
   return (
     <>
         <div className="space-y-6">        
@@ -515,10 +516,9 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
                   <div className="bg-white rounded-lg p-3 border border-gray-200">
                     <div className="flex flex-wrap gap-2 items-center">
                       {matchingInfo.recommendation.dates.map((date, idx) => {
-                        console.log("Processing date:", date);
                         const localDate = toLocalDateStr(date);
                         const availInfo = matchingInfo.availability.find(a => 
-                          toLocalDateStr(a.date) === localDate  // ← normalize ทั้งสองฝั่ง
+                          toLocalDateStr(a.date) === localDate
                         );
                         const peopleCount = availInfo?.count || 0;
 
@@ -563,6 +563,13 @@ export const StepVote: React.FC<StepVoteProps> = ({ trip, matchingData, initialD
 
       {/* Analysis Modal */}
       {renderAnalysisModal()}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${
+          toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        }`}>
+          {toast.message}
+        </div>
+      )}
     </>
   );
 };

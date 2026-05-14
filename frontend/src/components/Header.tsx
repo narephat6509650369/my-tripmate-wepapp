@@ -7,15 +7,10 @@ import { formatRelativeTime } from "../utils";
 import { notiApi } from "../services/tripService";
 import { getSocket } from "../socket";
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
 interface HeaderProps {
   onLogout?: () => void;
 }
 
-// เปลี่ยน type ให้ตรง DB
 type NotificationType = 
   | 'trip_invitation' 
   | 'new_voting_session'
@@ -37,10 +32,6 @@ interface Notification {
   subText?: string;
 }
 
-// ============================================================================
-// COMPONENT
-// ============================================================================
-
 const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -60,6 +51,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
   const [, forceUpdate] = useState(0);
   const [toast, setToast] = useState<{ text: string; type: string } | null>(null);
+  const toastTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const fetchNoti = async () => {
@@ -83,8 +75,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
     fetchNoti();
   }, []);
 
-  // ============== Socket ==============
-
   useEffect(() => {
 
   if (!user?.user_id) return;
@@ -93,7 +83,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   if (!socket) return;
 
   const handleNewNotification = async () => {
-    console.log("🔔 socket notification received");
     try {
       const res = await notiApi.getNoti();
       if (res?.success && Array.isArray(res.data?.notifications)) {
@@ -110,11 +99,11 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
 
         const latest = mapped.find((n: any) => !n.read);
         if (latest) {
+          if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
           setToast({ text: latest.text, type: latest.type });
-          setTimeout(() => setToast(null), 4000);
+          toastTimeoutRef.current = setTimeout(() => setToast(null), 4000);
         }
 
-        // ✅ ถ้ามี noti trip_confirmed/archived/completed และอยู่ใน votepage ของทริปนั้น
         const closedNoti = mapped.find((n: any) =>
           ["trip_confirmed", "voting_closed", "trip_archived"].includes(n.type) &&
           n.tripId &&
@@ -122,7 +111,6 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
         );
         if (closedNoti) {
           navigate(`/votepage/${closedNoti.tripId}`);
-          window.location.reload();
         }
       }
     } catch (err) {
@@ -130,17 +118,17 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
     }
   };
 
-  socket.on("connect", () => {
-    console.log("🔌 socket connected:", socket.id);
-
+  const handleConnect = () => {
     socket.emit("join_user", user.user_id);
-  });
+  };
 
+  socket.on("connect", handleConnect);
   socket.on("new_notification", handleNewNotification);
 
   return () => {
     socket.off("new_notification", handleNewNotification);
-    socket.off("connect");
+    socket.off("connect", handleConnect);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
   };
 
 }, [user?.user_id]);
@@ -204,11 +192,10 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   const handleLogout = () => {
     if (onLogout) onLogout();
     logout();
-    console.log("User logged out");
   };
 
   const markAllAsRead = async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))); // optimistic
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     await notiApi.markAllAsRead();
   };
 
@@ -224,13 +211,12 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
     setNotiOpen(false);
     if (notification.tripId) {
       navigate(`/votepage/${notification.tripId}`);
-      console.log(`Navigating to trip: ${notification.tripId}`);
     }
   };
 
   const deleteNotification = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setNotifications((prev) => prev.filter((n) => n.id !== id)); // optimistic
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
     await notiApi.deleteNoti(id);
   };
 
@@ -508,7 +494,7 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
         </div>
       )}
 
-      {/* ✅ Toast Notification */}
+      {/* Toast Notification */}
       {toast && (
         <div className="fixed top-20 right-4 z-[9999] max-w-sm bg-white border border-gray-200 rounded-xl shadow-2xl px-4 py-3 flex items-start gap-3 animate-in slide-in-from-right duration-300">
           <span className="text-xl flex-shrink-0">🔔</span>
