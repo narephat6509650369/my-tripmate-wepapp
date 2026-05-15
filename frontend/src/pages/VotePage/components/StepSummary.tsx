@@ -78,6 +78,146 @@ const MODEL_ICON_MAP: Record<AIModel, string> = {
   'gemini-pro': '💎',
 };
 
+const PROMPT_FIELD_LABELS: Record<string, string> = {
+  trip: 'รายละเอียดทริป',
+  name: 'ชื่อทริป',
+  description: 'รายละเอียด',
+  duration: 'ระยะเวลา',
+  code: 'รหัสทริป',
+  group: 'ข้อมูลกลุ่ม',
+  size: 'จำนวนคน',
+  estimated_ages: 'ช่วงอายุโดยประมาณ',
+  gender_ratio: 'ลักษณะกลุ่ม',
+  dates: 'วันที่ที่เลือก',
+  preferred: 'วันที่สะดวก',
+  availability: 'จำนวนคนที่ว่าง',
+  budget: 'งบประมาณ',
+  accommodation: 'ค่าที่พัก',
+  transport: 'ค่าเดินทาง',
+  food: 'ค่าอาหาร',
+  other: 'เงินสำรอง',
+  total_per_person: 'รวมต่อคน',
+  total_group: 'รวมทั้งกลุ่ม',
+  destination: 'จุดหมาย',
+  province: 'จังหวัด',
+  score: 'คะแนนโหวต',
+  region: 'ภูมิภาค',
+};
+
+const formatPromptValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return 'ไม่ระบุ';
+  if (Array.isArray(value)) return value.length ? value.join(', ') : 'ไม่มีข้อมูล';
+  if (typeof value === 'number') return value.toLocaleString('th-TH');
+  if (typeof value === 'boolean') return value ? 'ใช่' : 'ไม่ใช่';
+  return String(value);
+};
+
+const formatPromptObject = (value: unknown, level = 0): string => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return formatPromptValue(value);
+  }
+
+  return Object.entries(value as Record<string, unknown>)
+    .map(([key, item]) => {
+      const label = PROMPT_FIELD_LABELS[key] || key;
+      const indent = '  '.repeat(level);
+
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        const nested = formatPromptObject(item, level + 1);
+        return `${indent}- ${label}:\n${nested}`;
+      }
+
+      return `${indent}- ${label}: ${formatPromptValue(item)}`;
+    })
+    .join('\n');
+};
+
+const removeJsonResponseInstructions = (text: string) => {
+  return text
+    .split('\n')
+    .map((line) => {
+      const lower = line.toLowerCase();
+      const asksForJson =
+        lower.includes('json') &&
+        (
+          lower.includes('output') ||
+          lower.includes('structured') ||
+          lower.includes('machine-readable') ||
+          line.includes('รูปแบบ') ||
+          line.includes('ตอบกลับ') ||
+          line.includes('ผลลัพธ์')
+        );
+
+      if (asksForJson) {
+        return 'กรุณาตอบกลับเป็นภาษาไทยแบบหัวข้อหรือตารางที่อ่านง่าย ไม่ต้องใช้ JSON';
+      }
+
+      return line;
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+};
+
+const formatPromptForCopy = (text: string) => {
+  if (!text) return '';
+
+  const withoutJsonBlocks = text.replace(/```(?:json)?\s*([\s\S]*?)```/gi, (_match, blockText: string) => {
+    const trimmed = blockText.trim();
+    if (!trimmed) return '';
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      return formatPromptObject(parsed);
+    } catch {
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        return 'กรุณาอธิบายผลลัพธ์เป็นภาษาไทยแบบอ่านง่าย ไม่ต้องแสดงโครงสร้าง JSON';
+      }
+      return trimmed;
+    }
+  });
+
+  const plainPrompt = removeJsonResponseInstructions(withoutJsonBlocks);
+
+  return `${plainPrompt.trim()}\n\nข้อกำหนดคำตอบ: กรุณาตอบเป็นภาษาไทยแบบหัวข้อหรือตารางที่อ่านง่าย ห้ามตอบเป็น JSON และไม่ต้องใส่ code block`;
+};
+
+const buildPromptContext = (trip: TripDetail, summaryData: SummaryData | null) => {
+  const bestDates = summaryData?.bestDates?.length
+    ? summaryData.bestDates.join(', ')
+    : 'ยังไม่มีวันที่สรุป';
+
+  const budget = summaryData
+    ? [
+        `ค่าที่พัก ${formatCurrency(summaryData.avgBudget.accommodation)} บาท`,
+        `ค่าเดินทาง ${formatCurrency(summaryData.avgBudget.transport)} บาท`,
+        `ค่าอาหาร ${formatCurrency(summaryData.avgBudget.food)} บาท`,
+        `เงินสำรอง ${formatCurrency(summaryData.avgBudget.other)} บาท`,
+      ].join(', ')
+    : 'ยังไม่มีข้อมูลงบประมาณ';
+
+  const totalBudget = summaryData
+    ? Object.values(summaryData.avgBudget).reduce((sum, value) => sum + value, 0)
+    : 0;
+
+  const locations = summaryData?.topLocations?.length
+    ? summaryData.topLocations
+        .map((location, index) => `${index + 1}. ${location.place} (${location.total_score} คะแนน)`)
+        .join('\n')
+    : 'ยังไม่มีสถานที่สรุป';
+
+  return [
+    '## ข้อมูลสรุปจาก TripMate',
+    `- ชื่อทริป: ${trip.tripname}`,
+    `- ระยะเวลา: ${trip.numdays} วัน`,
+    `- วันที่ที่สมาชิกเลือก: ${bestDates}`,
+    `- งบประมาณเฉลี่ยต่อคน: ${budget}`,
+    `- รวมงบเฉลี่ยต่อคน: ${formatCurrency(totalBudget)} บาท`,
+    `- สถานที่/จังหวัดที่ได้รับโหวตสูงสุด:\n${locations}`,
+    '',
+    'โปรดใช้ข้อมูลสรุปจาก TripMate ข้างต้นเป็นข้อมูลหลักในการตอบ',
+  ].join('\n');
+};
+
 // ============== COMPONENT ==============
 
 export const StepSummary: React.FC<StepSummaryProps> = ({
@@ -311,7 +451,8 @@ useEffect(() => {
     }
   };
 
-  const prompt = aiSummary;
+  const promptContext = buildPromptContext(trip, summaryData);
+  const prompt = `${promptContext}\n\n---\n\n${formatPromptForCopy(aiSummary)}`;
   const metadata = aiMeta ?? {
     estimatedTokens: 0,
     estimatedCost: 0,
@@ -808,7 +949,7 @@ useEffect(() => {
                 {[
                   { key: 'includeCOT', label: 'Chain-of-Thought (CoT)', note: '+20% tokens' },
                   { key: 'includeExamples', label: 'Few-Shot Examples', note: '+30% tokens' },
-                  { key: 'structured', label: 'Structured JSON Output', note: 'machine-readable' },
+                  { key: 'structured', label: 'Readable Thai Output', note: 'no JSON' },
                 ].map(({ key, label, note }) => (
                   <label key={key} className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox"

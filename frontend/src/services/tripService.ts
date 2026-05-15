@@ -1,7 +1,4 @@
-// ============================================================================
 // frontend/src/services/tripService.ts
-// ✅ รองรับทั้ง Mock Data และ API จริง - จัดเรียงตาม Step
-// ============================================================================
 
 import { CONFIG } from '../config/app.config';
 import type {
@@ -13,7 +10,6 @@ import type {
   TripDetail,
   TripSummaryResult,
   SubmitAvailabilityPayload,
-  HeatmapData,
   StartVotingResponse,
   UpdateBudgetPayload,
   UpdateBudgetResponse,
@@ -361,10 +357,6 @@ export const tripAPI = {
         body: JSON.stringify({ invite_code: inviteCode })
       });
 
-      const data = await response.json();
-      console.log('request-join response:', response.status, data); 
-
-      // ✅ เช็คก่อนว่าเป็น JSON จริงไหม
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         return {
@@ -376,6 +368,7 @@ export const tripAPI = {
         };
       }
 
+      const data = await response.json();
       return data;
       
     } catch (error) {

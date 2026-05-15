@@ -5,7 +5,7 @@ import { Users, Vote, CheckCircle } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { formatRelativeTime } from "../utils";
 import { notiApi } from "../services/tripService";
-import { getSocket } from "../socket";
+import { initSocket } from "../socket";
 
 interface HeaderProps {
   onLogout?: () => void;
@@ -52,86 +52,89 @@ const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   const [, forceUpdate] = useState(0);
   const [toast, setToast] = useState<{ text: string; type: string } | null>(null);
   const toastTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notificationReloadTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    const fetchNoti = async () => {
-      try {
-        const res = await notiApi.getNoti();
-        if (res?.success && Array.isArray(res.data?.notifications)) {
-          setNotifications(res.data.notifications.map((n: any) => ({
-            id: n.notification_id,
-            type: n.notification_type,
-            text: n.message || n.title,
-            subText: n.email,
-            read: Boolean(n.is_read),
-            timestamp: new Date(new Date(n.created_at).getTime() + 7 * 60 * 60 * 1000),
-            tripId: n.trip_id,
-          })));
-        }
-      } catch (err) {
-        console.error("Failed to fetch notifications:", err);
-      }
-    };
-    fetchNoti();
-  }, []);
+  const mapNotifications = React.useCallback((items: any[]): Notification[] => (
+    items.map((n: any) => ({
+      id: n.notification_id,
+      type: n.notification_type,
+      text: n.message || n.title,
+      subText: n.email,
+      read: Boolean(n.is_read),
+      timestamp: new Date(new Date(n.created_at).getTime() + 7 * 60 * 60 * 1000),
+      tripId: n.trip_id,
+    }))
+  ), []);
 
-  useEffect(() => {
-
-  if (!user?.user_id) return;
-
-  const socket = getSocket();
-  if (!socket) return;
-
-  const handleNewNotification = async () => {
+  const loadNotifications = React.useCallback(async (showLatestToast = false) => {
     try {
       const res = await notiApi.getNoti();
-      if (res?.success && Array.isArray(res.data?.notifications)) {
-        const mapped = res.data.notifications.map((n: any) => ({
-          id: n.notification_id,
-          type: n.notification_type,
-          text: n.message || n.title,
-          subText: n.email,
-          read: Boolean(n.is_read),
-          timestamp: new Date(new Date(n.created_at).getTime() + 7 * 60 * 60 * 1000),
-          tripId: n.trip_id,
-        }));
-        setNotifications(mapped);
+      if (!res?.success || !Array.isArray(res.data?.notifications)) return;
 
-        const latest = mapped.find((n: any) => !n.read);
+      const mapped = mapNotifications(res.data.notifications);
+      setNotifications(mapped);
+
+      if (showLatestToast) {
+        const latest = mapped.find((n) => !n.read);
         if (latest) {
           if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
           setToast({ text: latest.text, type: latest.type });
           toastTimeoutRef.current = setTimeout(() => setToast(null), 4000);
         }
+      }
 
-        const closedNoti = mapped.find((n: any) =>
-          ["trip_confirmed", "voting_closed", "trip_archived"].includes(n.type) &&
-          n.tripId &&
-          window.location.pathname.includes(n.tripId)
-        );
-        if (closedNoti) {
-          navigate(`/votepage/${closedNoti.tripId}`);
-        }
+      const closedNoti = mapped.find((n) =>
+        ["trip_confirmed", "voting_closed", "trip_archived"].includes(n.type) &&
+        n.tripId &&
+        window.location.pathname.includes(n.tripId)
+      );
+      if (closedNoti) {
+        navigate(`/votepage/${closedNoti.tripId}`);
       }
     } catch (err) {
-      console.error("Failed to reload notifications:", err);
+      console.error("Failed to load notifications:", err);
     }
+  }, [mapNotifications, navigate]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  useEffect(() => {
+
+  if (!user?.user_id) return;
+
+  const socket = initSocket(user.user_id);
+  if (!socket) return;
+
+  const scheduleNotificationReload = () => {
+    if (notificationReloadTimerRef.current) {
+      clearTimeout(notificationReloadTimerRef.current);
+    }
+    notificationReloadTimerRef.current = setTimeout(() => {
+      loadNotifications(true);
+    }, 250);
   };
 
   const handleConnect = () => {
     socket.emit("join_user", user.user_id);
   };
 
+  if (socket.connected) {
+    handleConnect();
+  }
+
   socket.on("connect", handleConnect);
-  socket.on("new_notification", handleNewNotification);
+  socket.on("new_notification", scheduleNotificationReload);
 
   return () => {
-    socket.off("new_notification", handleNewNotification);
+    socket.off("new_notification", scheduleNotificationReload);
     socket.off("connect", handleConnect);
+    if (notificationReloadTimerRef.current) clearTimeout(notificationReloadTimerRef.current);
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
   };
 
-}, [user?.user_id]);
+}, [user?.user_id, loadNotifications]);
 
   useEffect(() => {
     const interval = setInterval(() => {

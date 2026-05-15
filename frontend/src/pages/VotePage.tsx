@@ -1,5 +1,5 @@
 // src/pages/VotePage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Loader2, AlertCircle, Copy, Trash2 } from "lucide-react";
 
@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { tripAPI, voteAPI } from '../services/tripService';
 import type { TripDetail, LocationVote, LocationVoteResult, DateMatchingResponse, BudgetVotingResponse } from '../types';
 import { getSocket } from "../socket";
+import { validateInviteCode } from "../utils";
 type MatchingData = Pick<DateMatchingResponse, 'availability' | 'recommendation' | 'summary'>;
 type BudgetInfo = Pick<BudgetVotingResponse, 'rows' | 'stats' | 'budgetTotal' | 'minTotal' | 'maxTotal' | 'filledMembers' | 'totalMembers'>;
 
@@ -58,7 +59,8 @@ const VotePage: React.FC = () => {
 
   const [panelTab, setPanelTab] = useState<'pending' | 'members'>('pending');
   const [members, setMembers] = useState<{user_id: string, member_id: string, full_name?: string, name?: string, email?: string}[]>([]);
-
+  const tripIdRef = React.useRef<string | null>(null);
+  
   useEffect(() => {
     return () => {
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -108,6 +110,7 @@ const VotePage: React.FC = () => {
 
         setInviteCode(tripData.invitecode);
         setTrip(tripData);
+        tripIdRef.current = tripData.tripid;
 
         if (tripData.ownerid === user?.user_id) {
           try {
@@ -187,17 +190,15 @@ const VotePage: React.FC = () => {
           return;
         }
         if (status === 403) {
-          try {
-            const joinRes = await tripAPI.joinTrip(tripCode);
-            if (joinRes.success) {
-              await loadTripData();
-              return;
-            }
-          } catch (e) {
-            console.error("Join failed → fallback redirect");
+          if (validateInviteCode(tripCode || "")) {
             navigate(`/join/${tripCode}`);
-            return;
+          } else {
+            navigate("/homepage", {
+              state: { joinError: "คุณยังไม่มีสิทธิ์เข้าทริปนี้ กรุณาขอเข้าร่วมด้วยรหัสห้อง" },
+              replace: true
+            });
           }
+          return;
         }
       }
     };
@@ -205,158 +206,162 @@ const VotePage: React.FC = () => {
     loadTripData();
   }, [tripCode, navigate]);
 
-useEffect(() => {
+  const reloadTripData = useCallback(async (tripId?: string) => {
+    const id = tripId || tripIdRef.current || trip?.tripid;
+    
+    if (!id) return;
 
-  if (!trip?.tripid) return;
+    try {
+      const tripRes = await tripAPI.getTripDetail(id);
 
-  const socket = getSocket();
-  if (!socket) return;
+      if (!tripRes?.data) return;
 
-  socket.emit("join_trip", trip.tripid);
+      const freshTrip = tripRes.data;
+      setTrip(freshTrip);
 
-    let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+      const isOwner = freshTrip.ownerid === user?.user_id;
 
-  const handleVoteUpdate = (data: any) => {
+      const promises: Promise<any>[] = [
+        voteAPI.getDateMatchingResult(id),
+        voteAPI.getBudgetVoting(id),
+        voteAPI.getLocationVote(id)
+      ];
 
-    if (String(data.tripId) !== String(trip.tripid)) return;
+      if (isOwner) {
+        promises.push(tripAPI.getMembers(id));
+        promises.push(tripAPI.getPendingRequests(id));
+      }
 
-    if (reloadTimer) clearTimeout(reloadTimer);
+      const results = await Promise.allSettled(promises);
 
-    reloadTimer = setTimeout(() => {
-      reloadTripData();
-    }, 300);
+      let index = 0;
 
-  };
+      const dateRes = results[index++];
+      if (dateRes.status === "fulfilled" && dateRes.value?.data) {
+        const data = dateRes.value.data;
 
-  const handleMemberUpdate = async (data: any) => {
+        setMatchingData({
+          availability: data.availability || [],
+          recommendation: data.recommendation || null,
+          summary: {
+            ...data.summary,
+            actualVote:
+              data.summary?.actualVote ??
+              data.rowlog?.length ??
+              0
+          }
+        });
+      }
 
-    if (String(data.tripId) !== String(trip.tripid)) return;
+      const budgetRes = results[index++];
+      if (budgetRes.status === "fulfilled" && budgetRes.value?.data) {
+        const data = budgetRes.value.data;
+        setBudgetInfo(data);
+        if (data.stats) setBudgetAnalysis(data.stats);
+      }
 
-    await reloadTripData();
+      const locRes = results[index++];
+      if (locRes.status === "fulfilled" && locRes.value?.data) {
+        const data = locRes.value.data;
 
-  };
-  const handleRemoved = (data: any) => {
+        setLocationResults(Array.isArray(data.locationVotesTotal) ? data.locationVotesTotal : []);
+        if (data.analysis) setLocationAnalysis(data.analysis);
+        if (data.actualVote !== undefined) setLocationVotedCount(data.actualVote);
+        if (data.totalMembers !== undefined) setLocationTotalMembers(data.totalMembers);
 
-  setDialogMessage("คุณถูกนำออกจากทริป");
+        if (data?.rowlog && user?.user_id) {
+          const myVotes = data.rowlog
+            .filter((log: any) => log.proposed_by === user.user_id)
+            .map((log: any) => ({
+              place: log.province_name,
+              score: log.score
+            }));
 
-  };
-
-  const handleReload = () => {
-    reloadTripData(trip.tripid);
-  };
-
-  socket.on("you_were_removed", handleRemoved);
-  socket.on("vote_updated", handleVoteUpdate);
-  socket.on("member_updated", handleMemberUpdate);
-  socket.on("add_Info", handleReload);
-  
-
-  return () => {
-    socket.off("you_were_removed", handleRemoved);
-    socket.off("vote_updated", handleVoteUpdate);
-    socket.off("member_updated", handleMemberUpdate);
-    socket.off("add_Info",handleReload)
-    if (reloadTimer) clearTimeout(reloadTimer);
-  };
-
-}, [trip?.tripid]);
-
-const reloadTripData = async (tripId?: string) => {
-  const id = tripId || trip?.tripid;
-  if (!id) return;
-
-  try {
-    const tripRes = await tripAPI.getTripDetail(id);
-
-    if (!tripRes?.data) return;
-
-    const freshTrip = tripRes.data;
-    setTrip(freshTrip);
-
-    const isOwner = freshTrip.ownerid === user?.user_id;
-
-    const promises: Promise<any>[] = [
-      voteAPI.getDateMatchingResult(id),
-      voteAPI.getBudgetVoting(id),
-      voteAPI.getLocationVote(id)
-    ];
-
-    if (isOwner) {
-      promises.push(tripAPI.getMembers(id));
-      promises.push(tripAPI.getPendingRequests(id));
-    }
-
-    const results = await Promise.allSettled(promises);
-
-    let index = 0;
-
-    const dateRes = results[index++];
-    if (dateRes.status === "fulfilled" && dateRes.value?.data) {
-      const data = dateRes.value.data;
-
-      setMatchingData({
-        availability: data.availability || [],
-        recommendation: data.recommendation || null,
-        summary: {
-          ...data.summary,
-          actualVote:
-            data.summary?.actualVote ??
-            data.rowlog?.length ??
-            0
+          setUserLocations(myVotes);
         }
-      });
-    }
-
-    const budgetRes = results[index++];
-    if (budgetRes.status === "fulfilled" && budgetRes.value?.data) {
-      const data = budgetRes.value.data;
-      setBudgetInfo(data);
-      if (data.stats) setBudgetAnalysis(data.stats);
-    }
-
-    const locRes = results[index++];
-    if (locRes.status === "fulfilled" && locRes.value?.data) {
-      const data = locRes.value.data;
-
-      setLocationResults(Array.isArray(data.locationVotesTotal) ? data.locationVotesTotal : []);
-      if (data.analysis) setLocationAnalysis(data.analysis);
-      if (data.actualVote !== undefined) setLocationVotedCount(data.actualVote);
-      if (data.totalMembers !== undefined) setLocationTotalMembers(data.totalMembers);
-
-      if (data?.rowlog && user?.user_id) {
-        const myVotes = data.rowlog
-          .filter((log: any) => log.proposed_by === user.user_id)
-          .map((log: any) => ({
-            place: log.province_name,
-            score: log.score
-          }));
-
-        setUserLocations(myVotes);
-      }
-    }
-
-    if (isOwner) {
-      const membersRes = results[index++];
-      if (membersRes?.status === "fulfilled") {
-        setMembers(Array.isArray(membersRes.value?.data) ? membersRes.value.data : []);
       }
 
-      const pendingRes = results[index++];
-      if (pendingRes?.status === "fulfilled") {
-        const list =
-          pendingRes.value?.data?.data?.data ??
-          pendingRes.value?.data?.data ??
-          pendingRes.value?.data ??
-          [];
+      if (isOwner) {
+        const membersRes = results[index++];
+        if (membersRes?.status === "fulfilled") {
+          setMembers(Array.isArray(membersRes.value?.data) ? membersRes.value.data : []);
+        }
 
-        setPendingRequests(Array.isArray(list) ? list : []);
+        const pendingRes = results[index++];
+        if (pendingRes?.status === "fulfilled") {
+          const list =
+            pendingRes.value?.data?.data?.data ??
+            pendingRes.value?.data?.data ??
+            pendingRes.value?.data ??
+            [];
+
+          setPendingRequests(Array.isArray(list) ? list : []);
+        }
       }
-    }
 
-  } catch (err) {
-    console.error("reloadTripData error:", err);
-  }
-};
+    } catch (err) {
+      console.error("reloadTripData error:", err);
+    }
+  }, [trip?.tripid, user?.user_id]);
+
+  useEffect(() => {
+
+    if (!trip?.tripid) return;
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    socket.emit("join_trip", trip.tripid);
+
+      let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleVoteUpdate = (data: any) => {
+
+      if (String(data.tripId) !== String(trip.tripid)) return;
+
+      if (reloadTimer) clearTimeout(reloadTimer);
+
+      reloadTimer = setTimeout(() => {
+        reloadTripData();
+      }, 300);
+
+    };
+
+    const handleMemberUpdate = async (data: any) => {
+
+      const currentTripId = tripIdRef.current || trip?.tripid;
+
+      if (!currentTripId || String(data.tripId) !== String(currentTripId)) return;
+
+      await reloadTripData(currentTripId);
+    };
+    const handleRemoved = (data: any) => {
+
+    setDialogMessage("คุณถูกนำออกจากทริป");
+
+    };
+
+    const handleReload = () => {
+      reloadTripData(trip.tripid);
+    };
+
+    socket.on("you_were_removed", handleRemoved);
+    socket.on("vote_updated", handleVoteUpdate);
+    socket.on("member_updated", handleMemberUpdate);
+    socket.on("new_join_request", handleReload);
+    socket.on("add_Info", handleReload);
+    
+
+    return () => {
+      socket.off("you_were_removed", handleRemoved);
+      socket.off("vote_updated", handleVoteUpdate);
+      socket.off("member_updated", handleMemberUpdate);
+      socket.off("new_join_request", handleReload);
+      socket.off("add_Info", handleReload);
+      if (reloadTimer) clearTimeout(reloadTimer);
+    };
+
+  }, [trip?.tripid, reloadTripData]);
 
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
@@ -897,7 +902,7 @@ const reloadTripData = async (tripId?: string) => {
                   <div key={req.user_id} className="flex items-center justify-between px-4 py-3 border-b hover:bg-gray-50 transition">
                     <div className="flex-1 min-w-0 mr-2">
                       <p className="text-sm font-semibold text-gray-800 truncate">{req.full_name || req.name || 'ไม่ระบุชื่อ'}</p>
-                      <p className="text-xs text-gray-500 truncate">{req.email || req.user_id}</p>
+                      <p className="text-xs text-gray-500 truncate">{req.email || 'ไม่ระบุอีเมล'}</p>
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0">
                       <button onClick={() => handleApprove(req.user_id)} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition">✓ รับ</button>

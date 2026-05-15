@@ -156,7 +156,7 @@ const Dashboard: React.FC = () => {
     
     try {
       setJoiningTrip(true);
-      const response = await tripAPI.joinTrip(cleanCode);
+      const response = await tripAPI.requestToJoin(cleanCode);
       
       if (response.success) {
         showToast("ส่งคำขอเข้าร่วมสำเร็จ! รอ Owner อนุมัติ", "success");

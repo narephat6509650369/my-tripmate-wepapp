@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { Plus, Check, User, Trash2 } from "lucide-react";
 import { useAuth } from '../contexts/AuthContext';
-import { tripAPI, notiApi } from '../services/tripService';
+import { tripAPI } from '../services/tripService';
 import { formatInviteCode, validateInviteCode, validateTripName, validateDays } from '../utils';
 import type { TripSummary } from '../types';
 import { initSocket, getSocket } from "../socket";
@@ -44,6 +44,40 @@ const HomePage: React.FC = () => {
       loadTrips();
     }, 300);
   };
+
+  const getJoinMessage = (response: any) => {
+    const message = response?.message || '';
+    const normalized = message.toLowerCase();
+
+    if (
+      normalized.includes('pending') ||
+      normalized.includes('already requested') ||
+      message.includes('ส่งคำขอ') ||
+      message.includes('รอเจ้าของ') ||
+      message.includes('รอ Owner')
+    ) {
+      return 'ส่งคำขอเข้าร่วมไว้แล้ว รอเจ้าของทริปอนุมัติ';
+    }
+
+    if (
+      normalized.includes('already') ||
+      normalized.includes('active') ||
+      message.includes('สมาชิกอยู่แล้ว') ||
+      message.includes('เป็นสมาชิก')
+    ) {
+      return 'คุณเป็นสมาชิกทริปนี้อยู่แล้ว เปิดทริปได้จากรายการของคุณ';
+    }
+
+    if (
+      normalized.includes('invalid invite') ||
+      normalized.includes('not found') ||
+      message.includes('Invalid invite code')
+    ) {
+      return 'ไม่พบรหัสห้องนี้ กรุณาตรวจสอบรหัสอีกครั้ง';
+    }
+
+    return message || 'ไม่สามารถส่งคำขอเข้าร่วมได้';
+  };
   
   const formatTripSummary = (trip: TripSummary): TripCard => {
     const isCompleted = trip.status === 'completed' || trip.status === 'archived'|| trip.status === 'confirmed';
@@ -68,19 +102,9 @@ const HomePage: React.FC = () => {
 
   const socket = initSocket(user.user_id);
 
-  const handleNewNotification = async () => {
-
-  try {
-
-    await notiApi.getNoti();
-  
+  const handleNewNotification = () => {
     scheduleLoadTrips();
-
-  } catch (err) {
-    console.error("load notification failed", err);
-  }
-
-};
+  };
 
   const handleRemoved = (data: any) => {
     setDialogMessage("คุณถูกนำออกจากทริป");
@@ -109,7 +133,7 @@ const HomePage: React.FC = () => {
   if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
 };
 
-}, [user]);
+}, [user?.user_id]);
 
   useEffect(() => {
   const state = location.state as any;
@@ -192,7 +216,8 @@ const HomePage: React.FC = () => {
         setDialogMessage("ส่งคำขอเข้าร่วมแล้ว รอเจ้าของทริปอนุมัติ ⏳");
         loadTrips();
       } else {
-        setDialogMessage(response.message || 'ไม่สามารถส่งคำขอได้');
+        setDialogMessage(getJoinMessage(response));
+        loadTrips();
       }
     } catch (error) {
       setDialogMessage('เกิดข้อผิดพลาด กรุณาลองใหม่');
@@ -293,7 +318,7 @@ const HomePage: React.FC = () => {
               className="flex items-center justify-center gap-2 bg-blue-200 hover:bg-blue-300 text-blue-800 font-medium px-4 py-2 rounded-lg transition"
             >
               <Check className="w-5 h-5" />
-              เข้าร่วม
+              {joiningTrip ? 'กำลังส่ง...' : 'เข้าร่วม'}
             </button>
           </div>
         </div>

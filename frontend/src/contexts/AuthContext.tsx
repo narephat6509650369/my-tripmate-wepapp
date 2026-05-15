@@ -64,7 +64,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isLoading: false
         }); 
         
-        console.log('✅ Mock auth initialized');
 
         /* 
         // โค้ดเดิม - comment ไว้ก่อน
@@ -119,7 +118,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
   if (!authState.user?.user_id) return;
 
-  console.log("🔌 Init socket for user:", authState.user.user_id);
 
   initSocket(authState.user.user_id);
 
@@ -158,7 +156,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading: false
   });
 
-  console.log("✅ Login successful:", result.data.user.email);
 
   navigate(redirectPath || "/homepage");
   };
